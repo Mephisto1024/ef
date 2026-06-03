@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>p5.js Formula Animation</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.08), transparent 34rem),
+          #060606;
+        color: #f8f8f8;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+      }
+
+      .stage {
+        display: grid;
+        width: 100vw;
+        height: 100vh;
+        place-items: center;
+      }
+
+      .sketch {
+        width: min(92vmin, 640px);
+        height: min(92vmin, 640px);
+        image-rendering: auto;
+      }
+
+      .caption {
+        position: fixed;
+        right: 18px;
+        bottom: 16px;
+        max-width: calc(100vw - 36px);
+        color: rgba(255, 255, 255, 0.52);
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: right;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="stage" aria-label="生成艺术动画"></main>
+    <div class="caption">#つぶやきProcessing</div>
+
+    <script>
+      const PI = Math.PI;
+      const sin = Math.sin;
+      const cos = Math.cos;
+      const mag = Math.hypot;
+
+      let canvas;
+      let ctx;
+      let dpr = 1;
+      let currentStroke = "rgba(255,255,255,0.38)";
+      let w;
+      let t = 0;
+      let i;
+      let k;
+      let e;
+      let q;
+      let c;
+
+      const api = {
+        stroke
+      };
+
+      function clampChannel(value) {
+        return Math.max(0, Math.min(255, value));
+      }
+
+      function createCanvas(width, height) {
+        canvas = document.createElement("canvas");
+        canvas.className = "sketch";
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.aspectRatio = `${width} / ${height}`;
+        document.querySelector(".stage").append(canvas);
+        ctx = canvas.getContext("2d", { alpha: false });
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return api;
+      }
+
+      function background(value) {
+        const channel = clampChannel(value);
+        ctx.fillStyle = `rgb(${channel}, ${channel}, ${channel})`;
+        ctx.fillRect(0, 0, w, w);
+        return api;
+      }
+
+      function stroke(value, alpha = 255) {
+        const channel = clampChannel(value);
+        currentStroke = `rgba(${channel}, ${channel}, ${channel}, ${alpha / 255})`;
+        ctx.fillStyle = currentStroke;
+        return api;
+      }
+
+      function point(x, y) {
+        ctx.fillStyle = currentStroke;
+        ctx.fillRect(x, y, 1, 1);
+        return api;
+      }
+
+      function resetPixelRatio() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        if (!canvas) return;
+
+        canvas.width = w * dpr;
+        canvas.height = w * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      resetPixelRatio();
+      window.addEventListener("resize", resetPixelRatio);
+
+      let a = (y, o = mag(k = cos(y * 5) * (y < 11 ? 21 : 11), e = y / 8 - 13) / 6) =>
+        point(
+          (q = k * 2 + 49 + cos(y) / k + k * cos(y / 2) * (1 + sin(o * 4 - e / 2 - t))) *
+            sin(c = o / 1.5 - e / 5 - t / 8 + i % 3 * 8) +
+            200,
+          230 + q * cos(c) - 79 * sin(c / 2)
+        );
+
+      let draw = $ => {
+        t || createCanvas(w = 400, w);
+        background(6).stroke(w, 96);
+        for (t += PI / 90/4, i = 2e4; i--;) a(i / 500);
+      };
+
+      function loop() {
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
