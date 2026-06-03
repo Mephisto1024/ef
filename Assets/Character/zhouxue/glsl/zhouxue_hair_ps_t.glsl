@@ -437,7 +437,7 @@ void main()
     float lightOcclusionMask = controlMask.z;
     float materialAlpha = baseSample.w * _46._m20.w;
     vec3 tintedBaseColor = baseColor * _46._m18;
-    vec3 readableBaseColor = mix(vec3(dot(tintedBaseColor, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), tintedBaseColor, vec3(_46._m19));
+    vec3 readableBaseColor = mix(vec3(dot(tintedBaseColor, vec3(0.21, 0.71, 0.07))), tintedBaseColor, vec3(_46._m19));
     // dualNormalTex 把两张切线空间法线塞进 RGBA：RG 用作光照法线，BA 用作发丝方向/高光法线。
     vec4 dualNormalSample = texture(sampler2D(dualNormalTex, samplerDualNormal), uv, _15._m38);
     vec2 normalPackedA = (dualNormalSample.xy * 2.0) - vec2(1.0);

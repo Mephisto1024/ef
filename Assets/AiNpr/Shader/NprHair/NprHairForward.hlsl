@@ -248,9 +248,22 @@ void Frag(PackedVaryingsToPS packedInput
             float primarySpecMask = controlMask.y;
             float lightOcclusionMask = controlMask.z;
 
-            float3 tintedBaseColor = baseColor * _46._m18;
-            float3 readableBaseColor = lerp(vec3(dot(tintedBaseColor, vec3(0.21, 0.71, 0.07))), tintedBaseColor, vec3(_46._m19));
-            outColor = float4(baseColor,1);
+            float3 tintedBaseColor = baseColor * 1;
+            float3 readableBaseColor = lerp(dot(tintedBaseColor, float3(0.21, 0.71, 0.07)), tintedBaseColor, float3(1, 1, 1));
+            
+            // RG is used as lighting normal, BA is reserved for hair direction/specular normal.
+            float4 dualNormalSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_BaseColorMap, layerTexCoord.base).rgba;
+            float2 normalPackedA = (dualNormalSample.xy * 2.0) - (1.0);
+            float3 normalTSA = float3(normalPackedA.x, normalPackedA.y, 1);
+            float2 normalXYA = normalPackedA.xy;
+            normalTSA.z = max(1e-16, sqrt(1.0 - clamp(dot(normalXYA, normalXYA), 0.0, 1.0)));
+            float2 normalXYAScaled = normalTSA.xy * _NormalScale;
+
+            UVMapping hairStrandMapping = layerTexCoord.base;
+            hairStrandMapping.uv = hairStrandMapping.uv * _HairStrandMap_ST.xy + _HairStrandMap_ST.zw;
+            float4 strandMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_HairStrandMap, sampler_HairStrandMap, hairStrandMapping);
+        
+            outColor = float4(strandMaskSample.xxx,1);
                 
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);

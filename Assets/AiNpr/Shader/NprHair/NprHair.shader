@@ -1,10 +1,13 @@
-Shader "Ef/EfHairForwardOnly"
+Shader "AiNpr/NprHair"
 {
     Properties
     {
         // Following set of parameters represent the parameters node inside the MaterialGraph.
         // They are use to fill a SurfaceData. With a MaterialGraph this should not exist.
 
+        // Hair
+        _HairStrandMap("HairStrandMap", 2D) = "black" {}
+        
         // Reminder. Color here are in linear but the UI (color picker) do the conversion sRGB to linear
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
         [MainTexture] _BaseColorMap("BaseColorMap", 2D) = "white" {}
@@ -333,7 +336,7 @@ Shader "Ef/EfHairForwardOnly"
     //-------------------------------------------------------------------------------------
 
     // #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/Lit.cs.hlsl"
-    #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/LitProperties.hlsl"
+    #include "Assets/AiNpr/Shader/NprHair/NprHairProperties.hlsl"
 
     // TODO:
     // Currently, Lit.hlsl and LitData.hlsl are included for every pass. Split Lit.hlsl in two:
@@ -433,7 +436,7 @@ Shader "Ef/EfHairForwardOnly"
         Pass
         {
             Name "GBufferDisabled"
-            Tags { "LightMode" = "GBufferDisabled" }
+            Tags { "LightMode" = "GBufferDisabled" } // This will be only for opaque object based on the RenderQueue index
 
             Cull [_CullMode]
             ZTest [_ZTestGBuffer]
@@ -880,7 +883,7 @@ Shader "Ef/EfHairForwardOnly"
         Pass
         {
             Name "ForwardOnly"
-            Tags { "LightMode" = "ForwardOnly" }
+            Tags { "LightMode" = "ForwardOnly" } // This will be only for transparent object based on the RenderQueue index
 
             Stencil
             {
@@ -1007,7 +1010,7 @@ Shader "Ef/EfHairForwardOnly"
 
             #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/ShaderPass/LitSharePass.hlsl"
             #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/LitData.hlsl"
-            #include "Assets/Shader/EfHair/Hair/EfHairForward.hlsl"
+            #include "Assets/AiNpr/Shader/NprHair/NprHairForward.hlsl"
 
             #pragma vertex Vert
             #pragma fragment Frag
@@ -1089,5 +1092,5 @@ Shader "Ef/EfHairForwardOnly"
     
     
     FallBack "Hidden/HDRP/FallbackError"
-    //CustomEditor "Rendering.HighDefinition.LitGUI"
+    CustomEditor "Rendering.HighDefinition.NprHairGUI"
 }
