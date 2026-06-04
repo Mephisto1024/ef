@@ -243,7 +243,7 @@ void Frag(PackedVaryingsToPS packedInput
         
             float4 baseSample = SAMPLE_UVMAPPING_TEXTURE2D(_BaseColorMap, sampler_BaseColorMap, layerTexCoord.base).rgba * _BaseColor.rgba;
             float3 baseColor = baseSample.xyz;
-            float4 controlMask = SAMPLE_UVMAPPING_TEXTURE2D(_MaskMap, sampler_BaseColorMap, layerTexCoord.base).rgba;
+            float4 controlMask = SAMPLE_UVMAPPING_TEXTURE2D(_MaskMap, sampler_MaskMap, layerTexCoord.base).rgba;
             float flowBlendMask = controlMask.x;
             float primarySpecMask = controlMask.y;
             float lightOcclusionMask = controlMask.z;
@@ -252,18 +252,40 @@ void Frag(PackedVaryingsToPS packedInput
             float3 readableBaseColor = lerp(dot(tintedBaseColor, float3(0.21, 0.71, 0.07)), tintedBaseColor, float3(1, 1, 1));
             
             // RG is used as lighting normal, BA is reserved for hair direction/specular normal.
-            float4 dualNormalSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_BaseColorMap, layerTexCoord.base).rgba;
+            float4 dualNormalSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_NormalMap, layerTexCoord.base).rgba;
             float2 normalPackedA = (dualNormalSample.xy * 2.0) - (1.0);
             float3 normalTSA = float3(normalPackedA.x, normalPackedA.y, 1);
             float2 normalXYA = normalPackedA.xy;
             normalTSA.z = max(1e-16, sqrt(1.0 - clamp(dot(normalXYA, normalXYA), 0.0, 1.0)));
-            float2 normalXYAScaled = normalTSA.xy * _NormalScale;
+            float2 normalXYAScaled = normalTSA.xy * _NormalScale;   //光照、漫反射、Ramp、边缘光法线
 
             UVMapping hairStrandMapping = layerTexCoord.base;
             hairStrandMapping.uv = hairStrandMapping.uv * _HairStrandMap_ST.xy + _HairStrandMap_ST.zw;
             float4 strandMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_HairStrandMap, sampler_HairStrandMap, hairStrandMapping);
         
-            outColor = float4(strandMaskSample.xxx,1);
+            // 3. 由 TBN、实例基矩阵和控制 mask 生成世界空间法线与各向异性发丝切线。
+            float3 rootToPixelVector = posInput.positionWS - TransformObjectToWorld(0);
+            rootToPixelVector.y = 1e-16;
+            float3 rootToPixelDir = normalize(rootToPixelVector);
+            float3x3 tbnMatrix = input.tangentToWorld;
+            float3 normalWSRaw = mul(float3(normalXYAScaled.x, normalXYAScaled.y, normalTSA.z), tbnMatrix);
+            float frontFaceSign = input.isFrontFace? 1.0 : GetDoubleSidedConstants().z;
+            float3 normalWS = SafeNormalize(normalWSRaw) * frontFaceSign;
+            float3 geometricNormalWS = normalize(surfaceData.geomNormalWS) * frontFaceSign;
+            float2 normalPackedB = (dualNormalSample.zw * 2.0) - 1.0;
+            float3 normalTSB = float3(normalPackedB.x, normalPackedB.y, 1);
+            float2 normalXYB = normalPackedB.xy;
+            normalTSB.z = max(1e-16,sqrt(1.0 - saturate(dot(normalXYB, normalXYB))));
+            float2 normalXYBScaled = normalTSB.xy * 1;  //头发方向、各向异性高光法线
+            float3 secondaryNormalWS = normalize(TransformTangentToWorldDir(float3(normalXYBScaled.x, normalXYBScaled.y, normalTSB.z),tbnMatrix));
+            float3x3 objectToWorld3x3 = GetObjectToWorldMatrix();
+            //float3 hairFlowSeedWS = float3(_46._m35, 1.0, 0.0) * objectToWorld3x3;
+            //float3 hairTangentWS = cross(secondaryNormalWS, mix(cross(secondaryNormalWS, (hairFlowSeedWS * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(hairFlowSeedWS, hairFlowSeedWS)))).xyz), tangentWSAndSign.xyz, vec3(flowBlendMask)).xyz) * mix(1.0, tangentWSAndSign.w, flowBlendMask);
+            //float3 viewDirObjectBasis = objectToWorld3x3 * viewDirWS;
+            //float anisoViewFactor = pow(clamp(dot(normalize((objectToWorld3x3 * secondaryNormalWS).xz), normalize(viewDirObjectBasis.xz)), 0.0, 1.0), _46._m33);
+        
+        
+            outColor = float4(secondaryNormalWS.xyz,1);
                 
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
