@@ -21,7 +21,6 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
             AddProperty(affectSmoothnessText, () => decalData.affectsSmoothness, (newValue) => decalData.affectsSmoothness = newValue);
             AddProperty(affectEmissionText, () => decalData.affectsEmission, (newValue) => decalData.affectsEmission = newValue);
             AddProperty(supportLodCrossFadeText, () => decalData.supportLodCrossFade, (newValue) => decalData.supportLodCrossFade = newValue);
-            AddProperty(transparentDynamicUpdateText, () => decalData.transparentDynamicUpdate, (newValue) => decalData.transparentDynamicUpdate = newValue);
         }
     }
 }

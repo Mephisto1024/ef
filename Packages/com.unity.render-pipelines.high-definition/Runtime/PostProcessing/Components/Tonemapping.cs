@@ -135,9 +135,8 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds settings for the Tonemapping effect.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Post-processing/Tonemapping")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Post-Processing-Tonemapping")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Post-processing/Tonemapping", typeof(HDRenderPipeline))]
+    [HDRPHelpURLAttribute("Post-Processing-Tonemapping")]
     public sealed class Tonemapping : VolumeComponent, IPostProcessComponent
     {
         /// <summary>

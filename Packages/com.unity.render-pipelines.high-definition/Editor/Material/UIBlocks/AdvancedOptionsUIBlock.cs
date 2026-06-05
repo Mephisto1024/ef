@@ -123,8 +123,8 @@ namespace UnityEditor.Rendering.HighDefinition
             bool mixedPrecomputedVelocity = materials.Length > 1 && materials.Any(m => m.GetAddPrecomputedVelocity() != addPrecomputedVelocity);
 
             using (new EditorGUI.DisabledScope(addPrecomputedVelocity || mixedPrecomputedVelocity))
-            using (new EditorGUI.MixedValueScope(mixedValue))
             {
+                EditorGUI.showMixedValue = mixedValue;
                 EditorGUI.BeginChangeCheck();
                 enabled = EditorGUILayout.Toggle(Styles.motionVectorForVertexAnimationText, enabled);
                 if (EditorGUI.EndChangeCheck())
@@ -134,7 +134,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 }
             }
 
-            // Check for SpeedTree materials and disable custom velocity per-obj motion vector pass
+			// Check for SpeedTree materials and disable custom velocity per-obj motion vector pass
             // if the tree has no vertex shader based wind animation.
             foreach(Material mat in materials)
             {

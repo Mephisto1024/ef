@@ -66,6 +66,9 @@ namespace UnityEngine.Rendering.HighDefinition
         public Vector3 positionRWS;
         public uint lightLayers;
 
+        public float lightDimmer;
+        public float volumetricLightDimmer;   // Replaces 'lightDimer'
+
         public Vector3 forward;
         public CookieMode cookieMode;
 
@@ -95,47 +98,23 @@ namespace UnityEngine.Rendering.HighDefinition
         public float diffuseDimmer;
         public float specularDimmer;
 
-        public float lightDimmer;
-        public float volumetricLightDimmer;   // Replaces 'lightDimer'
-
         public float penumbraTint;
         public float isRayTracedContactShadow;
 
-        public float angularDiameter;         // Units: radians
         public float distanceFromCamera;      // -1 -> no sky interaction
-    };
+        public float angularDiameter;         // Units: radians
 
-    // These structures share between C# and hlsl need to be align on float4, so we pad them.
-    [GenerateHLSL(PackingRules.Exact, false)]
-    struct CelestialBodyData
-    {
-        public Vector3 color;
-        public float radius;
-
-        public Vector3 forward;
-        public float distanceFromCamera;
-        public Vector3 right;
-        public float angularRadius;       // Units: radians
-        public Vector3 up;
-        public int type;                  // 0: star, 1: moon
-
-        public Vector3 surfaceColor;
-        public float earthshine;
-
-        public Vector4 surfaceTextureScaleOffset; // -1 if unused (TODO: 16 bit)
-
-        public Vector3 sunDirection;
-        public float flareCosInner;
-
-        public Vector2 phaseAngleSinCos;
-        public float flareCosOuter;
-        public float flareSize;           // Units: radians
-
-        public Vector3 flareColor;
         public float flareFalloff;
+        public float flareCosInner;
+        public float flareCosOuter;
+        public float __unused__;
 
-        public Vector3 padding;
-        public int shadowIndex;
+        public Vector3 flareTint;
+        public float flareSize;               // Units: radians
+
+        public Vector3 surfaceTint;
+
+        public Vector4 surfaceTextureScaleOffset;     // -1 if unused (TODO: 16 bit)
     };
 
     [GenerateHLSL(PackingRules.Exact, false)]
@@ -293,18 +272,18 @@ namespace UnityEngine.Rendering.HighDefinition
         public fixed float _CubeScaleOffset[s_MaxCubeReflections * 4];
     };
 
-    [GenerateHLSL(needAccessors = false, generateCBuffer = true, constantRegister = (int)ConstantRegister.WorldEnvLightReflectionData)]
-    unsafe struct WorldEnvLightReflectionData
+    [GenerateHLSL(needAccessors = false, generateCBuffer = true)]
+    unsafe struct EnvLightReflectionDataRT
     {
         public const int s_MaxPlanarReflections = HDRenderPipeline.k_MaxPlanarReflectionsOnScreen;
         public const int s_MaxCubeReflections = HDRenderPipeline.k_MaxCubeReflectionsOnScreen;
 
-		[HLSLArray(s_MaxPlanarReflections, typeof(Matrix4x4))]
-        public fixed float _PlanarCaptureVPWL[s_MaxPlanarReflections * 4 * 4];
+        [HLSLArray(s_MaxPlanarReflections, typeof(Matrix4x4))]
+        public fixed float _PlanarCaptureVPRT[s_MaxPlanarReflections * 4 * 4];
         [HLSLArray(s_MaxPlanarReflections, typeof(Vector4))]
-        public fixed float _PlanarScaleOffsetWL[s_MaxPlanarReflections * 4];
-		[HLSLArray(s_MaxCubeReflections, typeof(Vector4))]
-        public fixed float _CubeScaleOffsetWL[s_MaxCubeReflections * 4];
+        public fixed float _PlanarScaleOffsetRT[s_MaxPlanarReflections * 4];
+        [HLSLArray(s_MaxCubeReflections, typeof(Vector4))]
+        public fixed float _CubeScaleOffsetRT[s_MaxCubeReflections * 4];
     };
 
     [GenerateHLSL]

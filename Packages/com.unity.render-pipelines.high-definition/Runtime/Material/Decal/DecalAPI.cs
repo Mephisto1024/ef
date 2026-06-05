@@ -61,9 +61,6 @@ namespace UnityEngine.Rendering.HighDefinition
             if (material.FindPass(HDShaderPassNames.s_DecalProjectorForwardEmissiveStr) != -1)
                 material.SetShaderPassEnabled(HDShaderPassNames.s_DecalProjectorForwardEmissiveStr, enableForwardEmissivePass);
 
-            if (material.FindPass(HDShaderPassNames.s_DecalAtlasProjectorStr) != -1)
-                material.SetShaderPassEnabled(HDShaderPassNames.s_DecalAtlasProjectorStr, true);
-
             // Set stencil state
             material.SetInt(kDecalStencilWriteMask, (int)StencilUsage.Decals);
             material.SetInt(kDecalStencilRef, (int)StencilUsage.Decals);

@@ -1,22 +1,16 @@
 {
     "name": "Unity.RenderPipelines.HighDefinition.Editor",
-    "rootNamespace": "",
     "references": [
         "Unity.RenderPipelines.HighDefinition.Runtime",
         "Unity.ShaderGraph.Editor",
         "Unity.RenderPipelines.Core.Runtime",
-        "Unity.RenderPipelines.Core.Runtime.Shared",
         "Unity.RenderPipelines.Core.Editor",
-        "Unity.RenderPipelines.Core.Editor.Shared",
-        "Unity.Mathematics",
         "Unity.ugui",
         "Unity.ugui.Editor",
         "Unity.VisualEffectGraph.Editor",
-        "Unity.VisualEffectGraph.Runtime",
         "Unity.PackageManagerDocTools.Editor",
         "Unity.Rendering.Denoising.Runtime",
-        "Unity.RenderPipelines.HighDefinition.Config.Runtime",
-        "Unity.RenderPipelines.GPUDriven.Runtime"
+        "Unity.RenderPipelines.HighDefinition.Config.Runtime"
     ],
     "includePlatforms": [
         "Editor"
@@ -44,11 +38,6 @@
             "define": "ENABLE_NVIDIA_MODULE"
         },
         {
-            "name": "com.unity.modules.amd",
-            "expression": "1.0.0",
-            "define": "ENABLE_AMD_MODULE"
-        },
-        {
             "name": "com.unity.sensorsdk",
             "expression": "2.0.0",
             "define": "ENABLE_SENSOR_SDK"
@@ -57,12 +46,6 @@
             "name": "com.unity.rendering.denoising",
             "expression": "1.0.0",
             "define": "ENABLE_UNITY_DENOISING_PLUGIN"
-        },
-        {
-            "name": "com.unity.demoteam.hair",
-            "expression": "0.0.0",
-            "define": "HAS_UNITY_HAIR_PACKAGE"
         }
-    ],
-    "noEngineReferences": false
+    ]
 }

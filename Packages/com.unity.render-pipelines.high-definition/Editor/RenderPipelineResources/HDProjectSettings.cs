@@ -13,6 +13,9 @@ namespace UnityEditor.Rendering.HighDefinition
     //copying mechanism here
     sealed class HDProjectSettings : HDProjectSettingsReadOnlyBase, IVersionable<HDProjectSettings.Version>
     {
+        [SerializeField]
+        bool m_WizardPopupAtStart = true;
+
         // Note: this is for the *material version*, which uses MaterialPostProcessor k_Migrations[] as migration
         // functions table. See note on Version enum above.
         [SerializeField]
@@ -65,6 +68,16 @@ namespace UnityEditor.Rendering.HighDefinition
             set
             {
                 instance.m_ProjectSettingFolderPath = value;
+                Save();
+            }
+        }
+
+        public static bool wizardIsStartPopup
+        {
+            get => instance.m_WizardPopupAtStart;
+            set
+            {
+                instance.m_WizardPopupAtStart = value;
                 Save();
             }
         }
@@ -338,6 +351,7 @@ namespace UnityEditor.Rendering.HighDefinition
             {
 #pragma warning disable 618 // Type or member is obsolete
                 HDUserSettings.wizardPopupAlreadyShownOnce = data.m_ObsoleteWizardPopupAlreadyShownOnce;
+                HDUserSettings.wizardActiveTab = data.m_ObsoleteWizardActiveTab;
                 HDUserSettings.wizardNeedRestartAfterChangingToDX12 = data.m_ObsoleteWizardNeedRestartAfterChangingToDX12;
                 HDUserSettings.wizardNeedToRunFixAllAgainAfterDomainReload = data.m_ObsoleteWizardNeedToRunFixAllAgainAfterDomainReload;
 #pragma warning restore 618 // Type or member is obsolete
@@ -345,13 +359,13 @@ namespace UnityEditor.Rendering.HighDefinition
         );
 
 #pragma warning disable 649 // Field never assigned
-        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings. #from(2022.1)"), FormerlySerializedAs("m_WizardPopupAlreadyShownOnce")]
+        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings"), FormerlySerializedAs("m_WizardPopupAlreadyShownOnce")]
         bool m_ObsoleteWizardPopupAlreadyShownOnce;
-        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings. #from(2022.1)"), FormerlySerializedAs("m_WizardActiveTab")]
+        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings"), FormerlySerializedAs("m_WizardActiveTab")]
         int m_ObsoleteWizardActiveTab;
-        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings. #from(2022.1)"), FormerlySerializedAs("m_WizardNeedRestartAfterChangingToDX12")]
+        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings"), FormerlySerializedAs("m_WizardNeedRestartAfterChangingToDX12")]
         bool m_ObsoleteWizardNeedRestartAfterChangingToDX12;
-        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings. #from(2022.1)"), FormerlySerializedAs("m_WizardNeedToRunFixAllAgainAfterDomainReload")]
+        [SerializeField, Obsolete("Moved from HDProjectSettings to HDUserSettings"), FormerlySerializedAs("m_WizardNeedToRunFixAllAgainAfterDomainReload")]
         bool m_ObsoleteWizardNeedToRunFixAllAgainAfterDomainReload;
 #pragma warning restore 649 // Field never assigned
         #endregion

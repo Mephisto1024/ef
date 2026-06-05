@@ -24,7 +24,7 @@ if(_EnableDecalLayers)
 	// Decal layer of the decal
 	DecodeFromDecalPrepass(i.pos.xy, material);
 
-	if ((decalLayerMask & material.renderingLayerMask) == 0)
+	if ((decalLayerMask & material.decalLayerMask) == 0)
 	{
 		clip(-1);
 	}
@@ -142,6 +142,9 @@ if(_EnableDecalLayers)
     #ifdef DECAL_SURFACE_GRADIENT
         float3x3 tangentToWorld = transpose(normalToWorld);
         #if USE_NORMAL_MAP
+        #ifdef VFX_VARYING_NORMALSCALE
+        normalScale = i.VFX_VARYING_NORMALSCALE;
+        #endif
 	    float2 deriv = UnpackDerivativeNormalRGorAG(SampleTexture(VFX_SAMPLER(normalMap),uvData));
         #else // USE_NORMAL_MAP
         float2 deriv = float2(0.0f,0.0f);

@@ -160,6 +160,8 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
 
         int m_RecorderTempRT = Shader.PropertyToID("TempRecorder");
 
+        static private CompositionManager s_CompositorInstance;
+
         // Built-in Color.black has an alpha of 1, so defien here a fully transparent black
         static Color s_TransparentBlack = new Color(0, 0, 0, 0);
 
@@ -249,7 +251,8 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
                 return false;
             }
 
-            if (!m_OutputCamera.TryGetComponent<HDAdditionalCameraData>(out var cameraData))
+            var cameraData = m_OutputCamera.GetComponent<HDAdditionalCameraData>();
+            if (cameraData == null)
             {
                 m_OutputCamera.gameObject.AddComponent(typeof(HDAdditionalCameraData));
                 cameraData = m_OutputCamera.GetComponent<HDAdditionalCameraData>();
@@ -497,7 +500,7 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
             SetupLayerPriorities();
         }
 
-        static HDRenderPipelineAsset m_CurrentAsset;
+        static HDRenderPipelineGlobalSettings m_globalSettings;
 
         // LateUpdate is called once per frame
         void LateUpdate()
@@ -969,8 +972,8 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
             return newCamera;
         }
 
-        private static CompositionManager s_CompositorInstance;
-        public static CompositionManager GetInstance() => s_CompositorInstance ??= FindAnyObjectByType<CompositionManager>(FindObjectsInactive.Include);
+        static public CompositionManager GetInstance() =>
+            s_CompositorInstance ?? (s_CompositorInstance = GameObject.FindObjectOfType<CompositionManager>(true));
 
         static public Vector4 GetAlphaScaleAndBiasForCamera(HDCamera hdCamera)
         {
@@ -1002,7 +1005,10 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
         /// <returns> The color buffer that will be used to draw on top, or null if not a stacked camera </returns>
         static internal Texture GetClearTextureForStackedCamera(HDCamera hdCamera)
         {
-            if (hdCamera.camera.TryGetComponent<AdditionalCompositorData>(out var compositorData))
+            AdditionalCompositorData compositorData = null;
+            hdCamera.camera.TryGetComponent<AdditionalCompositorData>(out compositorData);
+
+            if (compositorData)
             {
                 return compositorData.clearColorTexture;
             }
@@ -1016,7 +1022,10 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
         /// <returns> The depth buffer that will be used to draw on top, or null if not a stacked camera </returns>
         static internal RenderTexture GetClearDepthForStackedCamera(HDCamera hdCamera)
         {
-            if (hdCamera.camera.TryGetComponent<AdditionalCompositorData>(out var compositorData))
+            AdditionalCompositorData compositorData = null;
+            hdCamera.camera.TryGetComponent<AdditionalCompositorData>(out compositorData);
+
+            if (compositorData)
             {
                 return compositorData.clearDepthTexture;
             }
@@ -1024,34 +1033,48 @@ namespace UnityEngine.Rendering.HighDefinition.Compositor
         }
 
         // Register the custom pp passes used by the compositor
-        void RegisterCustomPasses()
+        static internal void RegisterCustomPasses()
         {
-            if (GraphicsSettings.currentRenderPipeline is not HDRenderPipelineAsset hdrpAsset)
+            if (m_globalSettings != HDRenderPipelineGlobalSettings.instance)
             {
                 UnRegisterCustomPasses();
-                m_CurrentAsset = null;
-            }
-            else if (m_CurrentAsset != hdrpAsset)
-            {
-                UnRegisterCustomPasses();
-                m_CurrentAsset = hdrpAsset;
+                m_globalSettings = null;
             }
 
-            if (m_CurrentAsset == null)
+            if (m_globalSettings == null)
+                m_globalSettings = HDRenderPipelineGlobalSettings.instance;
+            if (m_globalSettings == null) // if the global settings are not ready let us early out for this frame
+                return;
+
+            if (m_globalSettings.beforePostProcessCustomPostProcesses == null) // global settings may not be ready yet
                 return;
 
             // If custom post processes are not registered in the HDRP asset, they are never executed so we have to add them manually
-            m_CurrentAsset.compositorCustomVolumeComponentsList.Add<ChromaKeying>();
-            m_CurrentAsset.compositorCustomVolumeComponentsList.Add<AlphaInjection>();
+            if (!m_globalSettings.beforePostProcessCustomPostProcesses.Contains(typeof(ChromaKeying).AssemblyQualifiedName))
+            {
+                m_globalSettings.beforePostProcessCustomPostProcesses.Add(typeof(ChromaKeying).AssemblyQualifiedName);
+            }
+
+            if (!m_globalSettings.beforePostProcessCustomPostProcesses.Contains(typeof(AlphaInjection).AssemblyQualifiedName))
+            {
+                m_globalSettings.beforePostProcessCustomPostProcesses.Add(typeof(AlphaInjection).AssemblyQualifiedName);
+            }
         }
 
         // Unregister the custom pp passes used by the compositor
-        void UnRegisterCustomPasses()
+        static internal void UnRegisterCustomPasses()
         {
-            if (m_CurrentAsset != null)
+            if (m_globalSettings == null || m_globalSettings.beforePostProcessCustomPostProcesses == null) // global settings may not be ready yet
+                return;
+
+            if (m_globalSettings.beforePostProcessCustomPostProcesses.Contains(typeof(ChromaKeying).AssemblyQualifiedName))
             {
-                m_CurrentAsset.compositorCustomVolumeComponentsList.Remove<ChromaKeying>();
-                m_CurrentAsset.compositorCustomVolumeComponentsList.Remove<AlphaInjection>();
+                m_globalSettings.beforePostProcessCustomPostProcesses.Remove(typeof(ChromaKeying).AssemblyQualifiedName);
+            }
+
+            if (m_globalSettings.beforePostProcessCustomPostProcesses.Contains(typeof(AlphaInjection).AssemblyQualifiedName))
+            {
+                m_globalSettings.beforePostProcessCustomPostProcesses.Remove(typeof(AlphaInjection).AssemblyQualifiedName);
             }
         }
     }

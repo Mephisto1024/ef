@@ -7,12 +7,7 @@ void ApplyDecalToSurfaceData(DecalSurfaceData decalSurfaceData, float3 vtxNormal
     // Always test the normal as we can have decompression artifact
     if (decalSurfaceData.normalWS.w < 1.0)
     {
-        // Re-evaluate the surface gradient of the simulation normal
-        float3 normalSG = SurfaceGradientFromPerturbedNormal(vtxNormal, surfaceData.normalWS);
-        // Add the contribution of the decals to the normal
-        normalSG += SurfaceGradientFromVolumeGradient(vtxNormal, decalSurfaceData.normalWS.xyz);
-        // Move back to world space
-        surfaceData.normalWS.xyz = SurfaceGradientResolveNormal(vtxNormal, normalSG);
+        surfaceData.normalWS.xyz = SafeNormalize(surfaceData.normalWS.xyz * decalSurfaceData.normalWS.w + decalSurfaceData.normalWS.xyz);
     }
 
     surfaceData.perceptualSmoothness = surfaceData.perceptualSmoothness * decalSurfaceData.mask.w + decalSurfaceData.mask.z;
@@ -33,7 +28,6 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
 
     $SurfaceDescription.TipThickness:               surfaceData.tipThickness =              surfaceDescription.TipThickness;
     $SurfaceDescription.Caustics:                   surfaceData.caustics =                  surfaceDescription.Caustics;
-    $SurfaceDescription.RefractedPositionWS:        surfaceData.refractedPositionWS =       surfaceDescription.RefractedPositionWS;
 
     bentNormalWS = float3(0, 1, 0);
 
@@ -42,7 +36,7 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
         {
             float alpha = 1.0;
             // Both uses and modifies 'surfaceData.normalWS'.
-            DecalSurfaceData decalSurfaceData = GetDecalSurfaceData(posInput, fragInputs, _WaterRenderingLayer, alpha);
+            DecalSurfaceData decalSurfaceData = GetDecalSurfaceData(posInput, fragInputs, _WaterDecalLayer, alpha);
             ApplyDecalToSurfaceData(decalSurfaceData, fragInputs.tangentToWorld[2], surfaceData);
         }
     #endif

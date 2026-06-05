@@ -32,7 +32,7 @@
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RaytracingIntersection.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RaytracingSampling.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RayTracingCommon.hlsl"
-#include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/Common/RayTracingHelpers.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/Common/RaytracingHelpers.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/ScreenSpaceLighting/ScreenSpaceLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/Common/AtmosphericScatteringRayTracing.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Debug/RayCountManager.cs.hlsl"
@@ -44,7 +44,7 @@
 
 // The target acceleration structure that we will evaluate the reflexion in
 TEXTURE2D_X(_DepthTexture);
-TYPED_TEXTURE2D_X(uint2, _StencilTexture);
+TEXTURE2D_X_UINT2(_StencilTexture);
 
 // Output structure of the reflection raytrace shader
 RW_TEXTURE2D_X(float4, _IndirectDiffuseTextureRW);
@@ -64,19 +64,12 @@ void MissShaderIndirectDiffuse(inout RayIntersection rayIntersection : SV_RayPay
     {
         // Read from the APV
         float3 backBakeDiffuseLighting = 0.0;
-        EvaluateAdaptiveProbeVolume(GetAbsolutePositionWS(rayOrigin),
-                                    rayDirection,
-                                    -rayDirection,
-                                    0.0,
-                                    0.0,
-                                    _RaytracingAPVLayerMask,
-                                    rayIntersection.color,
-                                    backBakeDiffuseLighting);
+        EvaluateAdaptiveProbeVolume(GetAbsolutePositionWS(rayOrigin), rayDirection, -rayDirection, 0.0, 0.0, rayIntersection.color, backBakeDiffuseLighting);
         weight = 1.0;
     }
 #endif
 
-    // Try the reflection probes
+    // Try the reflection probes    
     if ((RAYTRACINGFALLBACKHIERACHY_REFLECTION_PROBES & _RayTracingRayMissFallbackHierarchy) && weight < 1.0)
         rayIntersection.color += RayTraceReflectionProbes(rayOrigin, rayDirection, weight);
 

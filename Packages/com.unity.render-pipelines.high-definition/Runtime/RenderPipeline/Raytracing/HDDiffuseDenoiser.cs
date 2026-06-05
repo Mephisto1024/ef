@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
 namespace UnityEngine.Rendering.HighDefinition
@@ -12,7 +12,7 @@ namespace UnityEngine.Rendering.HighDefinition
         // Runtime Initialization data
         bool m_DenoiserInitialized;
         Texture2D m_OwnenScrambledTexture;
-        GraphicsBuffer m_PointDistribution;
+        ComputeBuffer m_PointDistribution;
 
         // Kernels that may be required
         int m_BilateralFilterSingleKernel;
@@ -20,10 +20,10 @@ namespace UnityEngine.Rendering.HighDefinition
         int m_GatherSingleKernel;
         int m_GatherColorKernel;
 
-        public void Init(HDRenderPipeline renderPipeline)
+        public void Init(HDRenderPipelineRuntimeResources rpResources, HDRenderPipeline renderPipeline)
         {
             // Keep track of the resources
-            m_DiffuseDenoiser = renderPipeline.runtimeShaders.diffuseDenoiserCS;
+            m_DiffuseDenoiser = rpResources.shaders.diffuseDenoiserCS;
 
             // Grab all the kernels we'll eventually need
             m_BilateralFilterSingleKernel = m_DiffuseDenoiser.FindKernel("BilateralFilterSingle");
@@ -33,8 +33,8 @@ namespace UnityEngine.Rendering.HighDefinition
 
             // Data required for the online initialization
             m_DenoiserInitialized = false;
-            m_OwnenScrambledTexture = renderPipeline.runtimeTextures.owenScrambledRGBATex;
-            m_PointDistribution = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 16 * 4, 2 * sizeof(float));
+            m_OwnenScrambledTexture = rpResources.textures.owenScrambledRGBATex;
+            m_PointDistribution = new ComputeBuffer(16 * 4, 2 * sizeof(float));
         }
 
         public void Release()
@@ -63,7 +63,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public int gatherKernel;
 
             // Other parameters
-            public BufferHandle pointDistribution;
+            public ComputeBufferHandle pointDistribution;
             public ComputeShader diffuseDenoiserCS;
 
             public Texture2D owenScrambledTexture;
@@ -86,8 +86,11 @@ namespace UnityEngine.Rendering.HighDefinition
         public TextureHandle Denoise(RenderGraph renderGraph, HDCamera hdCamera, DiffuseDenoiserParameters denoiserParams,
             TextureHandle noisyBuffer, TextureHandle depthBuffer, TextureHandle normalBuffer, TextureHandle outputBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<DiffuseDenoiserPassData>("DiffuseDenoiser", out var passData, ProfilingSampler.Get(HDProfileId.DiffuseFilter)))
+            using (var builder = renderGraph.AddRenderPass<DiffuseDenoiserPassData>("DiffuseDenoiser", out var passData, ProfilingSampler.Get(HDProfileId.DiffuseFilter)))
             {
+                // Cannot run in async
+                builder.EnableAsyncCompute(false);
+
                 // Initialization data
                 passData.needInit = !m_DenoiserInitialized;
                 m_DenoiserInitialized = true;
@@ -113,20 +116,15 @@ namespace UnityEngine.Rendering.HighDefinition
                 // Other parameters
                 passData.diffuseDenoiserCS = m_DiffuseDenoiser;
 
-                passData.pointDistribution = renderGraph.ImportBuffer(m_PointDistribution);
-                builder.UseBuffer(passData.pointDistribution, AccessFlags.Read);
-                passData.depthStencilBuffer = depthBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.noisyBuffer = noisyBuffer;
-                builder.UseTexture(passData.noisyBuffer, AccessFlags.Read);
-                passData.intermediateBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.B10G11R11_UFloatPack32, enableRandomWrite = true, name = "DiffuseDenoiserIntermediate" });
-                passData.outputBuffer = outputBuffer;
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                passData.pointDistribution = builder.ReadComputeBuffer(renderGraph.ImportComputeBuffer(m_PointDistribution));
+                passData.depthStencilBuffer = builder.ReadTexture(depthBuffer);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.noisyBuffer = builder.ReadTexture(noisyBuffer);
+                passData.intermediateBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.B10G11R11_UFloatPack32, enableRandomWrite = true, name = "DiffuseDenoiserIntermediate" });
+                passData.outputBuffer = builder.WriteTexture(outputBuffer);
 
                 builder.SetRenderFunc(
-                    (DiffuseDenoiserPassData data, UnsafeGraphContext ctx) =>
+                    (DiffuseDenoiserPassData data, RenderGraphContext ctx) =>
                     {
                         // Generate the point distribution if needed (this is only ran once)
                         if (data.needInit)

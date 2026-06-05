@@ -56,11 +56,27 @@ namespace UnityEngine.Rendering.HighDefinition
             [ReadOnly]
             public bool isPbrSkyActive;
             [ReadOnly]
+            public int precomputedAtmosphericAttenuation;
+            [ReadOnly]
             public int defaultDataIndex;
             [ReadOnly]
             public int viewCounts;
             [ReadOnly]
             public bool useCameraRelativePosition;
+
+            //sky settings
+            [ReadOnly]
+            public Vector3 planetCenterPosition;
+            [ReadOnly]
+            public float planetaryRadius;
+            [ReadOnly]
+            public float airScaleHeight;
+            [ReadOnly]
+            public float aerosolScaleHeight;
+            [ReadOnly]
+            public Vector3 airExtinctionCoefficient;
+            [ReadOnly]
+            public float aerosolExtinctionCoefficient;
             [ReadOnly]
             public float maxShadowDistance;
 
@@ -124,8 +140,8 @@ namespace UnityEngine.Rendering.HighDefinition
 
             private static uint GetLightLayer(bool lightLayersEnabled, in HDLightRenderData lightRenderData)
             {
-                int lightLayerMaskValue = (int)lightRenderData.renderingLayerMask;
-                uint lightLayerValue = lightLayerMaskValue < 0 ? (uint)RenderingLayerMask.Everything : lightRenderData.renderingLayerMask;
+                int lightLayerMaskValue = (int)lightRenderData.lightLayer;
+                uint lightLayerValue = lightLayerMaskValue < 0 ? (uint)LightLayerEnum.Everything : (uint)lightLayerMaskValue;
                 return lightLayersEnabled ? lightLayerValue : uint.MaxValue;
             }
 
@@ -163,6 +179,13 @@ namespace UnityEngine.Rendering.HighDefinition
                 {
                     lightData.rangeAttenuationScale = 1.0f / (light.range * light.range);
                     lightData.rangeAttenuationBias = 1.0f;
+
+                    if (lightData.lightType == GPULightType.Rectangle)
+                    {
+                        // Rect lights are currently a special case because they use the normalized
+                        // [0, 1] attenuation range rather than the regular [0, r] one.
+                        lightData.rangeAttenuationScale = 1.0f;
+                    }
                 }
                 else
                 {
@@ -173,14 +196,17 @@ namespace UnityEngine.Rendering.HighDefinition
                     const float sqrtHuge = 4096.0f;
                     lightData.rangeAttenuationScale = sqrtHuge / (light.range * light.range);
                     lightData.rangeAttenuationBias = hugeValue;
+
+                    if (lightData.lightType == GPULightType.Rectangle)
+                    {
+                        // Rect lights are currently a special case because they use the normalized
+                        // [0, 1] attenuation range rather than the regular [0, r] one.
+                        lightData.rangeAttenuationScale = sqrtHuge;
+                    }
                 }
 
-                float shapeWidthVal = light.areaSize.x;
-                float shapeHeightVal = light.areaSize.y;
-
-                if (lightData.lightType == GPULightType.Tube) shapeHeightVal = 0;
-                if (lightData.lightType == GPULightType.Disc) shapeHeightVal = shapeWidthVal;
-
+                float shapeWidthVal = lightRenderData.shapeWidth;
+                float shapeHeightVal = lightRenderData.shapeHeight;
                 lightData.color = GetLightColor(light);
                 lightData.forward = visibleLightAxisAndPosition.Forward;
                 lightData.up = visibleLightAxisAndPosition.Up;
@@ -202,7 +228,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 {
                     // Get width and height for the current frustum
                     var spotAngle = light.spotAngle;
-                    float aspectRatioValue = Mathf.Tan(light.innerSpotAngle * Mathf.PI / 360f) / Mathf.Tan(light.spotAngle * Mathf.PI / 360f);
+                    float aspectRatioValue = lightRenderData.aspectRatio;
 
                     float frustumWidth, frustumHeight;
 
@@ -230,9 +256,10 @@ namespace UnityEngine.Rendering.HighDefinition
                 {
                     var spotAngle = light.spotAngle;
 
+                    var innerConePercent = lightRenderData.innerSpotPercent / 100.0f;
                     var cosSpotOuterHalfAngle = Mathf.Clamp(Mathf.Cos(spotAngle * 0.5f * Mathf.Deg2Rad), 0.0f, 1.0f);
                     var sinSpotOuterHalfAngle = Mathf.Sqrt(1.0f - cosSpotOuterHalfAngle * cosSpotOuterHalfAngle);
-                    var cosSpotInnerHalfAngle = Mathf.Clamp(Mathf.Cos(light.innerSpotAngle * 0.5f * Mathf.Deg2Rad), 0.0f, 1.0f); // inner cone
+                    var cosSpotInnerHalfAngle = Mathf.Clamp(Mathf.Cos(spotAngle * 0.5f * innerConePercent * Mathf.Deg2Rad), 0.0f, 1.0f); // inner cone
 
                     var val = Mathf.Max(0.0001f, (cosSpotInnerHalfAngle - cosSpotOuterHalfAngle));
                     lightData.angleScale = 1.0f / val;
@@ -259,7 +286,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     lightData.size = new Vector4(shapeRadiusVal * shapeRadiusVal, 0, 0, 0);
                 }
 
-                if (lightData.lightType == GPULightType.Rectangle || lightData.lightType == GPULightType.Tube || lightData.lightType == GPULightType.Disc)
+                if (lightData.lightType == GPULightType.Rectangle || lightData.lightType == GPULightType.Tube)
                 {
                     lightData.size = new Vector4(shapeWidthVal, shapeHeightVal, Mathf.Cos(lightRenderData.barnDoorAngle * Mathf.PI / 180.0f), lightRenderData.barnDoorLength);
                 }
@@ -316,7 +343,7 @@ namespace UnityEngine.Rendering.HighDefinition
 #endif
             private void StoreAndConvertLightToGPUFormat(
                 int outputIndex, int lightIndex,
-                LightCategory lightCategory, GPULightType gpuLightType, LightVolumeType lightVolumeType, bool offscreen)
+                LightCategory lightCategory, GPULightType gpuLightType, LightVolumeType lightVolumeType)
             {
                 var light = visibleLights[lightIndex];
                 var processedEntity = processedEntities[lightIndex];
@@ -388,7 +415,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
                 lightVolumeData.lightCategory = (uint)lightCategory;
                 lightVolumeData.lightVolume = (uint)lightVolumeType;
-                lightVolumeData.affectVolumetric = lightData.volumetricLightDimmer > 0.0f ? 1 : 0;
 
                 if (gpuLightType == GPULightType.Spot || gpuLightType == GPULightType.ProjectorPyramid)
                 {
@@ -582,8 +608,8 @@ namespace UnityEngine.Rendering.HighDefinition
                 lightData.isRayTracedContactShadow = 0.0f;
 
                 // Rescale for cookies and windowing.
-                lightData.right = light.GetRight() * 2 / Mathf.Max(light.areaSize.x, 0.001f);
-                lightData.up = light.GetUp() * 2 / Mathf.Max(light.areaSize.y, 0.001f);
+                lightData.right = light.GetRight() * 2 / Mathf.Max(lightRenderData.shapeWidth, 0.001f);
+                lightData.up = light.GetUp() * 2 / Mathf.Max(lightRenderData.shapeHeight, 0.001f);
                 lightData.positionRWS = light.GetPosition();
                 lightData.shadowDimmer = lightRenderData.shadowDimmer;
 
@@ -619,8 +645,39 @@ namespace UnityEngine.Rendering.HighDefinition
                     lightData.nonLightMappedOnly = 0;
                 }
 
+                // TODO: This won't work with anything but the PBR sky.
+                // A new virtual API was added to SkySetting to compute Atmospheric Attenuation but it's not accessible from within a burst job.
+                // Need to figure out how to compute that properly.
+                bool interactsWithSkyVal = isPbrSkyActive && lightRenderData.interactsWithSky;
+                lightData.distanceFromCamera = -1; // Encode 'interactsWithSky'
+
+                if (interactsWithSkyVal)
+                {
+                    lightData.distanceFromCamera = lightRenderData.distance;
+
+                    if (precomputedAtmosphericAttenuation != 0)
+                    {
+                        Vector3 transm = PhysicallyBasedSky.EvaluateAtmosphericAttenuation(
+                            airScaleHeight, aerosolScaleHeight, airExtinctionCoefficient, aerosolExtinctionCoefficient,
+                            planetCenterPosition, planetaryRadius, -lightData.forward, cameraPos);
+                        lightData.color.x *= transm.x;
+                        lightData.color.y *= transm.y;
+                        lightData.color.z *= transm.z;
+                    }
+                }
+
                 lightData.angularDiameter = lightRenderData.angularDiameter * Mathf.Deg2Rad;
-                lightData.distanceFromCamera = (isPbrSkyActive && lightRenderData.interactsWithSky) ? lightRenderData.distance : -1;
+
+                lightData.flareSize = Mathf.Max(lightRenderData.flareSize * Mathf.Deg2Rad, 5.960464478e-8f);
+                lightData.flareFalloff = lightRenderData.flareFalloff;
+
+                // On some vendors trigonometry has very bad precision, so we precompute what we can on CPU to avoid precision issues (case 1369376).
+                float radInner = 0.5f * lightData.angularDiameter;
+                lightData.flareCosInner = Mathf.Cos(radInner);
+                lightData.flareCosOuter = Mathf.Cos(radInner + lightData.flareSize);
+
+                lightData.flareTint = (Vector3)(Vector4)lightRenderData.flareTint;
+                lightData.surfaceTint = (Vector3)(Vector4)lightRenderData.surfaceTint;
 
                 if (useCameraRelativePosition)
                     lightData.positionRWS -= cameraPos;
@@ -638,7 +695,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public void Execute(int index)
             {
                 var sortKey = sortKeys[index];
-                HDGpuLightsBuilder.UnpackLightSortKey(sortKey, out var lightCategory, out var gpuLightType, out var lightVolumeType, out var lightIndex, out var offscreen);
+                HDGpuLightsBuilder.UnpackLightSortKey(sortKey, out var lightCategory, out var gpuLightType, out var lightVolumeType, out var lightIndex);
 
                 if (gpuLightType == GPULightType.Directional)
                 {
@@ -648,7 +705,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 else
                 {
                     int outputIndex = index - directionalSortedLightCounts;
-                    StoreAndConvertLightToGPUFormat(outputIndex, lightIndex, lightCategory, gpuLightType, lightVolumeType, offscreen);
+                    StoreAndConvertLightToGPUFormat(outputIndex, lightIndex, lightCategory, gpuLightType, lightVolumeType);
                 }
             }
         }
@@ -661,6 +718,7 @@ namespace UnityEngine.Rendering.HighDefinition
             HDLightRenderDatabase lightEntities)
         {
             var visualEnvironment = hdCamera.volumeStack.GetComponent<VisualEnvironment>();
+            var skySettings = hdCamera.volumeStack.GetComponent<PhysicallyBasedSky>();
             var shadowSettings = hdCamera.volumeStack.GetComponent<HDShadowSettings>();
             Debug.Assert(visualEnvironment != null);
             bool isPbrSkyActive = visualEnvironment.skyType.value == (int)SkyType.PhysicallyBased;
@@ -676,9 +734,18 @@ namespace UnityEngine.Rendering.HighDefinition
                 cameraPos = hdCamera.mainViewConstants.worldSpaceCameraPos,
                 directionalSortedLightCounts = visibleLights.sortedDirectionalLightCounts,
                 isPbrSkyActive = isPbrSkyActive,
+                precomputedAtmosphericAttenuation = ShaderConfig.s_PrecomputedAtmosphericAttenuation,
                 defaultDataIndex = lightEntities.GetEntityDataIndex(lightEntities.GetDefaultLightEntity()),
                 viewCounts = hdCamera.viewCount,
                 useCameraRelativePosition = ShaderConfig.s_CameraRelativeRendering != 0,
+
+                planetCenterPosition = skySettings.GetPlanetCenterPosition(hdCamera.camera.transform.position),
+                planetaryRadius = skySettings.GetPlanetaryRadius(),
+                airScaleHeight = skySettings.GetAirScaleHeight(),
+                aerosolScaleHeight = skySettings.GetAerosolScaleHeight(),
+                airExtinctionCoefficient = skySettings.GetAirExtinctionCoefficient(),
+                aerosolExtinctionCoefficient = skySettings.GetAerosolExtinctionCoefficient(),
+
                 maxShadowDistance = shadowSettings.maxShadowDistance.value,
 
                 // light entity data

@@ -284,6 +284,24 @@ void Frag(PackedVaryingsToPS packedInput
             //float3 viewDirObjectBasis = objectToWorld3x3 * viewDirWS;
             //float anisoViewFactor = pow(clamp(dot(normalize((objectToWorld3x3 * secondaryNormalWS).xz), normalize(viewDirObjectBasis.xz)), 0.0, 1.0), _46._m33);
         
+            // 4. 准备屏幕/相机状态，供深度、分块灯光和雾效路径使用。
+            float2 screenUV = posInput.positionSS.xy / _ScreenParams.xy;;
+            float2 pixelCoordU = float2(posInput.positionSS.xy);
+            float3 cameraForwardWS = TransformViewToWorldDir(float3(0,0,1));
+            //float probeLightingScale = mix(_15._m44.x, 1.0, _15._m113.w) * _15._m42.x;
+            float4 probeDominantDir;
+            float3 probeDiffuseColor;
+            float3 probeHueColor;
+            float probeIntensity;
+            
+            // 5. Probe/SH 风格的体积光照。fine/mid/coarse 三层 3D 体积混合出漫反射颜色和主方向。
+            
+            // 6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
+            //float instanceColorOverride = mix(_18._m0[instanceIndex]._m6.x, _15._m111.y, _15._m111.x);
+            //float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
+            float overrideSpecBoost;
+            float3 baseForLightness;
+            float3 baseForDiffuse;
         
             outColor = float4(secondaryNormalWS.xyz,1);
                 

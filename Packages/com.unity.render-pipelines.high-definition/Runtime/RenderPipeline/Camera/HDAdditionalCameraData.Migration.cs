@@ -104,13 +104,15 @@ namespace UnityEngine.Rendering.HighDefinition
         void Awake() => k_Migration.Migrate(this);
 
 #pragma warning disable 649 // Field never assigned
-        [SerializeField, FormerlySerializedAs("renderingPath"), Obsolete("For Data Migration. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("renderingPath"), Obsolete("For Data Migration")]
         [ExcludeCopy]
         int m_ObsoleteRenderingPath;
         [SerializeField]
-        [FormerlySerializedAs("serializedFrameSettings"), FormerlySerializedAs("m_FrameSettings"), Obsolete("For Data Migration. #from(2021.1)")]
+        [FormerlySerializedAs("serializedFrameSettings"), FormerlySerializedAs("m_FrameSettings")]
         [ExcludeCopy]
+#pragma warning disable 618 // Type or member is obsolete
         ObsoleteFrameSettings m_ObsoleteFrameSettings;
+#pragma warning restore 618
 #pragma warning restore 649
     }
 }

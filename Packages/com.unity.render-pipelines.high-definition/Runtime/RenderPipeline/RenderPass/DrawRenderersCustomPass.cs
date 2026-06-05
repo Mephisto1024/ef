@@ -141,16 +141,6 @@ namespace UnityEngine.Rendering.HighDefinition
         /// </summary>
         public ShaderPass shaderPass = ShaderPass.Forward;
 
-        /// <summary>
-        /// Apply variable rate shading using the shading rate image.
-        /// </summary>
-        public bool variableRateShading = false;
-
-        /// <summary>
-        /// True if you want your custom pass to enable and set variable rate shading (VRS) texture. False for regular passes.
-        /// </summary>
-        protected override bool enableVariableRateShading => variableRateShading;
-
         int fadeValueId;
 
         static ShaderTagId[] forwardShaderTags;
@@ -241,7 +231,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 stencilReference = overrideStencil ? stencilReferenceValue : 0,
             };
 
-            PerObjectData renderConfig = HDUtils.GetRendererConfiguration(ctx.hdCamera.frameSettings.IsEnabled(FrameSettingsField.AdaptiveProbeVolume), ctx.hdCamera.frameSettings.IsEnabled(FrameSettingsField.Shadowmask));
+            PerObjectData renderConfig = HDUtils.GetRendererConfiguration(ctx.hdCamera.frameSettings.IsEnabled(FrameSettingsField.ProbeVolume), ctx.hdCamera.frameSettings.IsEnabled(FrameSettingsField.Shadowmask));
             var overrideShaderMaterial = (overrideShader != null) ? new Material(overrideShader) : null;
 
             var result = new RendererUtils.RendererListDesc(shaderPasses, ctx.cullingResults, ctx.hdCamera.camera)
@@ -259,9 +249,10 @@ namespace UnityEngine.Rendering.HighDefinition
             };
 
             Object.DestroyImmediate(overrideShaderMaterial);
-            var rendererList = ctx.renderContext.CreateRendererList(result);
+            var renderCtx = ctx.renderContext;
+            var rendererList = renderCtx.CreateRendererList(result);
             bool opaque = renderQueueType == RenderQueueType.AllOpaque || renderQueueType == RenderQueueType.OpaqueAlphaTest || renderQueueType == RenderQueueType.OpaqueNoAlphaTest;
-            HDRenderPipeline.RenderForwardRendererList(ctx.hdCamera.frameSettings, rendererList, opaque, ctx.cmd);
+            HDRenderPipeline.RenderForwardRendererList(ctx.hdCamera.frameSettings, rendererList, opaque, ctx.renderContext, ctx.cmd);
         }
 
         /// <summary>

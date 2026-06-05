@@ -21,14 +21,14 @@
 
 // #pragma enable_d3d11_debug_symbols
 
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma kernel TraceGlobalIllumination          TRACE_GLOBAL_ILLUMINATION=TraceGlobalIllumination GI_TRACE
 #pragma kernel TraceGlobalIlluminationHalf      TRACE_GLOBAL_ILLUMINATION=TraceGlobalIlluminationHalf GI_TRACE HALF_RES
 #pragma kernel ReprojectGlobalIllumination      REPROJECT_GLOBAL_ILLUMINATION=ReprojectGlobalIllumination GI_REPROJECT
 #pragma kernel ReprojectGlobalIlluminationHalf  REPROJECT_GLOBAL_ILLUMINATION=ReprojectGlobalIlluminationHalf GI_REPROJECT HALF_RES
 
-#pragma multi_compile _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
+#pragma multi_compile PROBE_VOLUMES_OFF PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
 
 // The dispatch tile resolution
 #define INDIRECT_DIFFUSE_TILE_SIZE 8
@@ -41,7 +41,7 @@
 // Input depth pyramid texture
 TEXTURE2D_X(_DepthTexture);
 // Stencil buffer of the current frame
-TYPED_TEXTURE2D_X(uint2, _StencilTexture);
+TEXTURE2D_X_UINT2(_StencilTexture);
 // Input texture that holds the offset for every level of the depth pyramid
 StructuredBuffer<int2>  _DepthPyramidMipLevelOffsets;
 
@@ -61,7 +61,7 @@ CBUFFER_START(UnityScreenSpaceGlobalIllumination)
     int _IndirectDiffuseFrameIndex;
     int _ObjectMotionStencilBit;
     float _RayMarchingLowResPercentageInv;
-    int _SSGILayerMask;
+    int _SSGIUnused0;
 CBUFFER_END
 
 // Must be included after the declaration of variables
@@ -154,13 +154,13 @@ void TraceReflectionProbes(PositionInputs posInput, float3 normalWS, float3 rayD
     uint v_envLightListOffset = 0;
     uint v_envLightIdx = envLightStart;
 #if NEED_TO_CHECK_HELPER_LANE
-    // On some platform helper lanes don't behave as we'd expect, therefore we prevent them from entering the loop altogether.
-    bool isHelperLane = WaveIsHelperLane();
-    while (!isHelperLane && v_envLightListOffset < envLightCount)
+	// On some platform helper lanes don't behave as we'd expect, therefore we prevent them from entering the loop altogether.
+	bool isHelperLane = WaveIsHelperLane();
+	while (!isHelperLane && v_envLightListOffset < envLightCount)
 #else
-    while (v_envLightListOffset < envLightCount)
+	while (v_envLightListOffset < envLightCount)
 #endif
-    {
+	{
         v_envLightIdx = FetchIndex(envLightStart, v_envLightListOffset);
         uint s_envLightIdx = ScalarizeElementIndex(v_envLightIdx, fastPath);
         if (s_envLightIdx == -1)
@@ -294,7 +294,6 @@ void REPROJECT_GLOBAL_ILLUMINATION(uint3 dispatchThreadId : SV_DispatchThreadID,
                                     -normalData.normalWS, // Not used
                                     GetWorldSpaceNormalizeViewDir(posInput.positionWS),
                                     posInput.positionSS,
-                                    _SSGILayerMask,
                                     apvBuiltinData.bakeDiffuseLighting,
                                     apvBuiltinData.backBakeDiffuseLighting); // Not used
         color = apvBuiltinData.bakeDiffuseLighting;
@@ -308,7 +307,7 @@ void REPROJECT_GLOBAL_ILLUMINATION(uint3 dispatchThreadId : SV_DispatchThreadID,
 
         if((RAYMARCHINGFALLBACKHIERARCHY_SKY & _RayMarchingFallbackHierarchy) && weight < 1.0f)
         {
-            color += EvaluateAmbientProbe(normalData.normalWS) * (1.0 - weight);
+            color += SAMPLE_TEXTURECUBE_ARRAY_LOD(_SkyTexture, s_trilinear_clamp_sampler, sampleDir, 0.0, 0).xyz * (1.0 - weight);
             weight = 1.0;
         }
     }

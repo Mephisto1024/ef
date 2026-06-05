@@ -35,8 +35,8 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         }
 
         [SerializeField]
-        BlendingMode m_BlendMode = BlendingMode.Alpha;
-        public BlendingMode blendingMode
+        BlendMode m_BlendMode = BlendMode.Alpha;
+        public BlendMode blendMode
         {
             get => m_BlendMode;
             set => m_BlendMode = value;
@@ -92,19 +92,19 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
 
         [SerializeField]
         bool m_ExcludeFromTUAndAA = false;
-        public bool excludeFromTUAndAA
+        public bool excludeFromTUAndAA 
         {
             get => m_ExcludeFromTUAndAA;
             set => m_ExcludeFromTUAndAA = value;
         }
 
-        [SerializeField, Obsolete("Keep for migration. #from(2021.1)")]
+        [SerializeField, Obsolete("Keep for migration")]
         internal bool m_TransparentDepthPrepass;
 
-        [SerializeField, Obsolete("Keep for migration. #from(2021.1)")]
+        [SerializeField, Obsolete("Keep for migration")]
         internal bool m_TransparentDepthPostpass;
 
-        [SerializeField, Obsolete("Keep for migration. #from(2021.1)")]
+        [SerializeField, Obsolete("Keep for migration")]
         internal bool m_SupportLodCrossFade;
 
         [SerializeField]
@@ -202,14 +202,6 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         }
 
         // End Tessellation
-
-        [SerializeField]
-        bool m_DebugSymbols = false;
-        public bool debugSymbols
-        {
-            get => m_DebugSymbols;
-            set => m_DebugSymbols = value;
-        }
 
         [SerializeField]
         ShaderGraphVersion m_Version = MigrationDescription.LastVersion<ShaderGraphVersion>();

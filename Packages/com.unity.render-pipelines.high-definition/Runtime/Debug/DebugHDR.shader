@@ -16,7 +16,7 @@ Shader "Hidden/HDRP/DebugHDR"
 
     #pragma vertex Vert
     #pragma target 4.5
-    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
     TEXTURE2D_X(_DebugFullScreenTexture);
 
@@ -229,17 +229,11 @@ Shader "Hidden/HDRP/DebugHDR"
 
         float maxC = max(color.x, max(color.y, color.z));
 
+        float t = (maxC - _PaperWhite) / (_MaxNits - _PaperWhite);
+
         if (maxC > _PaperWhite)
         {
-            if ( maxC > _MaxNits)
-            {
-                return float3(0, 0, _PaperWhite);
-            }
-            else
-            {
-                float t = (maxC - _PaperWhite) / (_MaxNits - _PaperWhite);
-                return lerp(float3(_PaperWhite, _PaperWhite, 0), float3(_PaperWhite, 0, 0), saturate(t));
-            }
+            return lerp(float3(_PaperWhite, _PaperWhite, 0), float3(_PaperWhite, 0, 0), saturate(t));
         }
         else
         {

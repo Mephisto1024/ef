@@ -14,119 +14,88 @@ namespace UnityEditor.Rendering.HighDefinition
         protected ShaderKeyword m_ScreenSpaceShadowONKeywords = new ShaderKeyword("SCREEN_SPACE_SHADOWS_ON");
         protected ShaderKeyword m_ProbeVolumesL1 = new ShaderKeyword("PROBE_VOLUMES_L1");
         protected ShaderKeyword m_ProbeVolumesL2 = new ShaderKeyword("PROBE_VOLUMES_L2");
-        protected ShaderKeyword m_WaterAbsorption = new ShaderKeyword("SUPPORT_WATER_ABSORPTION");
-        protected ShaderKeyword m_AreaShadowHigh = new ShaderKeyword("AREA_SHADOW_HIGH");
-
-        protected HDRenderPipelineRuntimeShaders m_Shaders;
-
-        public HDRPComputeShaderVariantStripper()
-        {
-            m_Shaders = HDRPBuildData.instance.runtimeShaders;
-        }
 
         // Modify this function to add more stripping clauses
         internal bool StripShader(HDRenderPipelineAsset hdAsset, ComputeShader shader, string kernelName, ShaderCompilerData inputData)
         {
-            bool stripDebug = HDRPBuildData.instance.stripDebugVariants;
-            var settings = hdAsset.currentPlatformRenderPipelineSettings;
+            bool stripDebug = !Debug.isDebugBuild || !HDRenderPipelineGlobalSettings.Ensure().supportRuntimeDebugDisplay;
 
             // Strip debug compute shaders
-            if (stripDebug && !settings.supportRuntimeAOVAPI)
+            if (stripDebug && !hdAsset.currentPlatformRenderPipelineSettings.supportRuntimeAOVAPI)
             {
-                if (shader == m_Shaders.debugLightVolumeCS ||
-                    shader == m_Shaders.clearDebugBufferCS ||
-                    shader == m_Shaders.debugWaveformCS ||
-                    shader == m_Shaders.debugVectorscopeCS ||
-                    shader == m_Shaders.probeVolumeSamplingDebugComputeShader)
+                if (shader == hdAsset.renderPipelineResources.shaders.debugLightVolumeCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.clearDebugBufferCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.debugWaveformCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.debugVectorscopeCS)
                     return true;
             }
 
             // Remove water if disabled
-            if (!settings.supportWater)
+            if (!hdAsset.currentPlatformRenderPipelineSettings.supportWater)
             {
-                if (inputData.shaderKeywordSet.IsEnabled(m_WaterAbsorption))
+                if (shader == hdAsset.renderPipelineResources.shaders.waterSimulationCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.fourierTransformCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.waterLightingCS)
+                    return true;
+            }
+
+            // Remove volumetric clouds if disabled
+            if (!hdAsset.currentPlatformRenderPipelineSettings.supportVolumetricClouds)
+            {
+                if (shader == hdAsset.renderPipelineResources.shaders.volumetricCloudsCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.volumetricCloudMapGeneratorCS)
                     return true;
             }
 
             // Remove volumetric fog if disabled
-            if (!settings.supportVolumetrics)
+            if (!hdAsset.currentPlatformRenderPipelineSettings.supportVolumetrics)
             {
-                if (shader == m_Shaders.volumeVoxelizationCS ||
-                    shader == m_Shaders.volumetricLightingCS ||
-                    shader == m_Shaders.volumetricLightingFilteringCS)
+                if (shader == hdAsset.renderPipelineResources.shaders.volumeVoxelizationCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.volumetricLightingCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.volumetricLightingFilteringCS)
                     return true;
             }
 
             // Remove SSR if disabled
-            if (!settings.supportSSR)
+            if (!hdAsset.currentPlatformRenderPipelineSettings.supportSSR)
             {
-                if (shader == m_Shaders.screenSpaceReflectionsCS)
+                if (shader == hdAsset.renderPipelineResources.shaders.screenSpaceReflectionsCS)
                     return true;
             }
 
             // Remove SSGI if disabled
-            if (!settings.supportSSGI)
+            if (!hdAsset.currentPlatformRenderPipelineSettings.supportSSGI)
             {
-                if (shader == m_Shaders.screenSpaceGlobalIlluminationCS)
+                if (shader == hdAsset.renderPipelineResources.shaders.screenSpaceGlobalIlluminationCS)
                     return true;
             }
 
             // Remove SSS if disabled
-            if (!settings.supportSubsurfaceScattering)
+            if (!hdAsset.currentPlatformRenderPipelineSettings.supportSubsurfaceScattering)
             {
-                if (shader == m_Shaders.subsurfaceScatteringCS ||
-                    shader == m_Shaders.subsurfaceScatteringDownsampleCS)
-                    return true;
-            }
-
-            // Remove Line Rendering if disabled
-            if (!settings.supportHighQualityLineRendering)
-            {
-                if (shader == m_Shaders.lineStagePrepareCS ||
-                    shader == m_Shaders.lineStageSetupSegmentCS ||
-                    shader == m_Shaders.lineStageShadingSetupCS ||
-                    shader == m_Shaders.lineStageRasterBinCS ||
-                    shader == m_Shaders.lineStageWorkQueueCS ||
-                    shader == m_Shaders.lineStageRasterFineCS)
+                if (shader == hdAsset.renderPipelineResources.shaders.subsurfaceScatteringCS)
                     return true;
             }
 
             // Strip every useless shadow configs
-            var shadowInitParams = settings.hdShadowInitParams;
+            var shadowInitParams = hdAsset.currentPlatformRenderPipelineSettings.hdShadowInitParams;
 
-            foreach (var shadowVariant in m_ShadowKeywords.PunctualShadowVariants)
+            foreach (var shadowVariant in m_ShadowKeywords.ShadowVariants)
             {
-                if (shadowVariant.Key != shadowInitParams.punctualShadowFilteringQuality)
+                if (shadowVariant.Key != shadowInitParams.shadowFilteringQuality)
                 {
                     if (inputData.shaderKeywordSet.IsEnabled(shadowVariant.Value))
                         return true;
                 }
             }
 
-            foreach (var shadowVariant in m_ShadowKeywords.DirectionalShadowVariants)
+            foreach (var areaShadowVariant in m_ShadowKeywords.AreaShadowVariants)
             {
-                if (shadowVariant.Key != shadowInitParams.directionalShadowFilteringQuality)
+                if (areaShadowVariant.Key != shadowInitParams.areaShadowFilteringQuality)
                 {
-                    if (inputData.shaderKeywordSet.IsEnabled(shadowVariant.Value))
+                    if (inputData.shaderKeywordSet.IsEnabled(areaShadowVariant.Value))
                         return true;
                 }
-            }
-
-
-            if (ShaderConfig.s_AreaLights == 1)
-            {
-                foreach (var areaShadowVariant in m_ShadowKeywords.AreaShadowVariants)
-                {
-                    if (areaShadowVariant.Key != shadowInitParams.areaShadowFilteringQuality)
-                        if (inputData.shaderKeywordSet.IsEnabled(areaShadowVariant.Value))
-                            return true;
-                }
-            }
-            else
-            {
-                // Strip only AREA_SHADOW_HIGH variant, because HDRP enables AREA_SHADOW_MEDIUM if area light is disabled in ShaderConfig
-                if (inputData.shaderKeywordSet.IsEnabled(m_AreaShadowHigh))
-                    return true;
             }
 
             // Screen space shadow variant is exclusive, either we have a variant with dynamic if that support screen space shadow or not
@@ -135,17 +104,17 @@ namespace UnityEditor.Rendering.HighDefinition
                 return true;
 
             // In forward only, strip deferred shaders
-            if (settings.supportedLitShaderMode == RenderPipelineSettings.SupportedLitShaderMode.ForwardOnly)
+            if (hdAsset.currentPlatformRenderPipelineSettings.supportedLitShaderMode == RenderPipelineSettings.SupportedLitShaderMode.ForwardOnly)
             {
-                if (shader == m_Shaders.clearDispatchIndirectCS ||
-                    shader == m_Shaders.buildDispatchIndirectCS ||
-                    shader == m_Shaders.buildMaterialFlagsCS ||
-                    shader == m_Shaders.deferredCS)
+                if (shader == hdAsset.renderPipelineResources.shaders.clearDispatchIndirectCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.buildDispatchIndirectCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.buildMaterialFlagsCS ||
+                    shader == hdAsset.renderPipelineResources.shaders.deferredCS)
                     return true;
             }
 
             // In deferred only, strip MSAA variants
-            if (inputData.shaderKeywordSet.IsEnabled(m_MSAA) && (settings.supportedLitShaderMode == RenderPipelineSettings.SupportedLitShaderMode.DeferredOnly))
+            if (inputData.shaderKeywordSet.IsEnabled(m_MSAA) && (hdAsset.currentPlatformRenderPipelineSettings.supportedLitShaderMode == RenderPipelineSettings.SupportedLitShaderMode.DeferredOnly))
             {
                 return true;
             }
@@ -153,18 +122,18 @@ namespace UnityEditor.Rendering.HighDefinition
             if (inputData.shaderKeywordSet.IsEnabled(m_ScreenSpaceShadowONKeywords) && !shadowInitParams.supportScreenSpaceShadows)
                 return true;
 
-            if (inputData.shaderKeywordSet.IsEnabled(m_EnableAlpha) && !settings.SupportsAlpha())
+            if (inputData.shaderKeywordSet.IsEnabled(m_EnableAlpha) && !hdAsset.currentPlatformRenderPipelineSettings.SupportsAlpha())
             {
                 return true;
             }
 
             // Global Illumination
             if (inputData.shaderKeywordSet.IsEnabled(m_ProbeVolumesL1) &&
-                (!settings.supportProbeVolume || settings.probeVolumeSHBands != ProbeVolumeSHBands.SphericalHarmonicsL1))
+                (!hdAsset.currentPlatformRenderPipelineSettings.supportProbeVolume || hdAsset.currentPlatformRenderPipelineSettings.probeVolumeSHBands != ProbeVolumeSHBands.SphericalHarmonicsL1))
                 return true;
 
             if (inputData.shaderKeywordSet.IsEnabled(m_ProbeVolumesL2) &&
-                (!settings.supportProbeVolume || settings.probeVolumeSHBands != ProbeVolumeSHBands.SphericalHarmonicsL2))
+                (!hdAsset.currentPlatformRenderPipelineSettings.supportProbeVolume || hdAsset.currentPlatformRenderPipelineSettings.probeVolumeSHBands != ProbeVolumeSHBands.SphericalHarmonicsL2))
                 return true;
 
             // HDR Output
@@ -174,12 +143,27 @@ namespace UnityEditor.Rendering.HighDefinition
             return false;
         }
 
-        public bool active => HDRPBuildData.instance.buildingPlayerForHDRenderPipeline;
+        public bool active
+        {
+            get
+            {
+                if (HDRenderPipeline.currentAsset == null)
+                    return false;
+
+                if (HDRenderPipelineGlobalSettings.Ensure(canCreateNewAsset: false) == null)
+                    return false;
+
+                if (ShaderBuildPreprocessor.hdrpAssets.Count == 0)
+                    return false;
+
+                return true;
+            }
+        }
 
         public bool CanRemoveVariant([DisallowNull] ComputeShader shader, string shaderVariant, ShaderCompilerData shaderCompilerData)
         {
             bool removeInput = true;
-            foreach (var hdAsset in HDRPBuildData.instance.renderPipelineAssets)
+            foreach (var hdAsset in ShaderBuildPreprocessor.hdrpAssets)
             {
                 if (!StripShader(hdAsset, shader, shaderVariant, shaderCompilerData))
                 {
@@ -194,7 +178,7 @@ namespace UnityEditor.Rendering.HighDefinition
         public bool SkipShader([DisallowNull] ComputeShader shader, string shaderVariant)
         {
             // Discard any compute shader use for raytracing if none of the RP asset required it
-            if (!HDRPBuildData.instance.playerNeedRaytracing && HDRPBuildData.instance.rayTracingComputeShaderCache.ContainsKey(shader.GetInstanceID()))
+            if (!ShaderBuildPreprocessor.playerNeedRaytracing && ShaderBuildPreprocessor.computeShaderCache.TryGetValue(shader.GetInstanceID(), out ComputeShader _))
                 return true;
 
             return false;

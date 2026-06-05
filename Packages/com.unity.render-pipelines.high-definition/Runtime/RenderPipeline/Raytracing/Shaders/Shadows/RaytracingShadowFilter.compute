@@ -19,7 +19,7 @@
 // Debug
 #pragma kernel WriteShadowTextureDebug
 
-#pragma only_renderers d3d11 xboxseries ps5 switch2
+#pragma only_renderers d3d11 xboxseries ps5
 
 // #pragma enable_d3d11_debug_symbols
 
@@ -118,7 +118,7 @@ void AreaShadowApplyTAA(uint3 dispatchThreadId : SV_DispatchThreadID, uint2 grou
     float historyAnalyticValue = dot(_DenoisingHistoryMaskSn, SAMPLE_TEXTURE2D_ARRAY_LOD(_AnalyticHistoryBuffer, s_linear_clamp_sampler, historyUV, INDEX_TEXTURE2D_ARRAY_X(_DenoisingHistorySlice), 0));
 
     // Ok so here, if we do not match cloesly the previous analytic value, it means either TAA has invalidated the sample or the pixel just appeared
-    if (abs(historyAnalyticValue - currentAnalyticValue) >= 1e-1 * Max3(1.0f, abs(historyAnalyticValue), abs(currentAnalyticValue))
+    if (abs(historyAnalyticValue - currentAnalyticValue) >= 1e-1 * Max3(1.0f, abs(historyAnalyticValue), abs(currentAnalyticValue)) 
         || historyAnalyticValue < 0.0
         || _HistoryValidity == 0.0
         || historyTapCoord.x < 0.0 || historyTapCoord.x >= _ScreenSize.x || historyTapCoord.y < 0.0 || historyTapCoord.y >= _ScreenSize.y

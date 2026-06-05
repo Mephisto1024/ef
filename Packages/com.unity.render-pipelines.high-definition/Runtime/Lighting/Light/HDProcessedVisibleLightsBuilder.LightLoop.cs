@@ -12,7 +12,7 @@ namespace UnityEngine.Rendering.HighDefinition
     {
         private void SortLightKeys()
         {
-            using (new ProfilingScope(ProfilingSampler.Get(HDProfileId.SortVisibleLights)))
+            using (new ProfilingScope(null, ProfilingSampler.Get(HDProfileId.SortVisibleLights)))
             {
                 //Tunning against ps4 console,
                 //32 items insertion sort has a workst case of 3 micro seconds.
@@ -28,7 +28,7 @@ namespace UnityEngine.Rendering.HighDefinition
             }
         }
 
-        private unsafe void BuildVisibleLightEntities(in CullingResults cullResults)
+        private void BuildVisibleLightEntities(in CullingResults cullResults)
         {
             m_Size = 0;
 
@@ -41,144 +41,97 @@ namespace UnityEngine.Rendering.HighDefinition
             for (int i = 0; i < m_ProcessVisibleLightCounts.Length; ++i)
                 m_ProcessVisibleLightCounts[i] = 0;
 
-            using (new ProfilingScope(ProfilingSampler.Get(HDProfileId.BuildVisibleLightEntities)))
+            using (new ProfilingScope(null, ProfilingSampler.Get(HDProfileId.BuildVisibleLightEntities)))
             {
-                if (cullResults.visibleLights.Length > 0 && HDLightRenderDatabase.instance != null)
+                if (cullResults.visibleLights.Length == 0
+                    || HDLightRenderDatabase.instance == null)
+                    return;
+
+                if (cullResults.visibleLights.Length > m_Capacity)
                 {
-                    if (cullResults.visibleLights.Length > m_Capacity)
-                    {
-                        ResizeArrays(cullResults.visibleLights.Length);
-                    }
-
-                    m_Size = cullResults.visibleLights.Length;
-
-                    //TODO: this should be accelerated by a c++ API
-                    for (int i = 0; i < cullResults.visibleLights.Length; ++i)
-                    {
-                        Light light = cullResults.visibleLights[i].light;
-                        int dataIndex = HDLightRenderDatabase.instance.FindEntityDataIndex(light);
-                        if (dataIndex == HDLightRenderDatabase.InvalidDataIndex)
-                        {
-                            //Shuriken lights thing: this happens because shuriken lights dont have the HDAdditionalLightData OnEnabled.
-                            //Because of this, we have to forcefully create a light render entity on the rendering side. Horrible!!!
-                            if (light.TryGetComponent<HDAdditionalLightData>(out var hdAdditionalLightData))
-                            {
-                                if (!hdAdditionalLightData.lightEntity.valid)
-                                    hdAdditionalLightData.CreateHDLightRenderEntity(autoDestroy: true);
-                            }
-                            // This can happen if a scene is created via new asset creation vs proper scene creation dialog. In this situation we create a default additional light data.
-                            // This is bad, but should happen *extremely* rarely and all the entities will 99.9% of the time end up in the branch above.
-                            else
-                            {
-                                var hdLightData = light.gameObject.AddComponent<HDAdditionalLightData>();
-                                if (hdLightData)
-                                {
-                                    HDAdditionalLightData.InitDefaultHDAdditionalLightData(hdLightData);
-                                }
-                                if (!hdLightData.lightEntity.valid)
-                                    hdLightData.CreateHDLightRenderEntity(autoDestroy: true);
-
-                                // Make sure we have a valid data index
-                                dataIndex = HDLightRenderDatabase.instance.GetEntityDataIndex(hdLightData.lightEntity);
-                            }
-                        }
-
-                        m_VisibleLightEntityDataIndices[i] = dataIndex;
-                        m_VisibleLightBakingOutput[i] = light.bakingOutput;
-                        m_VisibleLightShadowCasterMode[i] = light.lightShadowCasterMode;
-                        m_VisibleLightShadows[i] = light.shadows;
-                    }
+                    ResizeArrays(cullResults.visibleLights.Length);
                 }
 
-                splitVisibleLightsAndIndicesBuffer.Clear();
-                shadowRequestValidityArray.SetBits(0, false, m_Size);
+                m_Size = cullResults.visibleLights.Length;
 
-                dynamicPointVisibleLightsAndIndices = default;
-                cachedPointVisibleLightsAndIndices = default;
-                dynamicSpotVisibleLightsAndIndices = default;
-                cachedSpotVisibleLightsAndIndices = default;
-                dynamicAreaRectangleVisibleLightsAndIndices = default;
-                cachedAreaRectangleVisibleLightsAndIndices = default;
-                dynamicDirectionalVisibleLightsAndIndices = default;
-                cachedDirectionalVisibleLightsAndIndices = default;
+                //TODO: this should be accelerated by a c++ API
+                for (int i = 0; i < cullResults.visibleLights.Length; ++i)
+                {
+                    Light light = cullResults.visibleLights[i].light;
+                    int dataIndex = HDLightRenderDatabase.instance.FindEntityDataIndex(light);
+                    if (dataIndex == HDLightRenderDatabase.InvalidDataIndex)
+                    {
+                        //Shuriken lights bullshit: this happens because shuriken lights dont have the HDAdditionalLightData OnEnabled.
+                        //Because of this, we have to forcefully create a light render entity on the rendering side. Horrible!!!
+                        if (light.TryGetComponent<HDAdditionalLightData>(out var hdAdditionalLightData))
+                        {
+                            if (!hdAdditionalLightData.lightEntity.valid)
+                                hdAdditionalLightData.CreateHDLightRenderEntity(autoDestroy: true);
+                        }
+                        // This can happen if a scene is created via new asset creation vs proper scene creation dialog. In this situation we create a default additional light data.
+                        // This is bad, but should happen *extremely* rarely and all the entities will 99.9% of the time end up in the branch above.
+                        else
+                        {
+                            var hdLightData = light.gameObject.AddComponent<HDAdditionalLightData>();
+                            if (hdLightData)
+                            {
+                                HDAdditionalLightData.InitDefaultHDAdditionalLightData(hdLightData);
+                            }
 
-                dynamicPointHDSplits = default;
-                cachedPointHDSplits = default;
-                dynamicSpotHDSplits = default;
-                cachedSpotHDSplits = default;
-                dynamicAreaRectangleHDSplits = default;
-                cachedAreaRectangleHDSplits = default;
-                dynamicDirectionalHDSplits = default;
-                cachedDirectionalHDSplits = default;
+                            if (!hdLightData.lightEntity.valid)
+                                hdLightData.CreateHDLightRenderEntity(autoDestroy: true);
+
+                            // Make sure we have a valid data index
+                            dataIndex = HDLightRenderDatabase.instance.GetEntityDataIndex(hdLightData.lightEntity);
+                        }
+                    }
+
+                    m_VisibleLightEntityDataIndices[i] = dataIndex;
+                    m_VisibleLightBakingOutput[i] = light.bakingOutput;
+                    m_VisibleLightShadowCasterMode[i] = light.lightShadowCasterMode;
+                    m_VisibleLightShadows[i] = light.shadows;
+                }
             }
         }
 
-        private unsafe void ProcessShadows(
+        private void ProcessShadows(
             HDCamera hdCamera,
             HDShadowManager shadowManager,
-            LightingDebugSettings lightingDebugSettings,
             in HDShadowInitParameters inShadowInitParameters,
             in CullingResults cullResults)
         {
-            if (shadowLightCount == 0)
+            int shadowLights = m_ProcessVisibleLightCounts[(int)ProcessLightsCountSlots.ShadowLights];
+            if (shadowLights == 0)
                 return;
 
-            using (new ProfilingScope(ProfilingSampler.Get(HDProfileId.ProcessShadows)))
+            using (new ProfilingScope(null, ProfilingSampler.Get(HDProfileId.ProcessShadows)))
             {
                 NativeArray<VisibleLight> visibleLights = cullResults.visibleLights;
                 var hdShadowSettings = hdCamera.volumeStack.GetComponent<HDShadowSettings>();
+
                 var defaultEntity = HDLightRenderDatabase.instance.GetDefaultLightEntity();
                 int defaultEntityDataIndex = HDLightRenderDatabase.instance.GetEntityDataIndex(defaultEntity);
-                HDProcessedVisibleLight* entitiesPtr = (HDProcessedVisibleLight*)m_ProcessedEntities.GetUnsafePtr();
 
-                for (int i = 0; i < shadowLightCount; ++i)
+                unsafe
                 {
-                    int lightIndex = m_ShadowLightsDataIndices[i];
-                    HDProcessedVisibleLight* entity = entitiesPtr + lightIndex;
-                    if (!cullResults.GetShadowCasterBounds(lightIndex, out var bounds) || defaultEntityDataIndex == entity->dataIndex)
+                    HDProcessedVisibleLight* entitiesPtr = (HDProcessedVisibleLight*)m_ProcessedEntities.GetUnsafePtr<HDProcessedVisibleLight>();
+                    for (int i = 0; i < shadowLights; ++i)
                     {
-                        entity->shadowMapFlags = ShadowMapFlags.None;
-                        continue;
+                        int lightIndex = m_ShadowLightsDataIndices[i];
+                        HDProcessedVisibleLight* entity = entitiesPtr + lightIndex;
+                        if (!cullResults.GetShadowCasterBounds(lightIndex, out var bounds) || defaultEntityDataIndex == entity->dataIndex)
+                        {
+                            entity->shadowMapFlags = ShadowMapFlags.None;
+                            continue;
+                        }
+
+                        HDAdditionalLightData additionalLightData = HDLightRenderDatabase.instance.hdAdditionalLightData[entity->dataIndex];
+                        if (additionalLightData == null)
+                            continue;
+
+                        VisibleLight visibleLight = visibleLights[lightIndex];
+                        additionalLightData.ReserveShadowMap(hdCamera.camera, shadowManager, hdShadowSettings, inShadowInitParameters, visibleLight, entity->lightType);
                     }
-
-                    HDAdditionalLightData additionalLightData = HDLightRenderDatabase.instance.hdAdditionalLightData[entity->dataIndex];
-                    if (additionalLightData == null)
-                        continue;
-
-                    VisibleLight visibleLight = visibleLights[lightIndex];
-
-                    if (additionalLightData.GetResolutionFromSettings(additionalLightData.GetShadowMapType(visibleLight.lightType), inShadowInitParameters) == 0)
-                        continue;
-
-                    additionalLightData.ReserveShadowMap(hdCamera.camera, shadowManager, hdShadowSettings, inShadowInitParameters, visibleLight, entity->lightType, visibleLight.forcedVisible);
-                }
-
-                // Now that all the lights have requested a shadow resolution, we can layout them in the atlas
-                // And if needed rescale the whole atlas
-                shadowManager.LayoutShadowMaps(lightingDebugSettings);
-
-                for (int i = 0; i < shadowLightCount; ++i)
-                {
-                    int lightIndex = m_ShadowLightsDataIndices[i];
-                    HDProcessedVisibleLight* entity = entitiesPtr + lightIndex;
-
-                    if (defaultEntityDataIndex == entity->dataIndex)
-                        continue;
-
-                    if ((entity->shadowMapFlags & ShadowMapFlags.WillRenderShadowMap) == 0)
-                        continue;
-
-                    HDAdditionalLightData additionalLightData = HDLightRenderDatabase.instance.hdAdditionalLightData[entity->dataIndex];
-                    if (additionalLightData == null)
-                        continue;
-
-                    VisibleLight visibleLight = visibleLights[lightIndex];
-
-                    if (additionalLightData.GetResolutionFromSettings(additionalLightData.GetShadowMapType(visibleLight.lightType), inShadowInitParameters) == 0)
-                        continue;
-
-                    if (additionalLightData.HasShadowAtlasPlacement())
-                        additionalLightData.OverrideShadowResolutionRequestsWithShadowCache(shadowManager, hdShadowSettings, entity->lightType);
                 }
             }
         }

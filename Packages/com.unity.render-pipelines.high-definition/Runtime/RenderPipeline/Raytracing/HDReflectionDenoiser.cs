@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -19,10 +19,10 @@ namespace UnityEngine.Rendering.HighDefinition
         {
         }
 
-        public void Init(HDRPRayTracingResources rpRTResources)
+        public void Init(HDRenderPipelineRayTracingResources rpRTResources)
         {
             m_ReflectionDenoiserCS = rpRTResources.reflectionDenoiserCS;
-            m_ReflectionFilterMapping = rpRTResources.reflectionFilterMappingTexture;
+            m_ReflectionFilterMapping = rpRTResources.reflectionFilterMapping;
 
             // Fetch all the kernels we shall be using
             s_TemporalAccumulationFullResKernel = m_ReflectionDenoiserCS.FindKernel("TemporalAccumulationFullRes");
@@ -79,8 +79,10 @@ namespace UnityEngine.Rendering.HighDefinition
         public TextureHandle DenoiseRTR(RenderGraph renderGraph, HDCamera hdCamera, float historyValidity, int maxKernelSize, bool fullResolution, bool singleReflectionBounce, bool affectSmoothSurfaces,
             TextureHandle depthPyramid, TextureHandle normalBuffer, TextureHandle motionVectorBuffer, TextureHandle clearCoatTexture, TextureHandle lightingTexture, RTHandle historyBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<ReflectionDenoiserPassData>("Denoise ray traced reflections", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingReflectionFilter)))
+            using (var builder = renderGraph.AddRenderPass<ReflectionDenoiserPassData>("Denoise ray traced reflections", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingReflectionFilter)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Camera parameters
                 passData.texWidth = fullResolution ? hdCamera.actualWidth : (hdCamera.actualWidth / 2);
                 passData.texHeight = fullResolution ? hdCamera.actualHeight : (hdCamera.actualHeight / 2);
@@ -105,25 +107,20 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.bilateralFilterVKernel = fullResolution ? s_BilateralFilterV_FRKernel : s_BilateralFilterV_HRKernel;
                 passData.reflectionFilterMapping = m_ReflectionFilterMapping;
 
-                passData.depthBuffer = depthPyramid;
-                builder.UseTexture(passData.depthBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.motionVectorBuffer = motionVectorBuffer;
-                builder.UseTexture(passData.motionVectorBuffer, AccessFlags.Read);
+                passData.depthBuffer = builder.ReadTexture(depthPyramid);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.motionVectorBuffer = builder.ReadTexture(motionVectorBuffer);
                 RTHandle depthT = hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.Depth);
                 passData.historyDepth = depthT != null ? renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.Depth)) : renderGraph.defaultResources.blackTextureXR;
 
                 passData.intermediateBuffer0 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "IntermediateTexture0" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "IntermediateTexture0" });
                 passData.intermediateBuffer1 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "IntermediateTexture1" });
-                passData.historySignal = renderGraph.ImportTexture(historyBuffer);
-                builder.UseTexture(passData.historySignal, AccessFlags.ReadWrite);
-                passData.noisyToOutputSignal = lightingTexture;
-                builder.UseTexture(passData.noisyToOutputSignal, AccessFlags.ReadWrite);
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "IntermediateTexture1" });
+                passData.historySignal = builder.ReadWriteTexture(renderGraph.ImportTexture(historyBuffer));
+                passData.noisyToOutputSignal = builder.ReadWriteTexture(lightingTexture);
 
-                builder.SetRenderFunc((ReflectionDenoiserPassData data, UnsafeGraphContext ctx) =>
+                builder.SetRenderFunc((ReflectionDenoiserPassData data, RenderGraphContext ctx) =>
                 {
                     // Evaluate the dispatch parameters
                     int tileSize = 8;

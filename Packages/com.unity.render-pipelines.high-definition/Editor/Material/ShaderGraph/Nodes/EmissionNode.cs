@@ -5,7 +5,6 @@ using UnityEditor.Graphing;
 using UnityEditor.ShaderGraph;
 using UnityEditor.ShaderGraph.Drawing.Controls;
 using UnityEditor.ShaderGraph.Internal;
-using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
 namespace UnityEditor.Rendering.HighDefinition
@@ -21,7 +20,7 @@ namespace UnityEditor.Rendering.HighDefinition
             UpdateNodeAfterDeserialization();
         }
 
-        public override string documentationURL => NodeUtils.GetDocumentationString("Emission");
+        public override string documentationURL => Documentation.GetPageLink("SGNode-Emission");
 
         [SerializeField]
         EmissiveIntensityUnit _intensityUnit;
@@ -145,7 +144,7 @@ namespace UnityEditor.Rendering.HighDefinition
             float multiplier = intensity;
 
             if (intensityUnit == EmissiveIntensityUnit.EV100)
-                multiplier = LightUnitUtils.Ev100ToNits(intensity);
+                multiplier = LightUtils.ConvertEvToLuminance(intensity);
 
             return ldrColor * intensity;
         }

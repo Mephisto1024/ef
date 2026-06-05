@@ -5,12 +5,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.ShaderGraph
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Eye", "ScleraIrisBlend")]
+    [Title("Utility", "High Definition Render Pipeline", "Eye", "ScleraIrisBlend (Preview)")]
     class ScleraIrisBlend : CodeFunctionNode
     {
         public ScleraIrisBlend()
         {
-            name = "Sclera Iris Blend";
+            name = "Sclera Iris Blend (Preview)";
         }
 
         public override bool hasPreview

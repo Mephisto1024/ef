@@ -6,10 +6,8 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds settings for the global illumination (screen space and ray traced).
     /// </summary>
-    [Serializable, VolumeComponentMenu("Lighting/Screen Space Global Illumination")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Override-Screen-Space-GI")]
-    [DisplayInfo(name = "Screen Space Global Illumination")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Lighting/Screen Space Global Illumination", typeof(HDRenderPipeline))]
+    [HDRPHelpURLAttribute("Ray-Traced-Global-Illumination")]
     public sealed class GlobalIllumination : VolumeComponentWithQuality
     {
         bool UsesQualityMode()
@@ -37,13 +35,6 @@ namespace UnityEngine.Rendering.HighDefinition
         [FormerlySerializedAs("fallbackHierarchy")]
         [AdditionalProperty]
         public RayMarchingFallbackHierarchyParameter rayMiss = new RayMarchingFallbackHierarchyParameter(RayMarchingFallbackHierarchy.ReflectionProbesAndSky);
-
-        /// <summary>
-        /// Controls the fallback hierarchy for indirect diffuse in case the ray misses.
-        /// </summary>
-        [Tooltip("Controls which APV rendering layer mask to sample from. If no probes in proximity are from the specified layer or the feature is disabled for the Baking Set, any surrounding probes will be sampled.")]
-        [AdditionalProperty]
-        public RenderingLayerMaskParameter adaptiveProbeVolumesLayerMask = new RenderingLayerMaskParameter(UnityEngine.RenderingLayerMask.defaultRenderingLayerMask);
         #endregion
 
         #region RayMarching
@@ -52,7 +43,12 @@ namespace UnityEngine.Rendering.HighDefinition
         /// </summary>
         [Tooltip("Controls the thickness of the depth buffer used for ray marching.")]
         public ClampedFloatParameter depthBufferThickness = new ClampedFloatParameter(0.1f, 0.0f, 0.5f);
-        
+
+        GlobalIllumination()
+        {
+            displayName = "Screen Space Global Illumination";
+        }
+
         /// <summary>
         /// Defines if the screen space global illumination should be evaluated at full resolution.
         /// </summary>
@@ -172,10 +168,10 @@ namespace UnityEngine.Rendering.HighDefinition
         public LayerMaskParameter layerMask = new LayerMaskParameter(-1);
 
         /// <summary>
-        /// The LOD Bias that HDRP adds to texture sampling in the global illumination.
+        /// The LOD Bias HDRP applies to textures in the global illumination.
         /// </summary>
-        [Tooltip("The LOD Bias that HDRP adds to texture sampling in the global illumination. A higher value increases performance and makes denoising easier, but it might reduce visual fidelity.")]
-        public ClampedFloatParameter textureLodBias = new ClampedFloatParameter(7.0f, 0.0f, 7.0f);
+        [Tooltip("The LOD Bias HDRP applies to textures in the global illumination. A higher value increases performance and makes denoising easier, but it might reduce visual fidelity.")]
+        public ClampedIntParameter textureLodBias = new ClampedIntParameter(7, 0, 7);
 
         /// <summary>
         /// Controls the length of GI rays in meters.
@@ -201,13 +197,16 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             get
             {
-                return m_ClampValue.value;
+                if (!UsesQualitySettings() || UsesQualityMode())
+                    return m_ClampValue.value;
+                else
+                    return GetLightingQualitySettings().RTGIClampValue[(int)quality.value];
             }
             set { m_ClampValue.value = value; }
         }
         [SerializeField, FormerlySerializedAs("clampValue")]
         [Tooltip("Controls the clamp of intensity.")]
-        private MinFloatParameter m_ClampValue = new MinFloatParameter(100.0f, 0.001f);
+        private ClampedFloatParameter m_ClampValue = new ClampedFloatParameter(1.0f, 0.001f, 10.0f);
 
         /// <summary>
         /// Controls which version of the effect should be used.

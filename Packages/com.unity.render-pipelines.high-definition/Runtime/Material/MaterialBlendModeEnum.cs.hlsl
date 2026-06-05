@@ -5,11 +5,11 @@
 #ifndef MATERIALBLENDMODEENUM_CS_HLSL
 #define MATERIALBLENDMODEENUM_CS_HLSL
 //
-// UnityEngine.Rendering.HighDefinition.BlendingMode:  static fields
+// UnityEditor.Rendering.HighDefinition.BlendMode:  static fields
 //
-#define BLENDINGMODE_ALPHA (0)
-#define BLENDINGMODE_PREMULTIPLY (4)
-#define BLENDINGMODE_ADDITIVE (1)
+#define BLENDMODE_ALPHA (0)
+#define BLENDMODE_PREMULTIPLY (4)
+#define BLENDMODE_ADDITIVE (1)
 
 
 #endif

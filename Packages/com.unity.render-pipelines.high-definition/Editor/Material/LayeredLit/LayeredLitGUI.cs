@@ -47,7 +47,7 @@ namespace UnityEditor.Rendering.HighDefinition
         public static void SynchronizeAllLayers(Material material)
         {
             int layerCount = (int)material.GetFloat(kLayerCount);
-            AssetImporter materialImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(material.GetEntityId()));
+            AssetImporter materialImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(material.GetInstanceID()));
 
             Material[] layers = null;
             bool[] withUV = null;
@@ -76,36 +76,36 @@ namespace UnityEditor.Rendering.HighDefinition
             if (layerMaterial != null)
             {
                 Shader layerShader = layerMaterial.shader;
-                int propertyCount = layerShader.GetPropertyCount();
+                int propertyCount = ShaderUtil.GetPropertyCount(layerShader);
                 for (int i = 0; i < propertyCount; ++i)
                 {
-                    string propertyName = layerShader.GetPropertyName(i);
+                    string propertyName = ShaderUtil.GetPropertyName(layerShader, i);
                     string layerPropertyName = propertyName + layerIndex;
 
                     if (includeUVMappingProperties || !exclusionList.Contains(propertyName))
                     {
                         if (material.HasProperty(layerPropertyName))
                         {
-                            ShaderPropertyType type = layerShader.GetPropertyType(i);
+                            ShaderUtil.ShaderPropertyType type = ShaderUtil.GetPropertyType(layerShader, i);
                             switch (type)
                             {
-                                case ShaderPropertyType.Color:
+                                case ShaderUtil.ShaderPropertyType.Color:
                                 {
                                     material.SetColor(layerPropertyName, layerMaterial.GetColor(propertyName));
                                     break;
                                 }
-                                case ShaderPropertyType.Float:
-                                case ShaderPropertyType.Range:
+                                case ShaderUtil.ShaderPropertyType.Float:
+                                case ShaderUtil.ShaderPropertyType.Range:
                                 {
                                     material.SetFloat(layerPropertyName, layerMaterial.GetFloat(propertyName));
                                     break;
                                 }
-                                case ShaderPropertyType.Vector:
+                                case ShaderUtil.ShaderPropertyType.Vector:
                                 {
                                     material.SetVector(layerPropertyName, layerMaterial.GetVector(propertyName));
                                     break;
                                 }
-                                case ShaderPropertyType.Texture:
+                                case ShaderUtil.ShaderPropertyType.TexEnv:
                                 {
                                     material.SetTexture(layerPropertyName, layerMaterial.GetTexture(propertyName));
                                     if (includeUVMappingProperties)
@@ -126,7 +126,7 @@ namespace UnityEditor.Rendering.HighDefinition
         // so we can keep reference during serialization
         public static void InitializeMaterialLayers(Material material, ref Material[] layers, ref bool[] withUV)
         {
-            AssetImporter materialImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(material.GetEntityId()));
+            AssetImporter materialImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(material.GetInstanceID()));
             InitializeMaterialLayers(materialImporter, ref layers, ref withUV);
         }
 
@@ -137,7 +137,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 SerializeableGUIDs layersGUID = JsonUtility.FromJson<SerializeableGUIDs>(materialImporter.userData);
                 if (layersGUID.GUIDArray.Length > 0)
                 {
-                    layers = new Material[kMaxLayerCount];
+                    layers = new Material[layersGUID.GUIDArray.Length];
                     for (int i = 0; i < layersGUID.GUIDArray.Length; ++i)
                     {
                         layers[i] = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(layersGUID.GUIDArray[i]), typeof(Material)) as Material;
@@ -145,7 +145,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 }
                 if (layersGUID.withUV != null && layersGUID.withUV.Length > 0)
                 {
-                    withUV = new bool[kMaxLayerCount];
+                    withUV = new bool[layersGUID.withUV.Length];
                     for (int i = 0; i < layersGUID.withUV.Length; ++i)
                         withUV[i] = layersGUID.withUV[i];
                 }
@@ -167,16 +167,15 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public static void SaveMaterialLayers(Material material, Material[] materialLayers, bool[] withUV)
         {
-            AssetImporter materialImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(material.GetEntityId()));
+            AssetImporter materialImporter = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(material.GetInstanceID()));
 
             SerializeableGUIDs layersGUID;
-            // We should guarantee that the size of the layers is equal to kMaxLayerCount as it is initialized before.
-            layersGUID.GUIDArray = new string[kMaxLayerCount];
-            layersGUID.withUV = new bool[kMaxLayerCount];
+            layersGUID.GUIDArray = new string[materialLayers.Length];
+            layersGUID.withUV = new bool[withUV.Length];
             for (int i = 0; i < materialLayers.Length; ++i)
             {
                 if (materialLayers[i] != null)
-                    layersGUID.GUIDArray[i] = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(materialLayers[i].GetEntityId()));
+                    layersGUID.GUIDArray[i] = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(materialLayers[i].GetInstanceID()));
                 layersGUID.withUV[i] = withUV[i];
             }
 

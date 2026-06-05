@@ -6,7 +6,7 @@ For more information on the Chromatic Aberration effect, see the [Chromatic Aber
 
 ## Using Chromatic Aberration
 
-**Chromatic Aberration** uses the [Volume](understand-volumes.md) framework, so to enable and modify **Chromatic Aberration** properties, you must add a **Chromatic Aberration** override to a [Volume](understand-volumes.md) in your Scene. To add **Chromatic Aberration** to a Volume:
+**Chromatic Aberration** uses the [Volume](Volumes.md) framework, so to enable and modify **Chromatic Aberration** properties, you must add a **Chromatic Aberration** override to a [Volume](Volumes.md) in your Scene. To add **Chromatic Aberration** to a Volume:
 
 1. In the Scene or Hierarchy view, select a GameObject that contains a Volume component to view it in the Inspector.
 2. In the Inspector, go to **Add Override** > **Post-processing** and select **Chromatic Aberration**. HDRP now applies **Chromatic Aberration** to any Camera this Volume affects.
@@ -14,6 +14,8 @@ For more information on the Chromatic Aberration effect, see the [Chromatic Aber
 [!include[](snippets/volume-override-api.md)]
 
 ## Properties
+
+![](Images/Post-processingChromaticAberration1.png)
 
 | **Property**     | **Description**                                              |
 | ---------------- | ------------------------------------------------------------ |
@@ -26,7 +28,7 @@ For more information on the Chromatic Aberration effect, see the [Chromatic Aber
 
 From 2019.3, HDRP provides lookup Textures that you can use to customize this effect. These lookup Textures are for the **Spectral Lut** property. To add these Textures to your Unity Project, you must use the Package Manager:
 
-1. Select **Window** > **Package Management** > **Package Manager**.
+1. Select **Window** > **Package Manager**.
 2. In the **Packages** window, select **High Definition RP**.
 3. In the **High Definition RP** section, go to **Additional Post-processing Data** and select **Import into Project**.
 4. The Textures that are relevant to Chromatic Aberration are in the **Spectral LUTs** folder,  so if you only want the lookup Textures for Chromatic Aberration, only import the contents of the **Spectral LUTs** folder.

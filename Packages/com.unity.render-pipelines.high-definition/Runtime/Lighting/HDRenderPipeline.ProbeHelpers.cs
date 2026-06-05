@@ -1,11 +1,11 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
     public partial class HDRenderPipeline
     {
-        static Vector4[] m_PackedCoeffsProbe = new Vector4[7];
+        Vector4[] m_PackedCoeffsProbe = new Vector4[7];
 
         // Ref: "Efficient Evaluation of Irradiance Environment Maps" from ShaderX 2
         static Vector3 SHEvalLinearL0L1(Vector3 N, Vector4 shAr, Vector4 shAg, Vector4 shAb)
@@ -57,12 +57,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
             // Return the result
             return res;
-        }
-
-        static internal Vector3 EvaluateAmbientProbe(in SphericalHarmonicsL2 sh, Vector3 direction)
-        {
-            SphericalHarmonicMath.PackCoefficients(m_PackedCoeffsProbe, sh);
-            return EvaluateAmbientProbe(m_PackedCoeffsProbe, direction);
         }
     }
 }

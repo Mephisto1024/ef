@@ -1,4 +1,4 @@
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma kernel ComputeVolumetricMaterialRenderingParameters
 
@@ -8,20 +8,21 @@
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Builtin/BuiltinData.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/VolumetricLighting/HDRenderPipeline.VolumetricLighting.cs.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VertexCubeSlicing.hlsl"
 
+uint _VolumeCount;
+uint _MaxSliceCount;
 uint _ViewCount;
 
-// Readonly buffers
 StructuredBuffer<OrientedBBox> _VolumeBounds;
 StructuredBuffer<LocalVolumetricFogEngineData> _VolumeData;
-ByteAddressBuffer _VolumetricVisibleGlobalIndicesBuffer;
 
-RWBuffer<uint> _VolumetricGlobalIndirectArgsBuffer : register( u0 );   // Indirect arguments have to be in a _buffer_, not a structured buffer
-RWByteAddressBuffer _VolumetricGlobalIndirectionBuffer : register( u1 );
+RWBuffer<uint> _IndirectBufferArguments : register( u0 );   // Indirect arguments have to be in a _buffer_, not a structured buffer
 RWStructuredBuffer<VolumetricMaterialRenderingData> _VolumetricMaterialData;
 
 int DistanceToSlice(float distance)
 {
+    float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
     float de = _VBufferRcpSliceCount; // Log-encoded distance between slices
 
     float e1 = EncodeLogarithmicDepthGeneralized(distance, _VBufferDistanceEncodingParams);
@@ -133,15 +134,14 @@ void ComputeCubeVerticesOrder(uint volumeIndex)
 
 // Generate the compute buffer to dispatch the indirect draw
 [numthreads(32, 1, 1)]
-void ComputeVolumetricMaterialRenderingParameters(uint3 dispatchThreadID : SV_DispatchThreadID)
+void ComputeVolumetricMaterialRenderingParameters(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
-    if (dispatchThreadID.x >= _VolumeCount * _ViewCount)
+    if (dispatchThreadId.x >= _VolumeCount * _ViewCount)
         return;
 
-    uint volumeIndex = dispatchThreadID.x % _VolumeCount;
-    uint globalBufferWriteIndex = _VolumetricVisibleGlobalIndicesBuffer.Load(volumeIndex << 2);
-    uint viewIndex = dispatchThreadID.x / _VolumeCount;
-    uint materialDataIndex = volumeIndex + viewIndex * _VolumeCount;
+    uint volumeIndex = dispatchThreadId.x % _VolumeCount;
+    uint volumeWriteIndex = dispatchThreadId.x;
+    uint viewIndex = dispatchThreadId.x / _VolumeCount;
 
 #if defined(UNITY_STEREO_INSTANCING_ENABLED)
     unity_StereoEyeIndex = viewIndex;
@@ -168,11 +168,12 @@ void ComputeVolumetricMaterialRenderingParameters(uint3 dispatchThreadID : SV_Di
 
     // Find the min and max distance value from vertices
     float3 minPositionRWS = obb.center - obbExtents;
-    float maxVertexDepth = 0;
+    float maxVertexDepth;
     int i;
     for (i = 0; i < 8; i++)
     {
         float3 position = ComputeCubeVertexPositionRWS(obb, minPositionRWS, vertexMask[i]);
+        float depth = DepthDistance(position);
         float distance = length(position);
         maxVertexDepth = max(maxVertexDepth, distance);
 
@@ -198,22 +199,20 @@ void ComputeVolumetricMaterialRenderingParameters(uint3 dispatchThreadID : SV_Di
     minPositionVS = clamp(minPositionVS, -1, 1);
     maxPositionVS = clamp(maxPositionVS, -1, 1);
 
-    float vBufferNearPlane = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
-    float minBoxDistance = max(vBufferNearPlane, cameraDistanceToOBB);
+    // Compute min distance using the
+    float vBufferNearplane = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
+    float minBoxDistance = max(vBufferNearplane, cameraDistanceToOBB);
     int startSliceIndex = clamp(DistanceToSlice(minBoxDistance), 0, int(_MaxSliceCount));
     int stopSliceIndex = DistanceToSlice(maxVertexDepth);
     uint sliceCount = clamp(stopSliceIndex - startSliceIndex, 0, int(_MaxSliceCount) - startSliceIndex);
 
-    _VolumetricGlobalIndirectArgsBuffer[globalBufferWriteIndex * 5 + 0] = 6; // IndexCountPerInstance
-    _VolumetricGlobalIndirectArgsBuffer[globalBufferWriteIndex * 5 + 1] = sliceCount * _ViewCount; // InstanceCount
-    _VolumetricGlobalIndirectArgsBuffer[globalBufferWriteIndex * 5 + 2] = 0; // StartIndexLocation
-    _VolumetricGlobalIndirectArgsBuffer[globalBufferWriteIndex * 5 + 3] = 0; // BaseVertexLocation
-    _VolumetricGlobalIndirectArgsBuffer[globalBufferWriteIndex * 5 + 4] = 0; // StartInstanceLocation
+    _IndirectBufferArguments[volumeWriteIndex * 5 + 0] = 6; // IndexCountPerInstance
+    _IndirectBufferArguments[volumeWriteIndex * 5 + 1] = sliceCount; // InstanceCount
+    _IndirectBufferArguments[volumeWriteIndex * 5 + 2] = 0; // StartIndexLocation
+    _IndirectBufferArguments[volumeWriteIndex * 5 + 3] = 0; // BaseVertexLocation
+    _IndirectBufferArguments[volumeWriteIndex * 5 + 4] = 0; // StartInstanceLocation
 
-    // Provide smaller buffer index in the global indirection buffer to sample those buffers in the vertex during the voxelization.
-    _VolumetricGlobalIndirectionBuffer.Store(globalBufferWriteIndex << 2, volumeIndex);
-
-    _VolumetricMaterialData[materialDataIndex].sliceCount = sliceCount;
-    _VolumetricMaterialData[materialDataIndex].startSliceIndex = startSliceIndex;
-    _VolumetricMaterialData[materialDataIndex].viewSpaceBounds = float4(minPositionVS, maxPositionVS - minPositionVS);
+    _VolumetricMaterialData[volumeWriteIndex].sliceCount = sliceCount;
+    _VolumetricMaterialData[volumeWriteIndex].startSliceIndex = startSliceIndex;
+    _VolumetricMaterialData[volumeWriteIndex].viewSpaceBounds = float4(minPositionVS, maxPositionVS - minPositionVS);
 }

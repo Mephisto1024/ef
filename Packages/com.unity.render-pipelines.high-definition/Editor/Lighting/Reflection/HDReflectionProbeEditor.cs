@@ -1,13 +1,13 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering.HighDefinition;
-using UnityEngine.Rendering;
+using UnityEditor.Rendering;
 
 namespace UnityEditor.Rendering.HighDefinition
 {
-    [CustomEditor(typeof(ReflectionProbe))]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
+    [CustomEditorForRenderPipeline(typeof(ReflectionProbe), typeof(HDRenderPipelineAsset))]
     [CanEditMultipleObjects]
     sealed partial class HDReflectionProbeEditor : HDProbeEditor<HDProbeSettingsProvider, SerializedHDReflectionProbe>
     {
@@ -33,9 +33,14 @@ namespace UnityEditor.Rendering.HighDefinition
             EditorUtility.CopySerialized(HDUtils.s_DefaultHDAdditionalReflectionData, reflectionProbeAdditionalData);
         }
 
-        [MenuItem("CONTEXT/ReflectionProbe/Open Preferences > Graphics...", false, 100)]
-        [MenuItem("CONTEXT/PlanarReflectionProbe/Open Preferences > Graphics...", false, 700)]
+        [MenuItem("CONTEXT/ReflectionProbe/Show All Additional Properties...", false, 100)]
         static void ShowAllAdditionalProperties(MenuCommand menuCommand)
+        {
+            CoreRenderPipelinePreferences.Open();
+        }
+
+        [MenuItem("CONTEXT/PlanarReflectionProbe/Show All Additional Properties...", false, 700)]
+        static void ShowAllAdditionalPropertiesPlanar(MenuCommand menuCommand)
         {
             CoreRenderPipelinePreferences.Open();
         }
@@ -88,7 +93,6 @@ namespace UnityEditor.Rendering.HighDefinition
         ProbeSettingsOverride HDProbeUI.IProbeUISettingsProvider.displayedCustomSettings => new ProbeSettingsOverride
         {
             probe = ProbeSettingsFields.lightingLightLayer
-                | ProbeSettingsFields.importance
                 | ProbeSettingsFields.lightingMultiplier
                 | ProbeSettingsFields.lightingWeight
                 | ProbeSettingsFields.lightingFadeDistance,
@@ -99,5 +103,21 @@ namespace UnityEditor.Rendering.HighDefinition
         };
 
         Type HDProbeUI.IProbeUISettingsProvider.customTextureType => typeof(Cubemap);
+        static readonly HDProbeUI.ToolBar[] k_ToolBars =
+        {
+            HDProbeUI.ToolBar.InfluenceShape | HDProbeUI.ToolBar.NormalBlend | HDProbeUI.ToolBar.Blend,
+            HDProbeUI.ToolBar.CapturePosition,
+            HDProbeUI.ToolBar.ShowChromeGizmo
+        };
+        HDProbeUI.ToolBar[] HDProbeUI.IProbeUISettingsProvider.toolbars => k_ToolBars;
+
+        static Dictionary<KeyCode, HDProbeUI.ToolBar> k_ToolbarShortCutKey = new Dictionary<KeyCode, HDProbeUI.ToolBar>
+        {
+            { KeyCode.Alpha1, HDProbeUI.ToolBar.InfluenceShape },
+            { KeyCode.Alpha2, HDProbeUI.ToolBar.Blend },
+            { KeyCode.Alpha3, HDProbeUI.ToolBar.NormalBlend },
+            { KeyCode.Alpha4, HDProbeUI.ToolBar.CapturePosition }
+        };
+        Dictionary<KeyCode, HDProbeUI.ToolBar> HDProbeUI.IProbeUISettingsProvider.shortcuts => k_ToolbarShortCutKey;
     }
 }

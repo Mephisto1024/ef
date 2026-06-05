@@ -15,19 +15,15 @@ namespace UnityEngine.Rendering.HighDefinition
     /// </summary>
     public class HDUtils
     {
-#if UNITY_EDITOR
-        internal const string k_HdrpAssetBuildLabel = "HDRP:IncludeInBuild";
-#endif
-
         internal const SortingCriteria k_OpaqueSortingCriteria = SortingCriteria.CommonOpaque & (~SortingCriteria.QuantizedFrontToBack);
 
         /// <summary>Returns the render configuration for baked static lighting, this value can be used in a RendererListDesc call to render Lit objects.</summary>
         /// <returns></returns>
-        [Obsolete("Use GetRendererConfiguration() instead. #from(2023.2).")]
+        [Obsolete("Use GetRendererConfiguration() instead. #from(23.2).")]
         public static PerObjectData GetBakedLightingRenderConfig() => PerObjectData.LightProbe | PerObjectData.Lightmaps | PerObjectData.LightProbeProxyVolume;
         /// <summary>Returns the render configuration for baked static lighting with shadow masks, this value can be used in a RendererListDesc call to render Lit objects when shadow masks are enabled.</summary>
         /// <returns></returns>
-        [Obsolete("Use GetRendererConfiguration() instead. #from(2023.2).")]
+        [Obsolete("Use GetRendererConfiguration() instead. #from(23.2).")]
         public static PerObjectData GetBakedLightingWithShadowMaskRenderConfig() => GetBakedLightingRenderConfig() | PerObjectData.OcclusionProbe | PerObjectData.OcclusionProbeProxyVolume | PerObjectData.ShadowMask;
 
         /// <summary>
@@ -595,14 +591,14 @@ namespace UnityEngine.Rendering.HighDefinition
         // It returns the previously set RenderPipelineAsset, assetWasFromQuality is true if the current asset was set through the quality settings
         internal static RenderPipelineAsset SwitchToBuiltinRenderPipeline(out bool assetWasFromQuality)
         {
-            var graphicSettingAsset = GraphicsSettings.defaultRenderPipeline;
+            var graphicSettingAsset = GraphicsSettings.renderPipelineAsset;
             assetWasFromQuality = false;
             if (graphicSettingAsset != null)
             {
                 // Check if the currently used pipeline is the one from graphics settings
                 if (GraphicsSettings.currentRenderPipeline == graphicSettingAsset)
                 {
-                    GraphicsSettings.defaultRenderPipeline = null;
+                    GraphicsSettings.renderPipelineAsset = null;
                     return graphicSettingAsset;
                 }
             }
@@ -623,80 +619,51 @@ namespace UnityEngine.Rendering.HighDefinition
             }
             else
             {
-                GraphicsSettings.defaultRenderPipeline = renderPipelineAsset;
+                GraphicsSettings.renderPipelineAsset = renderPipelineAsset;
             }
         }
 
         internal struct PackedMipChainInfo
         {
             public Vector2Int textureSize;
-            public int mipLevelCount; // mips contain min (closest) depth
-            public int mipLevelCountCheckerboard;
+            public int mipLevelCount;
             public Vector2Int[] mipLevelSizes;
-            public Vector2Int[] mipLevelOffsets; // mips contain min (closest) depth
-            public Vector2Int[] mipLevelOffsetsCheckerboard;
+            public Vector2Int[] mipLevelOffsets;
 
             private Vector2 cachedTextureScale;
             private Vector2Int cachedHardwareTextureSize;
-            private int cachedCheckerboardMipCount;
 
             private bool m_OffsetBufferWillNeedUpdate;
 
             public void Allocate()
             {
                 mipLevelOffsets = new Vector2Int[15];
-                mipLevelOffsetsCheckerboard = new Vector2Int[15];
                 mipLevelSizes = new Vector2Int[15];
                 m_OffsetBufferWillNeedUpdate = true;
-            }
-
-            enum PackDirection
-            {
-                Right,
-                Down,
-            }
-
-            static Vector2Int NextMipBegin(Vector2Int prevMipBegin, Vector2Int prevMipSize, PackDirection dir)
-            {
-                Vector2Int mipBegin = prevMipBegin;
-                if (dir == PackDirection.Right)
-                    mipBegin.x += prevMipSize.x;
-                else
-                    mipBegin.y += prevMipSize.y;
-                return mipBegin;
             }
 
             // We pack all MIP levels into the top MIP level to avoid the Pow2 MIP chain restriction.
             // We compute the required size iteratively.
             // This function is NOT fast, but it is illustrative, and can be optimized later.
-            public void ComputePackedMipChainInfo(Vector2Int viewportSize, int checkerboardMipCount)
+            public void ComputePackedMipChainInfo(Vector2Int viewportSize)
             {
-                // only support up to 2 mips of checkerboard data being created
-                checkerboardMipCount = Mathf.Clamp(checkerboardMipCount, 0, 2);
-
                 bool isHardwareDrsOn = DynamicResolutionHandler.instance.HardwareDynamicResIsEnabled();
                 Vector2Int hardwareTextureSize = isHardwareDrsOn ? DynamicResolutionHandler.instance.ApplyScalesOnSize(viewportSize) : viewportSize;
                 Vector2 textureScale = isHardwareDrsOn ? new Vector2((float)viewportSize.x / (float)hardwareTextureSize.x, (float)viewportSize.y / (float)hardwareTextureSize.y) : new Vector2(1.0f, 1.0f);
 
-                // We need to mark the buffer dirty in case another camera has a different viewport size
-                m_OffsetBufferWillNeedUpdate = true;
-
                 // No work needed.
-                if (cachedHardwareTextureSize == hardwareTextureSize && cachedTextureScale == textureScale && cachedCheckerboardMipCount == checkerboardMipCount)
+                if (cachedHardwareTextureSize == hardwareTextureSize && cachedTextureScale == textureScale)
                     return;
 
                 cachedHardwareTextureSize = hardwareTextureSize;
                 cachedTextureScale = textureScale;
-                cachedCheckerboardMipCount = checkerboardMipCount;
 
                 mipLevelSizes[0] = hardwareTextureSize;
                 mipLevelOffsets[0] = Vector2Int.zero;
-                mipLevelOffsetsCheckerboard[0] = mipLevelOffsets[0];
 
                 int mipLevel = 0;
                 Vector2Int mipSize = hardwareTextureSize;
-                bool hasCheckerboard = (checkerboardMipCount != 0);
-                int maxCheckboardLevelCount = hasCheckerboard ? (1 + checkerboardMipCount) : 0;
+
                 do
                 {
                     mipLevel++;
@@ -707,40 +674,26 @@ namespace UnityEngine.Rendering.HighDefinition
 
                     mipLevelSizes[mipLevel] = mipSize;
 
-                    Vector2Int prevMipSize = mipLevelSizes[mipLevel - 1];
                     Vector2Int prevMipBegin = mipLevelOffsets[mipLevel - 1];
-                    Vector2Int prevMipBeginCheckerboard = mipLevelOffsetsCheckerboard[mipLevel - 1];
+                    Vector2Int prevMipEnd = prevMipBegin + mipLevelSizes[mipLevel - 1];
 
-                    Vector2Int mipBegin = prevMipBegin;
-                    Vector2Int mipBeginCheckerboard = prevMipBeginCheckerboard;
-                    if (mipLevel == 1)
+                    Vector2Int mipBegin = new Vector2Int();
+
+                    if ((mipLevel & 1) != 0) // Odd
                     {
-                        // first mip always below full resolution
-                        mipBegin = NextMipBegin(prevMipBegin, prevMipSize, PackDirection.Down);
-
-                        // pack checkerboard next to it if present
-                        if (hasCheckerboard)
-                            mipBeginCheckerboard = NextMipBegin(mipBegin, mipSize, PackDirection.Right);
-                        else
-                            mipBeginCheckerboard = mipBegin;
+                        mipBegin.x = prevMipBegin.x;
+                        mipBegin.y = prevMipEnd.y;
                     }
-                    else
+                    else // Even
                     {
-                        // alternate directions, mip 2 starts with down if checkerboard, right if not
-                        bool isOdd = ((mipLevel & 1) != 0);
-                        PackDirection dir = (isOdd ^ hasCheckerboard) ? PackDirection.Down : PackDirection.Right;
-
-                        mipBegin = NextMipBegin(prevMipBegin, prevMipSize, dir);
-                        mipBeginCheckerboard = NextMipBegin(prevMipBeginCheckerboard, prevMipSize, dir);
+                        mipBegin.x = prevMipEnd.x;
+                        mipBegin.y = prevMipBegin.y;
                     }
 
                     mipLevelOffsets[mipLevel] = mipBegin;
-                    mipLevelOffsetsCheckerboard[mipLevel] = mipBeginCheckerboard;
 
                     hardwareTextureSize.x = Math.Max(hardwareTextureSize.x, mipBegin.x + mipSize.x);
                     hardwareTextureSize.y = Math.Max(hardwareTextureSize.y, mipBegin.y + mipSize.y);
-                    hardwareTextureSize.x = Math.Max(hardwareTextureSize.x, mipBeginCheckerboard.x + mipSize.x);
-                    hardwareTextureSize.y = Math.Max(hardwareTextureSize.y, mipBeginCheckerboard.y + mipSize.y);
                 }
                 while ((mipSize.x > 1) || (mipSize.y > 1));
 
@@ -748,7 +701,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     (int)Mathf.Ceil((float)hardwareTextureSize.x * textureScale.x), (int)Mathf.Ceil((float)hardwareTextureSize.y * textureScale.y));
 
                 mipLevelCount = mipLevel + 1;
-                mipLevelCountCheckerboard = hasCheckerboard ? (1 + checkerboardMipCount) : 0;
+                m_OffsetBufferWillNeedUpdate = true;
             }
 
             public ComputeBuffer GetOffsetBufferData(ComputeBuffer mipLevelOffsetsBuffer)
@@ -764,10 +717,6 @@ namespace UnityEngine.Rendering.HighDefinition
         }
 
         internal static int DivRoundUp(int x, int y) => (x + y - 1) / y;
-
-        internal static Vector2Int DivRoundUp(Vector2Int n, int d) => new Vector2Int(HDUtils.DivRoundUp(n.x, d), HDUtils.DivRoundUp(n.y, d));
-        internal static Vector2Int DivRoundUp(Vector2Int n, Vector2Int d) => new Vector2Int(HDUtils.DivRoundUp(n.x, d.x), HDUtils.DivRoundUp(n.y, d.y));
-        internal static Vector3Int DivRoundUp(Vector3Int n, int d) => new Vector3Int(HDUtils.DivRoundUp(n.x, d), HDUtils.DivRoundUp(n.y, d), HDUtils.DivRoundUp(n.z, d));
 
         internal static bool IsQuaternionValid(Quaternion q)
             => (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]) > float.Epsilon;
@@ -807,12 +756,6 @@ namespace UnityEngine.Rendering.HighDefinition
         // Note: If you add new platform in this function, think about adding support in IsSupportedBuildTarget() function below
         internal static bool IsSupportedGraphicDevice(GraphicsDeviceType graphicDevice)
         {
-            if (graphicDevice == GraphicsDeviceType.Switch) // Switch support only enabled when forced by env variable for CI
-                return Environment.GetEnvironmentVariable("ENABLE_HDRP_SWITCH_SUPPORT") != null || Application.platform == RuntimePlatform.Switch;
-
-            if (graphicDevice == GraphicsDeviceType.Switch2) // Switch2 support only enabled when forced by env variable for CI
-                return Environment.GetEnvironmentVariable("ENABLE_HDRP_SWITCH2_SUPPORT") != null || Application.platform == RuntimePlatform.Switch2;
-
             return (graphicDevice == GraphicsDeviceType.Direct3D11 ||
                 graphicDevice == GraphicsDeviceType.Direct3D12 ||
                 graphicDevice == GraphicsDeviceType.PlayStation4 ||
@@ -824,39 +767,27 @@ namespace UnityEngine.Rendering.HighDefinition
                 graphicDevice == GraphicsDeviceType.GameCoreXboxSeries ||
                 graphicDevice == GraphicsDeviceType.Metal ||
                 graphicDevice == GraphicsDeviceType.Vulkan
-                // || graphicDevice == GraphicsDeviceType.Switch2
-                );
-        }
-
-        internal static bool IsHardwareDynamicResolutionSupportedByDevice(GraphicsDeviceType deviceType)
-        {
-            // TODO: This information should be exposed through the SystemInfo interface
-            return (deviceType != GraphicsDeviceType.Direct3D11 &&
-                deviceType != GraphicsDeviceType.OpenGLES3 &&
-                deviceType != GraphicsDeviceType.OpenGLCore &&
-                deviceType != GraphicsDeviceType.WebGPU);
+                // Switch isn't supported currently (19.3)
+                /* || graphicDevice == GraphicsDeviceType.Switch */);
         }
 
 #if UNITY_EDITOR
         // This function can't be in HDEditorUtils because we need it in HDRenderPipeline.cs (and HDEditorUtils is in an editor asmdef)
         internal static bool IsSupportedBuildTarget(UnityEditor.BuildTarget buildTarget)
         {
-            if (buildTarget == UnityEditor.BuildTarget.Switch) // Switch support only enabled when forced by env variable for CI
-                return Environment.GetEnvironmentVariable("ENABLE_HDRP_SWITCH_SUPPORT") != null;
-            if (buildTarget == UnityEditor.BuildTarget.Switch2) // Switch2 support only enabled when forced by env variable for CI
-                return Environment.GetEnvironmentVariable("ENABLE_HDRP_SWITCH2_SUPPORT") != null;
             return (buildTarget == UnityEditor.BuildTarget.StandaloneWindows ||
                 buildTarget == UnityEditor.BuildTarget.StandaloneWindows64 ||
                 buildTarget == UnityEditor.BuildTarget.StandaloneLinux64 ||
+                buildTarget == UnityEditor.BuildTarget.Stadia ||
                 buildTarget == UnityEditor.BuildTarget.StandaloneOSX ||
                 buildTarget == UnityEditor.BuildTarget.WSAPlayer ||
                 buildTarget == UnityEditor.BuildTarget.XboxOne ||
                 buildTarget == UnityEditor.BuildTarget.GameCoreXboxOne ||
                 buildTarget == UnityEditor.BuildTarget.GameCoreXboxSeries  ||
-                buildTarget == UnityEditor.BuildTarget.Switch2  ||
                 buildTarget == UnityEditor.BuildTarget.PS4 ||
                 buildTarget == UnityEditor.BuildTarget.PS5 ||
                 // buildTarget == UnityEditor.BuildTarget.iOS || // IOS isn't supported
+                // buildTarget == UnityEditor.BuildTarget.Switch || // Switch isn't supported
                 buildTarget == UnityEditor.BuildTarget.LinuxHeadlessSimulation);
         }
 
@@ -895,6 +826,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 case UnityEditor.BuildTarget.StandaloneWindows64:
                     return OperatingSystemFamily.Windows;
                 case UnityEditor.BuildTarget.StandaloneLinux64:
+                case UnityEditor.BuildTarget.Stadia:
                     return OperatingSystemFamily.Linux;
                 default:
                     return OperatingSystemFamily.Other;
@@ -915,11 +847,12 @@ namespace UnityEngine.Rendering.HighDefinition
             // If the editor's graphics device type is null though, we still have to iterate the target's graphic api list.
             bool skipCheckingAPIList = autoAPI && systemGraphicsDeviceType != GraphicsDeviceType.Null;
 
-            return skipCheckingAPIList
-                ? HDUtils.IsSupportedGraphicDevice(SystemInfo.graphicsDeviceType)
-                : HDUtils.AreGraphicsAPIsSupported(activeBuildTarget, ref unsupportedGraphicDevice)
-                  && HDUtils.IsSupportedBuildTarget(activeBuildTarget)
-                  && HDUtils.IsOperatingSystemSupported(SystemInfo.operatingSystem);
+            if (skipCheckingAPIList ? HDUtils.IsSupportedGraphicDevice(SystemInfo.graphicsDeviceType) : HDUtils.AreGraphicsAPIsSupported(activeBuildTarget, ref unsupportedGraphicDevice)
+                    && HDUtils.IsSupportedBuildTarget(activeBuildTarget)
+                    && HDUtils.IsOperatingSystemSupported(SystemInfo.operatingSystem))
+                return true;
+
+            return false;
         }
 
 #endif
@@ -1086,7 +1019,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <param name="renderContext">Current Scriptable Render Context.</param>
         /// <param name="cmd">Command Buffer used for rendering.</param>
         /// <param name="rendererList">Renderer List to render.</param>
-        [Obsolete("Please use CoreUtils.DrawRendererList instead. #from(2021.1)")]
+        [Obsolete("Please use CoreUtils.DrawRendererList instead.")]
         public static void DrawRendererList(ScriptableRenderContext renderContext, CommandBuffer cmd, UnityEngine.Rendering.RendererList rendererList)
         {
             CoreUtils.DrawRendererList(renderContext, cmd, rendererList);
@@ -1279,21 +1212,7 @@ namespace UnityEngine.Rendering.HighDefinition
             if (isSupportedBuildTarget)
                 msg = "Platform " + currentPlatform + " with graphics API " + graphicAPI + " is not supported with HDRP";
             else
-            {
                 msg = "Platform " + currentPlatform + " is not supported with HDRP";
-
-#if UNITY_EDITOR
-                if (buildTarget == UnityEditor.BuildTarget.Switch2)
-                {
-                    msg += ". (For testing purpose only, un-hide by defining environment variable ENABLE_HDRP_SWITCH2_SUPPORT)";
-                }
-#else
-                if (currentPlatform == "Switch2 OS")
-                {
-                    msg += ". (For testing purpose only, un-hide by defining environment variable ENABLE_HDRP_SWITCH2_SUPPORT)";
-                }
-#endif
-            }
 
             // Display more information to the users when it should have use Metal instead of OpenGL
             if (graphicAPI.StartsWith("OpenGL"))

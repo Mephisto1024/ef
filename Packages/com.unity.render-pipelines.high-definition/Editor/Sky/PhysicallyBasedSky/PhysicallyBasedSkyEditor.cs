@@ -1,5 +1,5 @@
+using UnityEditor.Rendering;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
 namespace UnityEditor.Rendering.HighDefinition
@@ -9,9 +9,10 @@ namespace UnityEditor.Rendering.HighDefinition
     class PhysicallyBasedSkyEditor : SkySettingsEditor
     {
         SerializedDataParameter m_Type;
-        SerializedDataParameter m_AtmosphericScattering;
-        SerializedDataParameter m_Mode;
-        SerializedDataParameter m_Material;
+        SerializedDataParameter m_SphericalMode;
+        SerializedDataParameter m_SeaLevel;
+        SerializedDataParameter m_PlanetaryRadius;
+        SerializedDataParameter m_PlanetCenterPosition;
         SerializedDataParameter m_PlanetRotation;
         SerializedDataParameter m_GroundColorTexture;
         SerializedDataParameter m_GroundTint;
@@ -33,10 +34,6 @@ namespace UnityEditor.Rendering.HighDefinition
         SerializedDataParameter m_AerosolTint;
         SerializedDataParameter m_AerosolAnisotropy;
 
-        SerializedDataParameter m_OzoneDensity;
-        SerializedDataParameter m_OzoneMinimumAltitude;
-        SerializedDataParameter m_OzoneLayerWidth;
-
         SerializedDataParameter m_ColorSaturation;
         SerializedDataParameter m_AlphaSaturation;
         SerializedDataParameter m_AlphaMultiplier;
@@ -44,13 +41,10 @@ namespace UnityEditor.Rendering.HighDefinition
         SerializedDataParameter m_ZenithTint;
         SerializedDataParameter m_HorizonZenithShift;
 
+        GUIContent m_ModelTypeLabel = new GUIContent("Type", "Specifies a preset to simplify the interface.");
+
         GUIContent[] m_ModelTypes = { new GUIContent("Earth (Simple)"), new GUIContent("Earth (Advanced)"), new GUIContent("Custom Planet") };
         int[] m_ModelTypeValues = { (int)PhysicallyBasedSkyModel.EarthSimple, (int)PhysicallyBasedSkyModel.EarthAdvanced, (int)PhysicallyBasedSkyModel.Custom };
-
-        static public readonly GUIContent k_NewMaterialButtonText = EditorGUIUtility.TrTextContent("New", "Creates a new Physically Based Sky Material asset template.");
-        static public readonly GUIContent k_CustomMaterial = EditorGUIUtility.TrTextContent("Material", "Sets a custom material that will be used to render the PBR Sky. If set to None, the default Rendering Mode is used.");
-
-        static public readonly string k_NewSkyMaterialText = "Physically Based Sky";
 
         public override void OnEnable()
         {
@@ -63,9 +57,10 @@ namespace UnityEditor.Rendering.HighDefinition
             var o = new PropertyFetcher<PhysicallyBasedSky>(serializedObject);
 
             m_Type = Unpack(o.Find(x => x.type));
-            m_AtmosphericScattering = Unpack(o.Find(x => x.atmosphericScattering));
-            m_Mode = Unpack(o.Find(x => x.renderingMode));
-            m_Material = Unpack(o.Find(x => x.material));
+            m_SphericalMode = Unpack(o.Find(x => x.sphericalMode));
+            m_SeaLevel = Unpack(o.Find(x => x.seaLevel));
+            m_PlanetaryRadius = Unpack(o.Find(x => x.planetaryRadius));
+            m_PlanetCenterPosition = Unpack(o.Find(x => x.planetCenterPosition));
             m_PlanetRotation = Unpack(o.Find(x => x.planetRotation));
             m_GroundColorTexture = Unpack(o.Find(x => x.groundColorTexture));
             m_GroundTint = Unpack(o.Find(x => x.groundTint));
@@ -87,10 +82,6 @@ namespace UnityEditor.Rendering.HighDefinition
             m_AerosolTint = Unpack(o.Find(x => x.aerosolTint));
             m_AerosolAnisotropy = Unpack(o.Find(x => x.aerosolAnisotropy));
 
-            m_OzoneDensity = Unpack(o.Find(x => x.ozoneDensityDimmer));
-            m_OzoneMinimumAltitude = Unpack(o.Find(x => x.ozoneMinimumAltitude));
-            m_OzoneLayerWidth = Unpack(o.Find(x => x.ozoneLayerWidth));
-
             m_ColorSaturation = Unpack(o.Find(x => x.colorSaturation));
             m_AlphaSaturation = Unpack(o.Find(x => x.alphaSaturation));
             m_AlphaMultiplier = Unpack(o.Find(x => x.alphaMultiplier));
@@ -99,66 +90,49 @@ namespace UnityEditor.Rendering.HighDefinition
             m_HorizonZenithShift = Unpack(o.Find(x => x.horizonZenithShift));
         }
 
-        void ModelTypeField(SerializedDataParameter property)
-        {
-            var title = EditorGUIUtility.TrTextContent(property.displayName,
-                property.GetAttribute<TooltipAttribute>()?.tooltip);
-
-            using (var scope = new OverridablePropertyScope(property, title, this))
-            {
-                if (!scope.displayed)
-                    return;
-
-                var rect = EditorGUILayout.GetControlRect();
-                EditorGUI.BeginProperty(rect, title, property.value);
-
-                EditorGUI.BeginChangeCheck();
-                var value = EditorGUI.IntPopup(rect, title, property.value.intValue, m_ModelTypes, m_ModelTypeValues);
-                if (EditorGUI.EndChangeCheck())
-                    property.value.intValue = value;
-
-                EditorGUI.EndProperty();
-            }
-        }
-
         public override void OnInspectorGUI()
         {
             DrawHeader("Model");
 
-            ModelTypeField(m_Type);
-            PropertyField(m_AtmosphericScattering);
+            using (var scope = new OverridablePropertyScope(m_Type, m_ModelTypeLabel, this))
+                if (scope.displayed)
+                    m_Type.value.intValue = EditorGUILayout.IntPopup(m_ModelTypeLabel, m_Type.value.intValue, m_ModelTypes, m_ModelTypeValues);
 
-            DrawHeader("Planet and Space");
-
-            PropertyField(m_Mode);
-            bool hasMaterial = m_Mode.value.intValue == 1;
-            if (hasMaterial)
-            {
-                using (new IndentLevelScope())
-                {
-                    MaterialFieldWithButton(m_Material, k_CustomMaterial);
-                }
-                    
-            }
+            PhysicallyBasedSkyModel type = (PhysicallyBasedSkyModel)m_Type.value.intValue;
 
             DrawHeader("Planet");
 
-            PhysicallyBasedSkyModel type = (PhysicallyBasedSkyModel)m_Type.value.intValue;
-            if (type != PhysicallyBasedSkyModel.EarthSimple && !hasMaterial)
+            if (type == PhysicallyBasedSkyModel.EarthSimple)
+                PropertyField(m_SeaLevel);
+            else
             {
+                PropertyField(m_SphericalMode);
+
+                using (new IndentLevelScope())
+                {
+                    bool isSpherical = !m_SphericalMode.overrideState.boolValue || m_SphericalMode.value.boolValue;
+                    if (isSpherical)
+                    {
+                        PropertyField(m_PlanetCenterPosition);
+                        if (type == PhysicallyBasedSkyModel.Custom)
+                            PropertyField(m_PlanetaryRadius);
+                    }
+                    else
+                        PropertyField(m_SeaLevel);
+                }
+
                 PropertyField(m_PlanetRotation);
                 PropertyField(m_GroundColorTexture);
             }
 
-            ColorFieldLinear(m_GroundTint);
-
-            if (type != PhysicallyBasedSkyModel.EarthSimple && !hasMaterial)
+            PropertyField(m_GroundTint);
+            if (type != PhysicallyBasedSkyModel.EarthSimple)
             {
                 PropertyField(m_GroundEmissionTexture);
                 PropertyField(m_GroundEmissionMultiplier);
             }
 
-            if (type != PhysicallyBasedSkyModel.EarthSimple && !hasMaterial)
+            if (type != PhysicallyBasedSkyModel.EarthSimple)
             {
                 DrawHeader("Space");
                 PropertyField(m_SpaceRotation);
@@ -179,19 +153,10 @@ namespace UnityEditor.Rendering.HighDefinition
             DrawHeader("Aerosols");
             PropertyField(m_AerosolDensity);
             PropertyField(m_AerosolTint);
-            PropertyField(m_AerosolAnisotropy);
-            if (type != PhysicallyBasedSkyModel.EarthSimple)
-                PropertyField(m_AerosolMaximumAltitude);
-
             if (type != PhysicallyBasedSkyModel.EarthSimple)
             {
-                DrawHeader("Ozone");
-                PropertyField(m_OzoneDensity);
-                if (type == PhysicallyBasedSkyModel.Custom)
-                {
-                    PropertyField(m_OzoneMinimumAltitude);
-                    PropertyField(m_OzoneLayerWidth);
-                }
+                PropertyField(m_AerosolAnisotropy);
+                PropertyField(m_AerosolMaximumAltitude);
             }
 
             EditorGUILayout.Space();
@@ -207,48 +172,6 @@ namespace UnityEditor.Rendering.HighDefinition
             DrawHeader("Miscellaneous");
 
             base.CommonSkySettingsGUI();
-        }
-
-        internal void MaterialFieldWithButton(SerializedDataParameter prop, GUIContent label)
-        {
-            using (var scope = new OverridablePropertyScope(prop, prop.displayName, this))
-            {
-                if (!scope.displayed)
-                    return;
-
-                const int k_NewFieldWidth = 70;
-                var rect = EditorGUILayout.GetControlRect();
-                rect.xMax -= k_NewFieldWidth + 2;
-
-                var newFieldRect = rect;
-                newFieldRect.x = rect.xMax + 2;
-                newFieldRect.width = k_NewFieldWidth;
-
-                EditorGUI.PropertyField(rect, prop.value, label);
-
-                if (GUI.Button(newFieldRect, k_NewMaterialButtonText))
-                {
-                    string materialName = "New " + k_NewSkyMaterialText + ".mat";
-                    var materialIcon = AssetPreview.GetMiniTypeThumbnail(typeof(Material));
-                    var action = ScriptableObject.CreateInstance<DoCreatePBRSkyDefaultMaterial>();
-                    action.physicallyBasedSky = target as PhysicallyBasedSky;
-                    ProjectWindowUtil.StartNameEditingIfProjectWindowExists(0, action, materialName, materialIcon, null);
-                }
-            }
-        }
-    }
-
-    class DoCreatePBRSkyDefaultMaterial : ProjectWindowCallback.EndNameEditAction
-    {
-        public PhysicallyBasedSky physicallyBasedSky;
-        public Material material = null;
-        public override void Action(int instanceId, string pathName, string resourceFile)
-        {
-            var shader = GraphicsSettings.GetRenderPipelineSettings<HDRenderPipelineRuntimeMaterials>().pbrSkyMaterial;
-            material = new Material(shader);
-            AssetDatabase.CreateAsset(material, pathName);
-            ProjectWindowUtil.ShowCreatedAsset(material);
-            physicallyBasedSky.material.value = material;
         }
     }
 }

@@ -4,7 +4,7 @@
 
 This is most obvious if you compare the original and digital signals for an audio source at its highest frequencies, or a visual source in its smallest details. Regular signal processing uses the [Nyquist rate](Glossary.md#NyquistRate) to avoid aliasing, however it's not practical for image rendering because it's resource intensive.
 
-![Example of aliasing happening during the rasterization process.](Images/MSAA1.png)
+![](Images/MSAA1.png)
 
 An example of the rasterization process creating some aliasing.
 
@@ -87,27 +87,27 @@ When you use MSAA, be aware of the following:
   * Normal Buffer patch up by Decals. It mean Decal which affect material's normal won't affect Screen space reflection (SSR). This isn't a problem as the effect is disabled, see 1.
 * MSAA doesn't affect the following features. HDRP doesn't disable these effects, it just doesn't process MSAA for them:
   * [Post-processing](Post-Processing-Main.md).
-  * [Subsurface scattering](skin-and-diffusive-surfaces-subsurface-scattering.md).
+  * [Subsurface scattering](Subsurface-Scattering.md).
   * Low Resolution Transparency.
 * Ray tracing doesn't support MSAA. If you use ray tracing in your project, you are unable to use MSAA.
-* The water system is not compatible with MSAA. If enable the water system in your project, you are unable to use MSAA.
+* The Water System is not compatible with MSAA. If enable the water system in your project, you are unable to use MSAA.
 
 When you enable MSAA in your Unity Project, you must also enable it for your Cameras in their [Frame Settings](Frame-Settings.md). You can do this either globally or on individual Cameras. To enable MSAA globally, go to **Edit** > **Project Settings** > **HDRP Default Settings** > **Frame Settings**. To enable MSAA on a per-Camera basis, enable Forward Lit Shader Mode and then enable the MSAA within Forward checkbox. For information on where to find global and local Frame Settings, see the documentation on [Frame Settings](Frame-Settings.md).
 
 Increasing the MSAA Sample Count produces smoother antialiasing, at the cost of performance. Here are some visual examples showing the effect of the different MSAA Sample Counts:
 
-![Rendered image sample with MSAA Sample Count set to None.](Images/MSAA3.png)
+![](Images/MSAA3.png)
 
 MSAA Sample Count set to None.
 
-![Rendered image sample with MSAA Sample Count set to MSAA 2X.](Images/MSAA4.png)
+![](Images/MSAA4.png)
 
 MSAA Sample Count set to MSAA 2X.
 
-![Rendered image sample with MSAA Sample Count set to MSAA 4X.](Images/MSAA5.png)
+![](Images/MSAA5.png)
 
 MSAA Sample Count set to MSAA 4X.
 
-![Rendered image sample with MSAA Sample Count set to MSAA 8X.](Images/MSAA6.png)
+![](Images/MSAA6.png)
 
 MSAA Sample Count set to MSAA 8X.

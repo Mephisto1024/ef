@@ -43,9 +43,8 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds settings for screen space reflection and ray traced reflections.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Lighting/Screen Space Reflection")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Override-Screen-Space-Reflection")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Lighting/Screen Space Reflection", typeof(HDRenderPipeline))]
+    [HDRPHelpURLAttribute("Override-Screen-Space-Reflection")]
     public class ScreenSpaceReflection : VolumeComponentWithQuality
     {
         bool UsesRayTracingQualityMode()
@@ -227,7 +226,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>
         /// Defines the LOD Bias for sampling all the textures.
         /// </summary>
-        public ClampedFloatParameter textureLodBias = new ClampedFloatParameter(1.0f, 0.0f, 7.0f);
+        public ClampedIntParameter textureLodBias = new ClampedIntParameter(1, 0, 7);
 
         /// <summary>
         /// Controls the length of reflection rays in meters.
@@ -253,13 +252,16 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             get
             {
-                return m_ClampValue.value;
+                if (!UsesQualitySettings() || UsesRayTracingQualityMode())
+                    return m_ClampValue.value;
+                else
+                    return GetLightingQualitySettings().RTRClampValue[(int)quality.value];
             }
             set { m_ClampValue.value = value; }
         }
         [SerializeField, FormerlySerializedAs("clampValue")]
         [Tooltip("Clamps the exposed intensity, this only affects reflections on opaque objects.")]
-        private MinFloatParameter m_ClampValue = new MinFloatParameter(100.0f, 0.001f);
+        private ClampedFloatParameter m_ClampValue = new ClampedFloatParameter(1.0f, 0.001f, 10.0f);
 
         /// <summary>
         /// Enable denoising on the ray traced reflections.
@@ -282,38 +284,38 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>
         /// Controls the radius of reflection denoiser.
         /// </summary>
-        public float denoiserRadius
+        public int denoiserRadius
         {
             get
             {
                 if (!UsesQualitySettings() || UsesRayTracingQualityMode())
                     return m_DenoiserRadius.value;
                 else
-                    return GetLightingQualitySettings().RTRDenoiserRadiusDimmer[(int)quality.value];
+                    return GetLightingQualitySettings().RTRDenoiserRadius[(int)quality.value];
             }
             set { m_DenoiserRadius.value = value; }
         }
-        [SerializeField]
+        [SerializeField, FormerlySerializedAs("denoiserRadius")]
         [Tooltip("Controls the radius of the ray traced reflection denoiser.")]
-        private ClampedFloatParameter m_DenoiserRadius = new ClampedFloatParameter(0.75f, 0.0f, 1.0f);
+        private ClampedIntParameter m_DenoiserRadius = new ClampedIntParameter(8, 1, 32);
 
         /// <summary>
-        /// Controls the anti-flickering strength of the reflection denoiser.
+        /// Controls if the denoising should affect pefectly smooth surfaces
         /// </summary>
-        public float denoiserAntiFlickeringStrength
+        public bool affectSmoothSurfaces
         {
             get
             {
                 if (!UsesQualitySettings() || UsesRayTracingQualityMode())
-                    return m_DenoiserAntiFlickeringStrength.value;
+                    return m_AffectSmoothSurfaces.value;
                 else
-                    return GetLightingQualitySettings().RTRDenoiserAntiFlicker[(int)quality.value];
+                    return GetLightingQualitySettings().RTRSmoothDenoising[(int)quality.value];
             }
-            set { m_DenoiserAntiFlickeringStrength.value = value; }
+            set { m_AffectSmoothSurfaces.value = value; }
         }
         [SerializeField]
-        [Tooltip("Controls the anti-flickering strength of the reflection denoiser.")]
-        private ClampedFloatParameter m_DenoiserAntiFlickeringStrength = new ClampedFloatParameter(1.0f, 0.0f, 1.0f);
+        [Tooltip("Denoiser affects smooth surfaces.")]
+        private BoolParameter m_AffectSmoothSurfaces = new BoolParameter(false);
 
         /// <summary>
         /// Controls which version of the effect should be used.
@@ -365,13 +367,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
         [SerializeField, FormerlySerializedAs("rayMaxIterations")]
         private MinIntParameter m_RayMaxIterationsRT = new MinIntParameter(48, 0);
-
-        /// <summary>
-        /// Controls which rendering layer mask to prioritize when sampling probes for indirect diffuse in reflections.
-        /// </summary>
-        [Tooltip("Controls which APV rendering layer mask to sample from. If no probes in proximity are from the specified layer or the feature is disabled for the Baking Set, any surrounding probes will be sampled.")]
-        [AdditionalProperty]
-        public RenderingLayerMaskParameter adaptiveProbeVolumesLayerMask = new RenderingLayerMaskParameter(UnityEngine.RenderingLayerMask.defaultRenderingLayerMask);
         #endregion
 
         internal static bool RayTracingActive(ScreenSpaceReflection volume)

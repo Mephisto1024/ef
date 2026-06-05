@@ -1,20 +1,20 @@
-#if SHADERPASS != SHADERPASS_FOG_VOLUME_OVERDRAW_DEBUG
+#if SHADERPASS != SHADERPASS_FOGVOLUME_OVERDRAW_DEBUG
 #error SHADERPASS_is_not_correctly_define
 #endif
 
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/ShaderPass/VertMesh.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Core/Utilities/GeometryUtils.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/VolumetricLighting/HDRenderPipeline.VolumetricLighting.cs.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/LightLoopDef.hlsl"
 
-uint _VolumetricFogGlobalIndex;
+uint _VolumeMaterialDataIndex;
 StructuredBuffer<VolumetricMaterialRenderingData> _VolumetricMaterialData;
-ByteAddressBuffer _VolumetricGlobalIndirectionBuffer;
 
 float3 GetCubeVertexPosition(uint vertexIndex)
 {
-    int index = _VolumetricGlobalIndirectionBuffer.Load(_VolumetricFogGlobalIndex << 2);
-    return _VolumetricMaterialData[index].obbVertexPositionWS[vertexIndex].xyz;
+    return _VolumetricMaterialData[_VolumeMaterialDataIndex].obbVertexPositionWS[vertexIndex].xyz;
 }
 
 // VertexCubeSlicing needs GetCubeVertexPosition to be declared before
@@ -50,9 +50,8 @@ VertexToFragment Vert(uint instanceId : INSTANCEID_SEMANTIC, uint vertexId : VER
 
 #else
 
-    int materialDataIndex = _VolumetricGlobalIndirectionBuffer.Load(_VolumetricFogGlobalIndex << 2);
     output.positionCS = GetQuadVertexPosition(vertexId);
-    output.positionCS.xy = output.positionCS.xy * _VolumetricMaterialData[materialDataIndex].viewSpaceBounds.zw + _VolumetricMaterialData[materialDataIndex].viewSpaceBounds.xy;
+    output.positionCS.xy = output.positionCS.xy * _VolumetricMaterialData[_VolumeMaterialDataIndex].viewSpaceBounds.zw + _VolumetricMaterialData[_VolumeMaterialDataIndex].viewSpaceBounds.xy;
     output.positionCS.w = 1;
 
 #endif // USE_VERTEX_CUBE_SLICING

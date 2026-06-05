@@ -1,13 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.VFX.Block;
+using UnityEngine;
 
 namespace UnityEditor.VFX.HDRP
 {
-    [VFXInfo(name = "Output Particle|HDRP Lit|Sphere", category = "#5Output Debug", experimental = true)]
+    [VFXInfo(experimental = true)]
     class VFXLitSphereOutput : VFXAbstractParticleHDRPLitOutput
     {
-        public override string name => "Output Particle".AppendLabel("HDRP Lit", false) + "\nSphere";
+        public override string name => "Output Particle HDRP Lit Sphere";
         public override string codeGeneratorTemplate => RenderPipeTemplate("VFXParticleSphere");
         public override VFXTaskType taskType => VFXTaskType.ParticleQuadOutput;
 
@@ -43,7 +44,7 @@ namespace UnityEditor.VFX.HDRP
         {
             get
             {
-                var orient = GetOrCreateImplicitBlock<Orient>(GetData());
+                var orient = VFXBlock.CreateImplicitBlock<Orient>(GetData());
                 orient.mode = Orient.Mode.FaceCameraPosition;
                 yield return orient;
             }
@@ -61,7 +62,6 @@ namespace UnityEditor.VFX.HDRP
                 yield return nameof(useAlphaClipping);
                 yield return nameof(doubleSided);
                 yield return nameof(shaderGraph);
-                yield return nameof(enableRayTracing);
             }
         }
 
@@ -76,7 +76,6 @@ namespace UnityEditor.VFX.HDRP
                 yield return nameof(blendMode);
                 yield return nameof(doubleSided);
                 yield return nameof(shaderGraph);
-                yield return nameof(enableRayTracing);
             }
         }
 
@@ -84,9 +83,8 @@ namespace UnityEditor.VFX.HDRP
         {
             get
             {
-                foreach (var define in base.additionalDefines)
-                    yield return define;
-
+                foreach (var d in base.additionalDefines)
+                    yield return d;
                 yield return "_CONSERVATIVE_DEPTH_OFFSET";
             }
         }

@@ -41,8 +41,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.MotionBlur);
-
             PropertyField(m_Intensity);
 
             base.OnInspectorGUI();

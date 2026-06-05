@@ -76,20 +76,58 @@ namespace UnityEngine.Rendering.HighDefinition
         IndirectPlanarProbe = 1 << 8,
     }
 
+    /// <summary>
+    /// Debug Light Layers Filtering.
+    /// </summary>
+    [GenerateHLSL]
+    [Flags]
+    public enum DebugLightLayersMask
+    {
+        /// <summary>No light layer debug.</summary>
+        None = 0,
+        /// <summary>Debug light layer 1.</summary>
+        LightLayer1 = 1 << 0,
+        /// <summary>Debug light layer 2.</summary>
+        LightLayer2 = 1 << 1,
+        /// <summary>Debug light layer 3.</summary>
+        LightLayer3 = 1 << 2,
+        /// <summary>Debug light layer 4.</summary>
+        LightLayer4 = 1 << 3,
+        /// <summary>Debug light layer 5.</summary>
+        LightLayer5 = 1 << 4,
+        /// <summary>Debug light layer 6.</summary>
+        LightLayer6 = 1 << 5,
+        /// <summary>Debug light layer 7.</summary>
+        LightLayer7 = 1 << 6,
+        /// <summary>Debug light layer 8.</summary>
+        LightLayer8 = 1 << 7,
+    }
+
+
     static class DebugLightHierarchyExtensions
     {
 
         [IgnoreWarning(1370)] //Ignore throwing exception warning on burst..
         public static bool IsEnabledFor(
              this DebugLightFilterMode mode,
-             GPULightType gpuLightType
+             GPULightType gpuLightType,
+             SpotLightShape spotLightShape
          )
         {
             switch (gpuLightType)
             {
-                case GPULightType.ProjectorBox: return (mode & DebugLightFilterMode.DirectSpotBox) != 0;
-                case GPULightType.ProjectorPyramid: return (mode & DebugLightFilterMode.DirectSpotPyramid) != 0;
-                case GPULightType.Spot: return (mode & DebugLightFilterMode.DirectSpotCone) != 0;
+                case GPULightType.ProjectorBox:
+                case GPULightType.ProjectorPyramid:
+                case GPULightType.Spot:
+                {
+                    switch (spotLightShape)
+                    {
+                        case SpotLightShape.Box: return (mode & DebugLightFilterMode.DirectSpotBox) != 0;
+                        case SpotLightShape.Cone: return (mode & DebugLightFilterMode.DirectSpotCone) != 0;
+                        case SpotLightShape.Pyramid: return (mode & DebugLightFilterMode.DirectSpotPyramid) != 0;
+                        default: throw new ArgumentOutOfRangeException(nameof(spotLightShape));
+                    }
+                }
                 case GPULightType.Tube: return (mode & DebugLightFilterMode.DirectTube) != 0;
                 case GPULightType.Point: return (mode & DebugLightFilterMode.DirectPunctual) != 0;
                 case GPULightType.Rectangle: return (mode & DebugLightFilterMode.DirectRectangle) != 0;
@@ -215,6 +253,7 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             return debugLightingMode != DebugLightingMode.None
                 || debugLightFilterMode != DebugLightFilterMode.None
+                || debugLightLayers
                 || overrideSmoothness
                 || overrideAlbedo
                 || overrideNormal
@@ -228,11 +267,13 @@ namespace UnityEngine.Rendering.HighDefinition
         public DebugLightFilterMode debugLightFilterMode = DebugLightFilterMode.None;
         /// <summary>Current Full Screen Lighting debug mode.</summary>
         public DebugLightingMode debugLightingMode = DebugLightingMode.None;
-        /// <summary>Current filtered Rendering Layer Mask.</summary>
-        public RenderingLayerMask debugLightLayersFilterMask = RenderingLayerMask.Everything;
-        /// <summary>True if filter should match Light Layer mask of the selected light.</summary>
+        /// <summary>True if light layers visualization is enabled.</summary>
+        public bool debugLightLayers = false;
+        /// <summary>Current Light Layers Filtering mode.</summary>
+        public DebugLightLayersMask debugLightLayersFilterMask = (DebugLightLayersMask)(-1); // Select Everything by default
+        /// <summary>True if light layers visualization uses light layers of the selected light.</summary>
         public bool debugSelectionLightLayers = false;
-        /// <summary>True if filter should match Custom Shadow Layer mask of the selected light.</summary>
+        /// <summary>True if light layers visualization uses shadow layers of the selected light.</summary>
         public bool debugSelectionShadowLayers = false;
         /// <summary>Rendering Layers Debug Colors.</summary>
         public Vector4[] debugRenderingLayersColors = GetDefaultRenderingLayersColorPalette();
@@ -291,7 +332,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>Exposure compensation to apply on current scene exposure.</summary>
         public float debugExposure = 0.0f;
         /// <summary>Obsolete, please use  the lens attenuation mode in HDRP Global Settings.</summary>
-        [Obsolete("Please use the lens attenuation mode in HDRP Global Settings. #from(2021.1) #breakingFrom(2021.1)", true)]
+        [Obsolete("Please use the lens attenuation mode in HDRP Global Settings", true)]
         public float debugLensAttenuation = 0.65f;
         /// <summary>Whether to show tonemap curve in the histogram debug view or not.</summary>
         public bool showTonemapCurveAlongHistogramView = true;
@@ -340,7 +381,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public bool showReflectionProbe = true;
 
         /// <summary>Display the Local Volumetric Fog atlas.</summary>
-        [Obsolete("The local volumetric fog atlas was removed. This field is unused. #from(2023.1)")]
+        [Obsolete("The local volumetric fog atlas was removed. This field is unused.")]
         public bool displayLocalVolumetricFogAtlas = false;
         /// <summary>Local Volumetric Fog atlas slice.</summary>
         public uint localVolumetricFogAtlasSlice = 0;
@@ -355,25 +396,6 @@ namespace UnityEngine.Rendering.HighDefinition
         public ClusterDebugMode clusterDebugMode = ClusterDebugMode.VisualizeOpaque;
         /// <summary>Distance at which clusters will be visualized.</summary>
         public float clusterDebugDistance = 1.0f;
-
-        /// <summary>Light category for cluster debug view.</summary>
-        public ClusterLightCategoryDebug clusterLightCategory = ClusterLightCategoryDebug.All;
-
-
-        /// <summary>Enable to make HDRP mix the albedo of the Material with its material capture.</summary>
-        public bool matCapMixAlbedo = false ;
-
-        /// <summary>Set the intensity of the material capture. This increases the brightness of the Scene. This is useful if the albedo darkens the Scene considerably.</summary>
-        public float matCapMixScale = 1.0f;
-
-#if UNITY_EDITOR
-        public LightingDebugSettings()
-        {
-            var matCapMode = HDRenderPipelinePreferences.matCapMode;
-            matCapMixAlbedo = matCapMode.mixAlbedo.value;
-            matCapMixScale = matCapMode.viewScale.value;
-        }
-#endif
 
         // Internal APIs
         internal bool IsDebugDisplayRemovePostprocess()
@@ -397,15 +419,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 new Vector4(240, 228, 66) / 255,
                 new Vector4(0, 114, 178) / 255,
                 new Vector4(213, 94, 0) / 255,
-                new Vector4(170, 68, 170) / 255,
-                new Vector4(1.0f, 0.5f, 0.5f),
-                new Vector4(0.5f, 1.0f, 0.5f),
-                new Vector4(0.5f, 0.5f, 1.0f),
-                new Vector4(0.5f, 1.0f, 1.0f),
-                new Vector4(0.75f, 0.25f, 1.0f),
-                new Vector4(0.25f, 1.0f, 0.75f),
-                new Vector4(0.25f, 0.25f, 0.75f),
-                new Vector4(0.75f, 0.25f, 0.25f),
+                new Vector4(170, 68, 170) / 255
             };
 
             int i = 0;
@@ -416,25 +430,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 colors[i] = new Vector4(0, 0, 0);
 
             return colors;
-        }
-
-        internal int ComputeOverrideHash()
-        {
-            int hash = (overrideSmoothness ? 1 : 0);
-            hash |= (overrideAlbedo ? 1 : 0) << 1;
-            hash |= (overrideNormal ? 1 : 0) << 2;
-            hash |= (overrideAmbientOcclusion ? 1 : 0) << 3;
-            hash |= (overrideSpecularColor ? 1 : 0) << 4;
-            hash |= (overrideEmissiveColor ? 1 : 0) << 5;
-            unchecked
-            {
-                hash = hash * 23 + overrideSmoothnessValue.GetHashCode();
-                hash = hash * 23 + overrideAlbedoValue.GetHashCode();
-                hash = hash * 23 + overrideAmbientOcclusionValue.GetHashCode();
-                hash = hash * 23 + overrideSpecularColorValue.GetHashCode();
-                hash = hash * 23 + overrideEmissiveColorValue.GetHashCode();
-            }
-            return hash;
         }
     }
 }

@@ -1,18 +1,13 @@
 {
     "name": "Unity.RenderPipelines.HighDefinition.Runtime",
-    "rootNamespace": "",
     "references": [
         "Unity.RenderPipelines.Core.Runtime",
-        "Unity.RenderPipelines.Core.Runtime.Shared",
         "Unity.ugui",
         "Unity.Mathematics",
-        "Unity.Collections",
         "Unity.Burst",
         "Unity.RenderPipelines.HighDefinition.Config.Runtime",
         "Unity.Rendering.Denoising.Runtime",
-        "Unity.Timeline",
-        "Unity.VisualEffectGraph.Runtime",
-        "Unity.RenderPipelines.GPUDriven.Runtime"
+        "Unity.VisualEffectGraph.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -48,14 +43,9 @@
             "define": "ENABLE_NVIDIA_MODULE"
         },
         {
-            "name": "com.unity.modules.amd",
-            "expression": "1.0.0",
-            "define": "ENABLE_AMD_MODULE"
-        },
-        {
-            "name": "com.unity.mathematics",
-            "expression": "1.2.1",
-            "define": "ENABLE_MATHEMATICS_1_2_1"
+            "name" : "com.unity.mathematics",
+            "expression" : "1.2.1",
+            "define" : "ENABLE_MATHEMATICS_1_2_1"
         },
         {
             "name": "com.unity.burst",
@@ -66,11 +56,6 @@
             "name": "com.unity.sensorsdk",
             "expression": "2.0.0",
             "define": "ENABLE_SENSOR_SDK"
-        },
-        {
-            "name": "com.unity.timeline",
-            "expression": "1.0.0",
-            "define": "HDRP_HAS_TIMELINE"
         },
         {
             "name": "com.unity.rendering.denoising",

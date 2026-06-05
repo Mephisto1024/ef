@@ -1,15 +1,12 @@
-using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
-using Object = UnityEngine.Object;
-using RenderingLayerMask = UnityEngine.Rendering.HighDefinition.RenderingLayerMask;
 
 namespace UnityEditor.Rendering.HighDefinition
 {
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
+    [LightingExplorerExtensionAttribute(typeof(HDRenderPipelineAsset))]
     class HDLightExplorerExtension : DefaultLightingExplorerExtension
     {
         struct LightData
@@ -60,7 +57,6 @@ namespace UnityEditor.Rendering.HighDefinition
             public static readonly GUIContent Name = EditorGUIUtility.TrTextContent("Name");
             public static readonly GUIContent Enabled = EditorGUIUtility.TrTextContent("Enabled");
             public static readonly GUIContent Type = EditorGUIUtility.TrTextContent("Type");
-            public static readonly GUIContent LightShape = EditorGUIUtility.TrTextContent("Shape");
             public static readonly GUIContent Shape = EditorGUIUtility.TrTextContent("Shape");
             public static readonly GUIContent Mode = EditorGUIUtility.TrTextContent("Mode");
             public static readonly GUIContent Range = EditorGUIUtility.TrTextContent("Range");
@@ -97,13 +93,11 @@ namespace UnityEditor.Rendering.HighDefinition
             public static readonly GUIContent ShadowDistance = EditorGUIUtility.TrTextContent("Shadow Distance");
             public static readonly GUIContent NearClip = EditorGUIUtility.TrTextContent("Near Clip");
             public static readonly GUIContent FarClip = EditorGUIUtility.TrTextContent("Far Clip");
-            public static readonly GUIContent Resolution = EditorGUIUtility.TrTextContent("Resolution Level");
-            public static readonly GUIContent CustomResolution = EditorGUIUtility.TrTextContent("Resolution Value");
             public static readonly GUIContent ParallaxCorrection = EditorGUIUtility.TrTextContent("Influence Volume as Proxy Volume");
             public static readonly GUIContent Weight = EditorGUIUtility.TrTextContent("Weight");
 
             public static readonly GUIContent[] LightTypeTitles = { EditorGUIUtility.TrTextContent("Spot"), EditorGUIUtility.TrTextContent("Directional"), EditorGUIUtility.TrTextContent("Point"), EditorGUIUtility.TrTextContent("Area") };
-            public static readonly int[] LightTypeValues = { (int)LightType.Spot, (int)LightType.Directional, (int)LightType.Point, (int)LightType.Rectangle };
+            public static readonly int[] LightTypeValues = { (int)HDLightType.Spot, (int)HDLightType.Directional, (int)HDLightType.Point, (int)HDLightType.Area };
             internal static readonly GUIContent DrawProbes = EditorGUIUtility.TrTextContent("Draw");
             internal static readonly GUIContent DebugColor = EditorGUIUtility.TrTextContent("Debug Color");
             internal static readonly GUIContent ResolutionX = EditorGUIUtility.TrTextContent("Resolution X");
@@ -232,32 +226,16 @@ namespace UnityEditor.Rendering.HighDefinition
                         return;
                     }
 
-                    HDLightUI.LightArchetype archetype = HDLightUI.GetArchetype(lightData.legacyLight.type);
+                    HDLightType lightType = lightData.type;
 
                     EditorGUI.BeginProperty(r, GUIContent.none, prop);
                     EditorGUI.BeginChangeCheck();
-                    archetype = (HDLightUI.LightArchetype)EditorGUI.EnumPopup(r, archetype);
+                    lightType = (HDLightType)EditorGUI.IntPopup(r, (int)lightType, HDStyles.LightTypeTitles, HDStyles.LightTypeValues);
 
                     if (EditorGUI.EndChangeCheck())
                     {
                         Undo.RecordObjects(new Object[] { prop.serializedObject.targetObject, lightData }, "Changed light type");
-                        switch (archetype)
-                        {
-                            case HDLightUI.LightArchetype.Spot:
-                                lightData.legacyLight.type = LightType.Spot;
-                                break;
-                            case HDLightUI.LightArchetype.Directional:
-                                lightData.legacyLight.type = LightType.Directional;
-                                break;
-                            case HDLightUI.LightArchetype.Point:
-                                lightData.legacyLight.type = LightType.Point;
-                                break;
-                            case HDLightUI.LightArchetype.Area:
-                                lightData.legacyLight.type = LightType.Rectangle;
-                                break;
-                            default:
-                                throw new ArgumentOutOfRangeException();
-                        }
+                        lightData.type = lightType;
                     }
                     EditorGUI.EndProperty();
                 }, (lprop, rprop) =>
@@ -268,132 +246,20 @@ namespace UnityEditor.Rendering.HighDefinition
                         if (IsNullComparison(lLightData, rLightData, out var order))
                             return order;
 
-                        return ((int)lLightData.legacyLight.type).CompareTo((int)rLightData.legacyLight.type);
+                        return ((int)lLightData.type).CompareTo((int)rLightData.type);
                     }, (target, source) =>
                     {
                         if (!TryGetAdditionalLightData(target, out var tLightData) || !TryGetAdditionalLightData(source, out var sLightData))
                             return;
 
                         Undo.RecordObjects(new Object[] { target.serializedObject.targetObject, tLightData }, "Changed light type");
-                        tLightData.legacyLight.type = sLightData.legacyLight.type;
+                        tLightData.type = sLightData.type;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.LightShape, "m_Type", 100, (r, prop, dep) =>                          // 3: LightShape
-                {
-                    if (!TryGetAdditionalLightData(prop, out var lightData))
-                    {
-                        EditorGUI.LabelField(r, "--");
-                        return;
-                    }
-
-
-                    if (lightData.legacyLight.type.IsSpot())
-                    {
-                        HDLightUI.SpotSubtype spotSubType = HDLightUI.SpotSubtype.Cone;
-                        if (lightData.legacyLight.type == LightType.Spot)
-                        {
-                            spotSubType = HDLightUI.SpotSubtype.Cone;
-                        }
-                        else if (lightData.legacyLight.type == LightType.Pyramid)
-                        {
-                            spotSubType = HDLightUI.SpotSubtype.Pyramid;
-                        }
-                        else if (lightData.legacyLight.type == LightType.Box)
-                        {
-                            spotSubType = HDLightUI.SpotSubtype.Box;
-                        }
-
-                        EditorGUI.BeginProperty(r, GUIContent.none, prop);
-                        EditorGUI.BeginChangeCheck();
-                        spotSubType = (HDLightUI.SpotSubtype)EditorGUI.EnumPopup(r, spotSubType);
-
-                        if (EditorGUI.EndChangeCheck())
-                        {
-                            Undo.RecordObjects(new Object[] { prop.serializedObject.targetObject, lightData }, "Changed light shape");
-                            switch (spotSubType)
-                            {
-                                case HDLightUI.SpotSubtype.Cone:
-                                    lightData.legacyLight.type = LightType.Spot;
-                                    break;
-                                case HDLightUI.SpotSubtype.Pyramid:
-                                    lightData.legacyLight.type = LightType.Pyramid;
-                                    break;
-                                case HDLightUI.SpotSubtype.Box:
-                                    lightData.legacyLight.type = LightType.Box;
-                                    break;
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
-                        }
-                        EditorGUI.EndProperty();
-                    }
-                    else if (lightData.legacyLight.type.IsArea())
-                    {
-                        HDLightUI.AreaSubtype areaSubType = HDLightUI.AreaSubtype.Rectangle;
-                        if (lightData.legacyLight.type == LightType.Rectangle)
-                        {
-                            areaSubType = HDLightUI.AreaSubtype.Rectangle;
-                        }
-                        else if (lightData.legacyLight.type == LightType.Tube)
-                        {
-                            areaSubType = HDLightUI.AreaSubtype.Tube;
-                        }
-                        else if (lightData.legacyLight.type == LightType.Disc)
-                        {
-                            areaSubType = HDLightUI.AreaSubtype.Disc;
-                        }
-
-                        EditorGUI.BeginProperty(r, GUIContent.none, prop);
-                        EditorGUI.BeginChangeCheck();
-                        areaSubType = (HDLightUI.AreaSubtype)EditorGUI.EnumPopup(r, areaSubType);
-
-                        if (EditorGUI.EndChangeCheck())
-                        {
-                            Undo.RecordObjects(new Object[] { prop.serializedObject.targetObject, lightData }, "Changed light shape");
-                            switch (areaSubType)
-                            {
-                                case HDLightUI.AreaSubtype.Rectangle:
-                                    lightData.legacyLight.type = LightType.Rectangle;
-                                    break;
-                                case HDLightUI.AreaSubtype.Tube:
-                                    lightData.legacyLight.type = LightType.Tube;
-                                    break;
-                                case HDLightUI.AreaSubtype.Disc:
-                                    lightData.legacyLight.type = LightType.Disc;
-                                    break;
-                                default:
-                                    throw new ArgumentOutOfRangeException();
-                            }
-                        }
-                        EditorGUI.EndProperty();
-                    }
-                    else
-                    {
-                        EditorGUI.LabelField(r, "--");
-                        return;
-                    }
-                }, (lprop, rprop) =>
-                    {
-                        TryGetAdditionalLightData(lprop, out var lLightData);
-                        TryGetAdditionalLightData(rprop, out var rLightData);
-
-                        if (IsNullComparison(lLightData, rLightData, out var order))
-                            return order;
-
-                        return ((int)lLightData.legacyLight.type).CompareTo((int)rLightData.legacyLight.type);
-                    }, (target, source) =>
-                    {
-                        if (!TryGetAdditionalLightData(target, out var tLightData) || !TryGetAdditionalLightData(source, out var sLightData))
-                            return;
-
-                        Undo.RecordObjects(new Object[] { target.serializedObject.targetObject, tLightData }, "Changed light shape");
-                        tLightData.legacyLight.type = sLightData.legacyLight.type;
-                    }),
-
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.Mode, "m_Lightmapping", 90),                                    // 4: Mixed mode
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.Range, "m_Range", 60),                                         // 5: Range
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Color, HDStyles.Color, "m_Color", 60),                                         // 6: Color
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.ColorTemperatureMode, "m_UseColorTemperature", 150),        // 7: Color Temperature Mode
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.ColorTemperature, "m_ColorTemperature", 120, (r, prop, dep) => // 8: Color Temperature
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.Mode, "m_Lightmapping", 90),                                    // 3: Mixed mode
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.Range, "m_Range", 60),                                         // 4: Range
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Color, HDStyles.Color, "m_Color", 60),                                         // 5: Color
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.ColorTemperatureMode, "m_UseColorTemperature", 150),        // 6: Color Temperature Mode
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.ColorTemperature, "m_ColorTemperature", 120, (r, prop, dep) => // 7: Color Temperature
                 {
                     // Sometimes during scene transition, the target object can be null, causing exceptions.
                     using (new EditorGUI.DisabledScope(prop.serializedObject.targetObject == null || !prop.serializedObject.FindProperty("m_UseColorTemperature").boolValue))
@@ -410,7 +276,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
                         return lTemp.CompareTo(rTemp);
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.Intensity, "m_Intensity", 60, (r, prop, dep) =>                // 9: Intensity
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.Intensity, "m_Intensity", 60, (r, prop, dep) =>                // 8: Intensity
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -418,23 +284,15 @@ namespace UnityEditor.Rendering.HighDefinition
                         return;
                     }
 
-                    LightType lightType = lightData.legacyLight.type;
-                    LightUnit nativeUnit = LightUnitUtils.GetNativeLightUnit(lightType);
-                    LightUnit lightUnit = lightData.legacyLight.lightUnit;
-                    float nativeIntensity = lightData.legacyLight.intensity;
-
-                    // Verify that ui light unit is in fact supported or revert to native.
-                    lightUnit = LightUnitUtils.IsLightUnitSupported(lightType, lightUnit) ? lightUnit : nativeUnit;
-
-                    float curIntensity = LightUnitUtils.ConvertIntensity(lightData.legacyLight, nativeIntensity, nativeUnit, lightUnit);
+                    float intensity = lightData.intensity;
 
                     EditorGUI.BeginProperty(r, GUIContent.none, prop);
                     EditorGUI.BeginChangeCheck();
-                    float newIntensity = EditorGUI.FloatField(r, curIntensity);
+                    intensity = EditorGUI.FloatField(r, intensity);
                     if (EditorGUI.EndChangeCheck())
                     {
                         Undo.RecordObjects(new Object[] { prop.serializedObject.targetObject, lightData }, "Changed light intensity");
-                        lightData.legacyLight.intensity = LightUnitUtils.ConvertIntensity(lightData.legacyLight, newIntensity, lightUnit, nativeUnit);
+                        lightData.intensity = intensity;
                     }
                     EditorGUI.EndProperty();
                 }, (lprop, rprop) =>
@@ -445,16 +303,16 @@ namespace UnityEditor.Rendering.HighDefinition
                         if (IsNullComparison(lLightData, rLightData, out var order))
                             return order;
 
-                        return ((float)lLightData.legacyLight.intensity).CompareTo((float)rLightData.legacyLight.intensity);
+                        return ((float)lLightData.intensity).CompareTo((float)rLightData.intensity);
                     }, (target, source) =>
                     {
                         if (!TryGetAdditionalLightData(target, out var tLightData) || !TryGetAdditionalLightData(source, out var sLightData))
                             return;
 
                         Undo.RecordObjects(new Object[] { target.serializedObject.targetObject, tLightData }, "Changed light intensity");
-                        tLightData.legacyLight.intensity = sLightData.legacyLight.intensity;
+                        tLightData.intensity = sLightData.intensity;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.Unit, "m_Intensity", 70, (r, prop, dep) =>                      // 10: Unit
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.Unit, "m_Intensity", 70, (r, prop, dep) =>                      // 9: Unit
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -464,13 +322,13 @@ namespace UnityEditor.Rendering.HighDefinition
 
                     EditorGUI.BeginChangeCheck();
 
-                    LightUnit unit = lightData.legacyLight.lightUnit;
-                    unit = LightUI.DrawLightIntensityUnitPopup(r, unit, lightData.legacyLight.type);
+                    LightUnit unit = lightData.lightUnit;
+                    unit = HDLightUI.DrawLightIntensityUnitPopup(r, unit, lightData.type, lightData.spotLightShape);
 
                     if (EditorGUI.EndChangeCheck())
                     {
                         Undo.RecordObject(lightData, "Changed light unit");
-                        lightData.legacyLight.lightUnit = unit;
+                        lightData.lightUnit = unit;
                     }
                 }, (lprop, rprop) =>
                     {
@@ -480,20 +338,17 @@ namespace UnityEditor.Rendering.HighDefinition
                         if (IsNullComparison(lLightData, rLightData, out var order))
                             return order;
 
-                        return ((int)lLightData.legacyLight.lightUnit).CompareTo((int)rLightData.legacyLight.lightUnit);
+                        return ((int)lLightData.lightUnit).CompareTo((int)rLightData.lightUnit);
                     }, (target, source) =>
                     {
                         if (!TryGetAdditionalLightData(target, out var tLightData) || !TryGetAdditionalLightData(source, out var sLightData))
                             return;
 
-                        if (!LightUnitUtils.IsLightUnitSupported(tLightData.legacyLight.type, sLightData.legacyLight.lightUnit))
-                            return;
-
                         Undo.RecordObject(tLightData, "Changed light unit");
-                        tLightData.legacyLight.lightUnit = sLightData.legacyLight.lightUnit;
+                        tLightData.lightUnit = sLightData.lightUnit;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.IndirectMultiplier, "m_BounceIntensity", 115),                 // 11: Indirect multiplier
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.Shadows, "m_Shadows.m_Type", 60, (r, prop, dep) =>          // 12: Shadows
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.IndirectMultiplier, "m_BounceIntensity", 115),                 // 10: Indirect multiplier
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.Shadows, "m_Shadows.m_Type", 60, (r, prop, dep) =>          // 11: Shadows
                 {
                     EditorGUI.BeginChangeCheck();
                     bool shadows = EditorGUI.Toggle(r, prop.intValue != (int)LightShadows.None);
@@ -502,7 +357,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         prop.intValue = shadows ? (int)LightShadows.Soft : (int)LightShadows.None;
                     }
                 }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.ShadowResolutionLevel, "m_Intensity", 130, (r, prop, dep) =>         // 13: Shadow Resolution level
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.ShadowResolutionLevel, "m_Intensity", 130, (r, prop, dep) =>         // 12: Shadow Resolution level
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -540,7 +395,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         tLightData.shadowResolution.level = sLightData.shadowResolution.level;
                         tLightData.shadowResolution.useOverride = sLightData.shadowResolution.useOverride;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.ShadowUpdateMode, "m_Intensity", 130, (r, prop, dep) =>         // 14: Shadow Update mode level
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.ShadowUpdateMode, "m_Intensity", 130, (r, prop, dep) =>         // 13: Shadow Update mode level
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -576,7 +431,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         Undo.RecordObject(tLightData, "Changed shadow update mode");
                         tLightData.shadowUpdateMode = sLightData.shadowUpdateMode;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Int, HDStyles.ShadowFitAtlas, "m_Intensity", 130, (r, prop, dep) =>         // 15: Shadow Fit atlas
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Int, HDStyles.ShadowFitAtlas, "m_Intensity", 130, (r, prop, dep) =>         // 13: Shadow Fit atlas
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -587,7 +442,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
                     var shadowResolution = lightData.shadowResolution;
                     int shadowRes = 0;
-                    var lightType = lightData.legacyLight.type;
+                    var lightType = lightData.type;
 
                     if (shadowResolution.useOverride)
                     {
@@ -618,17 +473,17 @@ namespace UnityEditor.Rendering.HighDefinition
 
                         var hdrp = HDRenderPipeline.currentAsset;
 
-                        var lightType = lLightData.legacyLight.type;
+                        var lightType = lLightData.type;
 
                         bool lFit = lLightData.ShadowIsUpdatedEveryFrame() || HDCachedShadowManager.instance.LightHasBeenPlacedInAtlas(lLightData);
 
-                        lightType = rLightData.legacyLight.type;
+                        lightType = rLightData.type;
 
                         bool rFit = rLightData.ShadowIsUpdatedEveryFrame() || HDCachedShadowManager.instance.LightHasBeenPlacedInAtlas(rLightData);
 
                         return rFit.CompareTo(lFit);
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Int, HDStyles.ShadowResolutionValue, "m_Intensity", 130, (r, prop, dep) =>          // 16: Shadow resolution override
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Int, HDStyles.ShadowResolutionValue, "m_Intensity", 130, (r, prop, dep) =>          // 14: Shadow resolution override
                 {
                     var hdrp = HDRenderPipeline.currentAsset;
 
@@ -654,7 +509,7 @@ namespace UnityEditor.Rendering.HighDefinition
                     }
                     else
                     {
-                        var lightType = lightData.legacyLight.type;
+                        var lightType = lightData.type;
                         var defaultValue = HDLightUI.ScalableSettings.ShadowResolution(lightType, hdrp);
 
                         using (new EditorGUI.DisabledScope(true))
@@ -673,8 +528,8 @@ namespace UnityEditor.Rendering.HighDefinition
                         var hdrp = GraphicsSettings.currentRenderPipeline as HDRenderPipelineAsset;
                         var lShadowResolution = lLightData.shadowResolution;
                         var rShadowResolution = rLightData.shadowResolution;
-                        var lLightShape = lLightData.legacyLight.type;
-                        var rLightShape = rLightData.legacyLight.type;
+                        var lLightShape = lLightData.type;
+                        var rLightShape = rLightData.type;
 
                         int lResolution = lShadowResolution.useOverride ? lShadowResolution.@override : (hdrp == null ? -1 : HDLightUI.ScalableSettings.ShadowResolution(lLightShape, hdrp)[lShadowResolution.level]);
                         int rResolution = rShadowResolution.useOverride ? rShadowResolution.@override : (hdrp == null ? -1 : HDLightUI.ScalableSettings.ShadowResolution(rLightShape, hdrp)[rShadowResolution.level]);
@@ -695,7 +550,7 @@ namespace UnityEditor.Rendering.HighDefinition
                             tShadowResolution.@override = sShadowResolution.@override;
                         }
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.ContactShadowsLevel, "m_Shadows.m_Type", 115, (r, prop, dep) =>      // 17: Contact Shadows level
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.ContactShadowsLevel, "m_Shadows.m_Type", 115, (r, prop, dep) =>      // 15: Contact Shadows level
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -730,7 +585,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         tLightData.useContactShadow.level = sLightData.useContactShadow.level;
                         tLightData.useContactShadow.useOverride = sLightData.useContactShadow.useOverride;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.ContactShadowsValue, "m_Shadows.m_Type", 115, (r, prop, dep) =>  // 18: Contact Shadows override
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.ContactShadowsValue, "m_Shadows.m_Type", 115, (r, prop, dep) =>  // 16: Contact Shadows override
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -797,7 +652,7 @@ namespace UnityEditor.Rendering.HighDefinition
                             tUseContactShadow.@override = sUseContactShadow.@override;
                         }
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.AffectDiffuse, "m_Intensity", 95, (r, prop, dep) =>         // 19: Affect Diffuse
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.AffectDiffuse, "m_Intensity", 95, (r, prop, dep) =>         // 17: Affect Diffuse
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -835,7 +690,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         Undo.RecordObject(tLightData, "Changed affects diffuse");
                         tLightData.affectDiffuse = sLightData.affectDiffuse;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.AffectSpecular, "m_Intensity", 100, (r, prop, dep) =>       // 20: Affect Specular
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.AffectSpecular, "m_Intensity", 100, (r, prop, dep) =>       // 17: Affect Specular
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -873,7 +728,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         Undo.RecordObject(tLightData, "Changed affects specular");
                         tLightData.affectSpecular = sLightData.affectSpecular;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.FadeDistance, "m_Intensity", 95, (r, prop, dep) =>             // 21: Fade Distance
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.FadeDistance, "m_Intensity", 95, (r, prop, dep) =>             // 18: Fade Distance
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -907,7 +762,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         Undo.RecordObject(tLightData, "Changed light fade distance");
                         tLightData.fadeDistance = sLightData.fadeDistance;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.ShadowFadeDistance, "m_Intensity", 145, (r, prop, dep) =>      // 22: Shadow Fade Distance
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.ShadowFadeDistance, "m_Intensity", 145, (r, prop, dep) =>      // 19: Shadow Fade Distance
                 {
                     if (!TryGetAdditionalLightData(prop, out var lightData))
                     {
@@ -941,7 +796,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         Undo.RecordObject(tLightData, "Changed light shadow fade distance");
                         tLightData.shadowFadeDistance = sLightData.shadowFadeDistance;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Custom, HDStyles.LightLayer, "m_RenderingLayerMask", 145, (r, prop, dep) =>    // 23: Light Layer
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Custom, HDStyles.LightLayer, "m_RenderingLayerMask", 145, (r, prop, dep) =>    // 20: Light Layer
                 {
                     using (new EditorGUI.DisabledScope(!HDRenderPipeline.currentAsset.currentPlatformRenderPipelineSettings.supportLightLayers))
                     {
@@ -951,13 +806,14 @@ namespace UnityEditor.Rendering.HighDefinition
                             return;
                         }
 
-                        var lightLayerMask = (uint)lightData.lightlayersMask;
+                        int lightlayersMask = (int)lightData.lightlayersMask;
+
                         EditorGUI.BeginChangeCheck();
-                        lightLayerMask = HDEditorUtils.DrawRenderingLayerMask(r, lightLayerMask, null, false);
+                        lightlayersMask = HDEditorUtils.DrawLightLayerMask(r, lightlayersMask);
                         if (EditorGUI.EndChangeCheck())
                         {
                             Undo.RecordObject(lightData, "Changed light layer");
-                            lightData.lightlayersMask = (RenderingLayerMask)lightLayerMask;
+                            lightData.lightlayersMask = (LightLayerEnum)lightlayersMask;
                         }
                     }
                 }, (lprop, rprop) =>
@@ -977,7 +833,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         Undo.RecordObject(tLightData, "Changed light layer");
                         tLightData.lightlayersMask = sLightData.lightlayersMask;
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Custom, HDStyles.IsPrefab, "m_Intensity", 120, (r, prop, dep) =>               // 24: Prefab
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Custom, HDStyles.IsPrefab, "m_Intensity", 120, (r, prop, dep) =>               // 21: Prefab
                 {
                     if (!TryGetLightPrefabData(prop, out var isPrefab, out var prefabRoot))
                         return;
@@ -1237,102 +1093,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         tReflectionData.FindProperty("m_ProbeSettings.cameraSettings.frustum.farClipPlaneRaw").floatValue = sReflectionData.FindProperty("m_ProbeSettings.cameraSettings.frustum.farClipPlaneRaw").floatValue;
                         tReflectionData.ApplyModifiedProperties();
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.Resolution, "m_Resolution", 130, (r, prop, dep) =>                        // 6: Resolution
-                {
-                    if (!TryGetAdditionalReflectionData(prop, out var reflectionData))
-                    {
-                        EditorGUI.LabelField(r, "--");
-                        return;
-                    }
-
-                    reflectionData.Update();
-
-                    EditorGUI.BeginChangeCheck();
-                    var(level, useOverride) = SerializedScalableSettingValueUI.LevelFieldGUI(r, GUIContent.none, ScalableSettingSchema.GetSchemaOrNull(ScalableSettingSchemaId.With3Levels), reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue, reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue);
-                    if(EditorGUI.EndChangeCheck())
-                    {
-                        reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue = level;
-                        reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue = useOverride;
-                    }
-                    reflectionData.ApplyModifiedProperties();
-                }, (lprop, rprop) =>
-                    {
-                        TryGetAdditionalReflectionData(lprop, out var lReflectionData);
-                        TryGetAdditionalReflectionData(rprop, out var rReflectionData);
-
-                        if (IsNullComparison(lReflectionData, rReflectionData, out var order))
-                            return order;
-
-                        return lReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue.CompareTo(rReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue);
-                    }, (target, source) =>
-                    {
-                        if (!TryGetAdditionalReflectionData(target, out var tReflectionData) || !TryGetAdditionalReflectionData(source, out var sReflectionData))
-                            return;
-
-                        tReflectionData.Update();
-                        tReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue = sReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue;
-                        tReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue = sReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue;
-                        tReflectionData.ApplyModifiedProperties();
-                    }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Enum, HDStyles.CustomResolution, "m_Resolution", 130, (r, prop, dep) =>                        // 7:  Resolution Override
-                {
-                    if (!TryGetAdditionalReflectionData(prop, out var reflectionData))
-                    {
-                        EditorGUI.LabelField(r, "--");
-                        return;
-                    }
-
-                    if(!TryGetCubemapResolution(reflectionData, out int resolution))
-                    {
-                        EditorGUI.LabelField(r, "--");
-                        return;
-                    }
-
-                    if(reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue)
-                    {
-                        reflectionData.Update();
-
-                        EditorGUI.BeginChangeCheck();
-                        var overrideResolution = (CubeReflectionResolution)EditorGUI.EnumPopup(r, (CubeReflectionResolution)resolution);
-                        if(EditorGUI.EndChangeCheck())
-                        {
-                            reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Override").intValue = (int)overrideResolution;
-                        }
-
-                        reflectionData.ApplyModifiedProperties();
-                    }
-                    else
-                    {
-                        using (new EditorGUI.DisabledScope(true))
-                        {
-                            EditorGUI.EnumFlagsField(r, (CubeReflectionResolution)resolution);
-                        }
-                    }
-                }, (lprop, rprop) =>
-                    {
-                        TryGetAdditionalReflectionData(lprop, out var lReflectionData);
-                        TryGetAdditionalReflectionData(rprop, out var rReflectionData);
-
-                        if (IsNullComparison(lReflectionData, rReflectionData, out var order))
-                            return order;
-
-                        if(!TryGetCubemapResolution(lReflectionData, out int lResolution) || !TryGetCubemapResolution(rReflectionData, out int rResolution))
-                            return order;
-
-                        return lResolution.CompareTo(rResolution);
-                    }, (target, source) =>
-                    {
-                        if (!TryGetAdditionalReflectionData(target, out var tReflectionData) || !TryGetAdditionalReflectionData(source, out var sReflectionData))
-                            return;
-
-                        if(tReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue)
-                        {
-                            tReflectionData.Update();
-                            tReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Override").intValue = sReflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Override").intValue;
-                            tReflectionData.ApplyModifiedProperties();
-                        }
-                    }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.ParallaxCorrection, "m_BoxProjection", 215, (r, prop, dep) =>   // 8. Use Influence volume as proxy
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Checkbox, HDStyles.ParallaxCorrection, "m_BoxProjection", 215, (r, prop, dep) =>   // 6. Use Influence volume as proxy
                 {
                     if (!TryGetAdditionalReflectionData(prop, out var reflectionData))
                     {
@@ -1361,7 +1122,7 @@ namespace UnityEditor.Rendering.HighDefinition
                         tReflectionData.FindProperty("m_ProbeSettings.proxySettings.useInfluenceVolumeAsProxyVolume").boolValue = sReflectionData.FindProperty("m_ProbeSettings.proxySettings.useInfluenceVolumeAsProxyVolume").boolValue;
                         tReflectionData.ApplyModifiedProperties();
                     }),
-                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.Weight, "m_Mode", 60, (r, prop, dep) =>                            // 9: Weight
+                new LightingExplorerTableColumn(LightingExplorerTableColumn.DataType.Float, HDStyles.Weight, "m_Mode", 60, (r, prop, dep) =>                            // 7: Weight
                 {
                     if (!TryGetAdditionalReflectionData(prop, out var reflectionData))
                     {
@@ -1500,25 +1261,6 @@ namespace UnityEditor.Rendering.HighDefinition
                 reflectionData = serializedReflectionProbeDataPairing[probe];
 
             return reflectionData != null;
-        }
-
-        private bool TryGetCubemapResolution(SerializedObject reflectionData, out int resolution)
-        {
-            if (reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_UseOverride").boolValue)
-            {
-                resolution = reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Override").intValue;
-                return true;
-            }
-
-            int level = reflectionData.FindProperty("m_ProbeSettings.cubeResolution.m_Level").intValue;
-            if (HDRenderPipeline.currentAsset.currentPlatformRenderPipelineSettings.cubeReflectionResolution.TryGet(level, out var cubeResolution))
-            {
-                resolution = (int)cubeResolution;
-                return true;
-            }
-
-            resolution = -1;
-            return false;
         }
 
         private bool IsNullComparison<T>(T l, T r, out int order)

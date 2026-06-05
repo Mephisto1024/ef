@@ -7,157 +7,6 @@ using System.Text;
 
 namespace UnityEngine.Rendering.HighDefinition.Tests
 {
-    class FrameSettingsGetResolvedValuesTest
-    {
-        private HDRenderPipelineAsset m_RenderPipelineAsset = null;
-        private FrameSettings m_CameraFrameSettings;
-
-        [SetUp]
-        public void Setup()
-        {
-            if (GraphicsSettings.currentRenderPipeline is not HDRenderPipelineAsset)
-                Assert.Ignore("This is an HDRP Tests, and the current pipeline is not HDRP.");
-
-#pragma warning disable 618 // Type or member is obsolete
-            m_CameraFrameSettings = HDRenderPipelineGlobalSettings.instance.GetDefaultFrameSettings(FrameSettingsRenderType.Camera);
-#pragma warning restore 618
-            m_RenderPipelineAsset = ScriptableObject.CreateInstance<HDRenderPipelineAsset>();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            ScriptableObject.DestroyImmediate(m_RenderPipelineAsset);
-        }
-
-        static TestCaseData[] s_ListTestsCaseDatasLODBias =
-        {
-            new TestCaseData(new float[] { 1.5f, 0, 0 }, 5.5f, LODBiasMode.FromQualitySettings, 0).Returns(1.5f).SetName("FromQualitySettings_Level0"),
-            new TestCaseData(new float[] { 0, 2.5f, 0 }, 5.5f, LODBiasMode.FromQualitySettings, 1).Returns(2.5f).SetName("FromQualitySettings_Level1"),
-            new TestCaseData(new float[] { 0, 0f, 3.5f }, 5.5f, LODBiasMode.FromQualitySettings, 2).Returns(3.5f).SetName("FromQualitySettings_Level2"),
-
-            new TestCaseData(new float[] { 1.5f, 0, 0 }, 5.5f, LODBiasMode.OverrideQualitySettings, 0).Returns(5.5f).SetName("OverrideQualitySettings"),
-
-            new TestCaseData(new float[] { 1.5f, 0, 0 }, 5.5f, LODBiasMode.ScaleQualitySettings, 0).Returns(5.5f * 1.5f).SetName("ScaleQualitySettings"),
-        };
-
-        [Test, TestCaseSource(nameof(s_ListTestsCaseDatasLODBias))]
-        public float TestGetResolvedLODBias(float[] scalableSettings, float lodBias, LODBiasMode mode, int level)
-        {
-            var settings = RenderPipelineSettings.NewDefault();
-            settings.lodBias = new FloatScalableSetting(scalableSettings, ScalableSettingSchemaId.With3Levels);
-            m_RenderPipelineAsset.currentPlatformRenderPipelineSettings = settings;
-            
-            m_CameraFrameSettings.lodBiasMode = mode;
-            m_CameraFrameSettings.lodBiasQualityLevel = level;
-            m_CameraFrameSettings.lodBias = lodBias;
-
-            return m_CameraFrameSettings.GetResolvedLODBias(m_RenderPipelineAsset);
-        }
-
-        static TestCaseData[] s_ListTestsCaseDatasMaximumLODLevel =
-        {
-            new TestCaseData(new int[] { 1, 0, 0 }, 5, MaximumLODLevelMode.FromQualitySettings, 0).Returns(1).SetName("FromQualitySettings_Level0"),
-            new TestCaseData(new int[] { 0, 2, 0 }, 5, MaximumLODLevelMode.FromQualitySettings, 1).Returns(2).SetName("FromQualitySettings_Level1"),
-            new TestCaseData(new int[] { 0, 0, 3 }, 5, MaximumLODLevelMode.FromQualitySettings, 2).Returns(3).SetName("FromQualitySettings_Level2"),
-
-            new TestCaseData(new int[] { 1, 0, 0 }, 5, MaximumLODLevelMode.OverrideQualitySettings, 0).Returns(5).SetName("OverrideQualitySettings"),
-
-            new TestCaseData(new int[] { 1, 0, 0 }, 5, MaximumLODLevelMode.OffsetQualitySettings, 0).Returns(5 + 1).SetName("ScaleQualitySettings"),
-        };
-
-        [Test, TestCaseSource(nameof(s_ListTestsCaseDatasMaximumLODLevel))]
-        public float TestGetResolvedMaximumLODLevelMode(int[] scalableSettings, int maximumLODLevel, MaximumLODLevelMode mode, int level)
-        {
-            var settings = RenderPipelineSettings.NewDefault();
-            settings.maximumLODLevel = new IntScalableSetting(scalableSettings, ScalableSettingSchemaId.With3Levels);
-            m_RenderPipelineAsset.currentPlatformRenderPipelineSettings = settings;
-
-            m_CameraFrameSettings.maximumLODLevelMode = mode;
-            m_CameraFrameSettings.maximumLODLevelQualityLevel = level;
-            m_CameraFrameSettings.maximumLODLevel = maximumLODLevel;
-
-            return m_CameraFrameSettings.GetResolvedMaximumLODLevel(m_RenderPipelineAsset);
-        }
-
-        static TestCaseData[] s_ListTestsCaseDataMSAAMode =
-        {
-            new TestCaseData(MSAAMode.FromHDRPAsset, MSAASamples.MSAA8x)
-                .Returns(MSAASamples.MSAA8x).SetName("FromHDRPAsset"),
-
-            new TestCaseData(MSAAMode.MSAA2X, MSAASamples.MSAA8x)
-                .Returns(MSAASamples.MSAA2x).SetName("Override")
-        };
-
-        [Test, TestCaseSource(nameof(s_ListTestsCaseDataMSAAMode))]
-        public MSAASamples TestGetResolvedMSAAMode(MSAAMode mode, MSAASamples sampleCount)
-        {
-            var settings = RenderPipelineSettings.NewDefault();
-            settings.msaaSampleCount = sampleCount;
-            m_RenderPipelineAsset.currentPlatformRenderPipelineSettings = settings;
-            
-            m_CameraFrameSettings.msaaMode = mode;
-
-            return m_CameraFrameSettings.GetResolvedMSAAMode(m_RenderPipelineAsset);
-        }
-
-        static TestCaseData[] s_ListTestsCaseDataSssSampleBudget =
-        {
-            new TestCaseData(SssQualityMode.FromQualitySettings, new int[] { 1, 0, 0 }, 0, 30)
-                .Returns(1).SetName("FromQualitySettings_0"),
-            new TestCaseData(SssQualityMode.FromQualitySettings, new int[] { 0, 2, 0 }, 1, 30)
-                .Returns(2).SetName("FromQualitySettings_1"),
-            new TestCaseData(SssQualityMode.FromQualitySettings, new int[] { 0, 0, 3 }, 2, 30)
-                .Returns(3).SetName("FromQualitySettings_2"),
-
-            new TestCaseData(SssQualityMode.OverrideQualitySettings, new int[] { 0, 0, 3 }, 2, 30)
-                .Returns(30).SetName("OverrideQualitySettings"),
-        };
-
-        [Test, TestCaseSource(nameof(s_ListTestsCaseDataSssSampleBudget))]
-        public int TestGetResolvedSssSampleBudget(SssQualityMode mode, int[] scalableSettings, int level, int budget)
-        {
-            var settings = RenderPipelineSettings.NewDefault();
-            settings.sssSampleBudget = new IntScalableSetting(scalableSettings, ScalableSettingSchemaId.With3Levels);
-            
-            m_RenderPipelineAsset.currentPlatformRenderPipelineSettings = settings;
-
-            m_CameraFrameSettings.sssQualityMode = mode;
-            m_CameraFrameSettings.sssQualityLevel = level;
-            m_CameraFrameSettings.sssCustomSampleBudget = budget;
-
-            return m_CameraFrameSettings.GetResolvedSssSampleBudget(m_RenderPipelineAsset);
-        }
-
-        static TestCaseData[] s_ListTestsCaseDataSssDownsampleSteps =
-        {
-            new TestCaseData(SssQualityMode.FromQualitySettings, new int[] { 1, 0, 0 }, 0, 30)
-                .Returns(1).SetName("FromQualitySettings_0"),
-            new TestCaseData(SssQualityMode.FromQualitySettings, new int[] { 0, 2, 0 }, 1, 30)
-                .Returns(2).SetName("FromQualitySettings_1"),
-            new TestCaseData(SssQualityMode.FromQualitySettings, new int[] { 0, 0, 3 }, 2, 30)
-                .Returns(3).SetName("FromQualitySettings_2"),
-
-            new TestCaseData(SssQualityMode.OverrideQualitySettings, new int[] { 0, 0, 3 }, 2, 30)
-                .Returns(30).SetName("OverrideQualitySettings"),
-        };
-
-        [Test, TestCaseSource(nameof(s_ListTestsCaseDataSssDownsampleSteps))]
-        public int TestGetResolvedSssDownsampleSteps(SssQualityMode mode, int[] scalableSettings, int level, int downsampleSteps)
-        {
-            var settings = RenderPipelineSettings.NewDefault();
-            settings.sssDownsampleSteps = new IntScalableSetting(scalableSettings, ScalableSettingSchemaId.With3Levels);
-
-            m_RenderPipelineAsset.currentPlatformRenderPipelineSettings = settings;
-
-            m_CameraFrameSettings.sssQualityMode = mode;
-            m_CameraFrameSettings.sssQualityLevel = level;
-            m_CameraFrameSettings.sssCustomDownsampleSteps = downsampleSteps;
-
-            return m_CameraFrameSettings.GetResolvedSssDownsampleSteps(m_RenderPipelineAsset);
-        }
-    }
-
     class FrameSettingsTests
     {
         Object m_ToClean;
@@ -181,9 +30,7 @@ namespace UnityEngine.Rendering.HighDefinition.Tests
             var singleValues = (values as IEnumerable<int>).Distinct();
 
 #pragma warning disable 0612 // Type or member is obsolete
-#pragma warning disable CS0618 // Type or member is obsolete
             var excluded = new List<FrameSettingsField> { FrameSettingsField.RoughRefraction };
-#pragma warning restore CS0618 // Type or member is obsolete
 #pragma warning restore 0612 // Type or member is obsolete
 
             //gathering helpful debug info
@@ -234,13 +81,25 @@ namespace UnityEngine.Rendering.HighDefinition.Tests
                 //init
                 FrameSettings fs = default;
                 FrameSettingsOverrideMask fso = default;
-
-                var defaultFSType = RandomUtilities.RandomEnumValue<FrameSettingsRenderType>(i);
-                var defaultFS = FrameSettingsDefaults.Get(defaultFSType);
-                var result = FrameSettingsDefaults.Get(FrameSettingsRenderType.Camera);
-
+                FrameSettingsRenderType defaultFSType = RandomUtilities.RandomEnumValue<FrameSettingsRenderType>(i);
+                FrameSettings defaultFS;
+                FrameSettings result = FrameSettings.NewDefaultCamera();
                 FrameSettings tester = default;
                 RenderPipelineSettings supportedFeatures = new RenderPipelineSettings();
+                switch (defaultFSType)
+                {
+                    case FrameSettingsRenderType.Camera:
+                        defaultFS = FrameSettings.NewDefaultCamera();
+                        break;
+                    case FrameSettingsRenderType.CustomOrBakedReflection:
+                        defaultFS = FrameSettings.NewDefaultCustomOrBakeReflectionProbe();
+                        break;
+                    case FrameSettingsRenderType.RealtimeReflection:
+                        defaultFS = FrameSettings.NewDefaultRealtimeReflectionProbe();
+                        break;
+                    default:
+                        throw new ArgumentException("Unknown FrameSettingsRenderType");
+                }
 
                 //change randomly override values
                 for (int j = 0; j < 10; ++j)
@@ -292,13 +151,25 @@ namespace UnityEngine.Rendering.HighDefinition.Tests
                 //init
                 FrameSettings fs = default;
                 FrameSettingsOverrideMask fso = default;
-
-                var defaultFSType = RandomUtilities.RandomEnumValue<FrameSettingsRenderType>(i);
-                var defaultFS = FrameSettingsDefaults.Get(defaultFSType);
-                var result = FrameSettingsDefaults.Get(FrameSettingsRenderType.Camera);
-
+                FrameSettingsRenderType defaultFSType = RandomUtilities.RandomEnumValue<FrameSettingsRenderType>(i);
+                FrameSettings defaultFS;
+                FrameSettings result = FrameSettings.NewDefaultCamera();
                 FrameSettings tester = default;
                 RenderPipelineSettings supportedFeatures = new RenderPipelineSettings();
+                switch (defaultFSType)
+                {
+                    case FrameSettingsRenderType.Camera:
+                        defaultFS = FrameSettings.NewDefaultCamera();
+                        break;
+                    case FrameSettingsRenderType.CustomOrBakedReflection:
+                        defaultFS = FrameSettings.NewDefaultCustomOrBakeReflectionProbe();
+                        break;
+                    case FrameSettingsRenderType.RealtimeReflection:
+                        defaultFS = FrameSettings.NewDefaultRealtimeReflectionProbe();
+                        break;
+                    default:
+                        throw new ArgumentException("Unknown FrameSettingsRenderType");
+                }
 
                 //change randomly override values
                 for (int j = 0; j < 10; ++j)
@@ -574,8 +445,10 @@ namespace UnityEngine.Rendering.HighDefinition.Tests
                 Assert.AreEqual(legacyFrameSettingsData.runVolumeVoxelizationAsync, frameSettingsData.IsEnabled(FrameSettingsField.VolumeVoxelizationsAsync));
 
                 Assert.AreEqual(legacyFrameSettingsData.lightLoopSettings.enableBigTilePrepass, frameSettingsData.IsEnabled(FrameSettingsField.BigTilePrepass));
+                Assert.AreEqual(legacyFrameSettingsData.lightLoopSettings.enableComputeLightEvaluation, frameSettingsData.IsEnabled(FrameSettingsField.ComputeLightEvaluation));
                 Assert.AreEqual(legacyFrameSettingsData.lightLoopSettings.enableComputeLightVariants, frameSettingsData.IsEnabled(FrameSettingsField.ComputeLightVariants));
                 Assert.AreEqual(legacyFrameSettingsData.lightLoopSettings.enableComputeMaterialVariants, frameSettingsData.IsEnabled(FrameSettingsField.ComputeMaterialVariants));
+                Assert.AreEqual(legacyFrameSettingsData.lightLoopSettings.enableDeferredTileAndCluster, frameSettingsData.IsEnabled(FrameSettingsField.DeferredTile));
                 Assert.AreEqual(legacyFrameSettingsData.lightLoopSettings.enableFptlForForwardOpaque, frameSettingsData.IsEnabled(FrameSettingsField.FPTLForForwardOpaque));
 
 
@@ -610,8 +483,10 @@ namespace UnityEngine.Rendering.HighDefinition.Tests
                 Assert.AreEqual((legacyFrameSettingsData.overrides & LegacyFrameSettingsOverrides.VolumeVoxelizationsAsync) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.VolumeVoxelizationsAsync]);
 
                 Assert.AreEqual((legacyFrameSettingsData.lightLoopSettings.overrides & LegacyLightLoopSettingsOverrides.BigTilePrepass) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.BigTilePrepass]);
+                Assert.AreEqual((legacyFrameSettingsData.lightLoopSettings.overrides & LegacyLightLoopSettingsOverrides.ComputeLightEvaluation) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.ComputeLightEvaluation]);
                 Assert.AreEqual((legacyFrameSettingsData.lightLoopSettings.overrides & LegacyLightLoopSettingsOverrides.ComputeLightVariants) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.ComputeLightVariants]);
                 Assert.AreEqual((legacyFrameSettingsData.lightLoopSettings.overrides & LegacyLightLoopSettingsOverrides.ComputeMaterialVariants) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.ComputeMaterialVariants]);
+                Assert.AreEqual((legacyFrameSettingsData.lightLoopSettings.overrides & LegacyLightLoopSettingsOverrides.TileAndCluster) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.DeferredTile]);
                 Assert.AreEqual((legacyFrameSettingsData.lightLoopSettings.overrides & LegacyLightLoopSettingsOverrides.FptlForForwardOpaque) > 0, frameSettingsMask.mask[(uint)FrameSettingsField.FPTLForForwardOpaque]);
             }
         }

@@ -14,17 +14,17 @@ In Mixed tracing mode, HDRP processes screen-space ray marching in the GBuffer. 
 
 In Mixed tracing mode, HDRP still uses ray tracing for any geometry inside the ray tracing acceleration structure, regardless of whether vertex animation or decals modify the geometry's surface. This means if HDRP fails to intersect the on-screen deformed geometry, it intersects the original mesh inside in the ray tracing acceleration structure. This may cause visual discrepancies between what you see and what you expect. For example, the following Scene contains a cliff that uses mesh deformation.
 
-![Example scene contains a cliff mesh that uses mesh deformation.](../Images/mixed-tracing-mixed.png)
+![](../Images/mixed-tracing-mixed.png)
 
-In this Scene, Mixed mode can include reflections for the opaque leaf particles, the white decal, and GameObjects that aren't visible in the cliff face's non-deformed geometry.
+In this Scene, Mixed mode can include reflections for the opaque leaf particles, the white decal, and for GameObjects that aren't visible in the cliff face's original, non-deformed, geometry.
 
-![Reflections in the water show elements that are not visible on the cliff surface.](../Images/mixed-tracing-ray-traced.png)
+![](../Images/mixed-tracing-ray-traced.png)
 
-Reflection rays intersect with the original, non-deformed cliff face geometry. This means the rays can still be affected by the bush behind the rock. To view the Scene from the perspective of the ray tracing mode, refer to the following image.
+Ray tracing mode doesn't render reflections for the white decal or for the opaque leaf particles. Also, reflection rays intersect with the original, non-deformed, cliff face geometry which means they can not see the rock and bush on the right-hand side. To see the Scene from the perspective of the ray tracing mode, see the following image.
 
-![The scene rendered using ray tracing. The reflections match the cliff surface.](../Images/mixed-tracing-ray-traced-no-deform.png)
+![](../Images/mixed-tracing-ray-traced-no-deform.png)
 
-This image shows the elements of the Scene that ray tracing takes into account. The non-deformed cliff face geometry reveals the bushes behind the rocks.
+This is the Scene from the perspective of the ray tracing mode. See how the original, non-deformed, cliff face geometry hides the rock and bush that were on the right-hand side of the Scene.
 
 ### Tracing Modes Limitation
 
@@ -35,7 +35,7 @@ This image shows the elements of the Scene that ray tracing takes into account. 
 #### Ray Tracing
 
 * Transparent Emissive Material aren't taken into account.
-* No [decals](decals.md) are supported including Emissive Decals.
+* No [decals](decal.md) are supported including Emissive Decals.
 
 #### Mixed Tracing
 

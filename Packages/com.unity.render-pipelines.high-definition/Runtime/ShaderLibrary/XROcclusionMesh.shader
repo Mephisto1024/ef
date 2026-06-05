@@ -2,7 +2,7 @@ Shader "Hidden/HDRP/XROcclusionMesh"
 {
     HLSLINCLUDE
         #pragma target 4.5
-        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
         #pragma multi_compile _ XR_OCCLUSION_MESH_COMBINED
 
@@ -26,7 +26,7 @@ Shader "Hidden/HDRP/XROcclusionMesh"
         Varyings Vert(Attributes input)
         {
             Varyings output;
-            output.vertex = mul(GetRawUnityObjectToWorld(), float4(input.vertex.xy * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), UNITY_NEAR_CLIP_VALUE, 1.0f));
+            output.vertex = float4(input.vertex.xy * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), UNITY_NEAR_CLIP_VALUE, 1.0f);
 
         #if XR_OCCLUSION_MESH_COMBINED
             output.rtArrayIndex = input.vertex.z;

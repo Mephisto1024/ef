@@ -2,7 +2,7 @@ Shader "Hidden/HDRP/ColorResolve"
 {
     HLSLINCLUDE
         #pragma target 4.5
-        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
         #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
@@ -100,7 +100,6 @@ Shader "Hidden/HDRP/ColorResolve"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "MSAA1X"
 
             HLSLPROGRAM
                 #pragma vertex Vert
@@ -112,7 +111,6 @@ Shader "Hidden/HDRP/ColorResolve"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "MSAA2X"
 
             HLSLPROGRAM
                 #pragma vertex Vert
@@ -124,7 +122,6 @@ Shader "Hidden/HDRP/ColorResolve"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "MSAA4X"
 
             HLSLPROGRAM
                 #pragma vertex Vert
@@ -136,7 +133,6 @@ Shader "Hidden/HDRP/ColorResolve"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "MSAA8X"
 
             HLSLPROGRAM
                 #pragma vertex Vert

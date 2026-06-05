@@ -17,8 +17,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         public override void Build()
         {
-            var shaders = GraphicsSettings.GetRenderPipelineSettings<HDRenderPipelineRuntimeShaders>();
-            m_GradientSkyMaterial = CoreUtils.CreateEngineMaterial(shaders.gradientSkyPS);
+            m_GradientSkyMaterial = CoreUtils.CreateEngineMaterial(HDRenderPipelineGlobalSettings.instance.renderPipelineResources.shaders.gradientSkyPS);
         }
 
         public override void Cleanup()

@@ -68,11 +68,16 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds settings for the Depth Of Field effect.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Post-processing/Depth Of Field")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Post-Processing-Depth-of-Field")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Post-processing/Depth Of Field", typeof(HDRenderPipeline))]
+    [HDRPHelpURLAttribute("Post-Processing-Depth-of-Field")]
     public sealed class DepthOfField : VolumeComponentWithQuality, IPostProcessComponent
     {
+        // Sampling ratios for adaptive sampling.
+        // X: ratio of the sharp part tiles of PBR dof that have high variance of CoC.
+        // Y: ratio of the blurry / sharp tiles that have low variance of CoC.
+        internal static Vector2 s_HighQualityAdaptiveSamplingWeights = new Vector2(4.0f, 1.0f);
+        internal static Vector2 s_LowQualityAdaptiveSamplingWeights  = new Vector2(1.0f, 0.75f);
+
         /// <summary>
         /// Specifies the mode that HDRP uses to set the focus for the depth of field effect.
         /// </summary>
@@ -231,7 +236,7 @@ namespace UnityEngine.Rendering.HighDefinition
             }
             set { m_HighQualityFiltering.value = value; }
         }
-
+    
         /// <summary>
         /// When enabled, HDRP uses a more accurate but slower physically based method to compute the depth of field effect.
         /// </summary>
@@ -250,27 +255,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 }
             }
             set { m_PhysicallyBased.value = value; }
-        }
-
-        /// <summary>
-        /// The adaptive sampling weight is a factor that modifies the number of samples in the depth of field depending
-        /// on the radius of the blur. Higher values will reduce the noise in the depth of field but increases its cost.
-        /// </summary>
-        public float adaptiveSamplingWeight
-        {
-            get
-            {
-                if (!UsesQualitySettings())
-                {
-                    return m_AdaptiveSamplingWeight.value;
-                }
-                else
-                {
-                    int qualityLevel = (int)quality.levelAndOverride.level;
-                    return GetPostProcessingQualitySettings().AdaptiveSamplingWeight[qualityLevel];
-                }
-            }
-            set { m_AdaptiveSamplingWeight.value = value; }
         }
 
         /// <summary>
@@ -312,6 +296,7 @@ namespace UnityEngine.Rendering.HighDefinition
             }
         }
 
+
         [Header("Near Blur")]
         [Tooltip("Sets the number of samples to use for the near field.")]
         [SerializeField, FormerlySerializedAs("nearSampleCount")]
@@ -350,23 +335,9 @@ namespace UnityEngine.Rendering.HighDefinition
         BoolParameter m_PhysicallyBased = new BoolParameter(false);
 
         [AdditionalProperty]
-        [Tooltip("When enabled, HDRP uses a more accurate but slower physically based algorithm to compute the depth of field effect.")]
-        [SerializeField]
-        FloatParameter m_AdaptiveSamplingWeight = new ClampedFloatParameter(0.75f, 0.5f, 4f);
-
-        [AdditionalProperty]
         [Tooltip("Adjust near blur CoC based on depth distance when manual, non-physical mode is used.")]
         [SerializeField]
         BoolParameter m_LimitManualRangeNearBlur = new BoolParameter(false);
-
-        /// <summary>
-        /// Enables the Circle of Confusion Reprojection used when anti-aliasing or an upsampling technique requiring jittering (TAA, DLSS, STP, etc.) is enabled. Disabling this option can get rid of ghosting artifacts in the depth of field."
-        /// </summary>
-        [AdditionalProperty]
-        [Tooltip("Enables the CoC Reprojection used when anti-aliasing or an upsampling technique requiring jittering (TAA, DLSS, STP, etc.) is enabled. Disabling this option can get rid of ghosting artifacts in the depth of field.")]
-        [SerializeField]
-        [InspectorName("CoC Stabilization")]
-        public BoolParameter coCStabilization = new BoolParameter(true);
 
         /// <summary>
         /// Tells if the effect needs to be rendered or not.

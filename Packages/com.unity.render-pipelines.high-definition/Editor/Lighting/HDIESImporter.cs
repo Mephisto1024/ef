@@ -37,15 +37,14 @@ namespace UnityEditor.Rendering.HighDefinition
         /// <param name="ies">Texture used for the prefab</param>
         static public void CreateRenderPipelinePrefabLight(AssetImportContext ctx, string iesFileName, bool useIESMaximumIntensity, string iesMaximumIntensityUnit, float iesMaximumIntensity, Light light, Texture ies)
         {
-            LightType lightType = (light.type == LightType.Point) ? LightType.Point : LightType.Spot;
+            HDLightTypeAndShape hdLightTypeAndShape = (light.type == LightType.Point) ? HDLightTypeAndShape.Point : HDLightTypeAndShape.ConeSpot;
 
-            HDAdditionalLightData hdLight = GameObjectExtension.AddHDLight(light.gameObject, lightType);
-            Light coreLight = hdLight.GetComponent<Light>();
+            HDAdditionalLightData hdLight = GameObjectExtension.AddHDLight(light.gameObject, hdLightTypeAndShape);
 
             if (useIESMaximumIntensity)
             {
                 LightUnit lightUnit = (iesMaximumIntensityUnit == "Lumens") ? LightUnit.Lumen : LightUnit.Candela;
-                coreLight.intensity = LightUnitUtils.ConvertIntensity(coreLight, iesMaximumIntensity, lightUnit, LightUnit.Candela);
+                hdLight.SetIntensity(iesMaximumIntensity, lightUnit);
                 if (light.type == LightType.Point)
                     hdLight.IESPoint = ies;
                 else

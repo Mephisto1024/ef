@@ -190,20 +190,19 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
     // Init LightLoop output structure
     ZERO_INITIALIZE(LightLoopOutput, lightLoopOutput);
 
-    // With XR single-pass and camera-relative: offset position to do lighting computations from the combined center view (original camera matrix).
-    // This is required because there is only one list of lights generated on the CPU. Shadows are also generated once and shared between the instanced views.
-    // We keep the unmodified per-eye position around since we use it to sample APV. Passing the modified world space position to GetAbsolutePositionWS after
-    // this point would give incorrect results.
-    float3 unmodifiedPositionWS = posInput.positionWS;
-    ApplyCameraRelativeXR(posInput.positionWS);
-
     LightLoopContext context;
+
     context.shadowContext    = InitShadowContext();
     context.shadowValue      = 1;
     context.sampleReflection = 0;
+    context.splineVisibility = -1;
 #ifdef APPLY_FOG_ON_SKY_REFLECTIONS
     context.positionWS       = posInput.positionWS;
 #endif
+
+    // With XR single-pass and camera-relative: offset position to do lighting computations from the combined center view (original camera matrix).
+    // This is required because there is only one list of lights generated on the CPU. Shadows are also generated once and shared between the instanced views.
+    ApplyCameraRelativeXR(posInput.positionWS);
 
     // Initialize the contactShadow and contactShadowFade fields
     InitContactShadow(posInput, context);
@@ -232,9 +231,21 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
                     IsNonZeroBSDF(V, L, preLightData, bsdfData) &&
                     !ShouldEvaluateThickObjectTransmission(V, L, preLightData, bsdfData, light.shadowIndex))
                 {
+                    float3 positionWS = posInput.positionWS;
+
+#ifdef LIGHT_EVALUATION_SPLINE_SHADOW_BIAS
+                    positionWS += L * GetSplineOffsetForShadowBias(bsdfData);
+#endif
                     context.shadowValue = GetDirectionalShadowAttenuation(context.shadowContext,
-                                                                          posInput.positionSS, posInput.positionWS, GetNormalForShadowBias(bsdfData),
+                                                                          posInput.positionSS, positionWS, GetNormalForShadowBias(bsdfData),
                                                                           light.shadowIndex, L);
+
+#ifdef LIGHT_EVALUATION_SPLINE_SHADOW_VISIBILITY_SAMPLE
+                    // Tap the shadow a second time for strand visibility term.
+                    context.splineVisibility = GetDirectionalShadowAttenuation(context.shadowContext,
+                                                                               posInput.positionSS, posInput.positionWS, GetNormalForShadowBias(bsdfData),
+                                                                               light.shadowIndex, L);
+#endif
                 }
             }
         }
@@ -278,7 +289,7 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
 #if NEED_TO_CHECK_HELPER_LANE
         // On some platform helper lanes don't behave as we'd expect, therefore we prevent them from entering the loop altogether.
         // IMPORTANT! This has implications if ddx/ddy is used on results derived from lighting, however given Lightloop is called in compute we should be
-        // sure it will not happen.
+        // sure it will not happen. 
         bool isHelperLane = WaveIsHelperLane();
         while (!isHelperLane && v_lightListOffset < lightCount)
 #else
@@ -457,10 +468,6 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
             replaceBakeDiffuseLighting = true;
 #endif
 
-#if defined(LIGHT_EVALUATION_SKIP_INDIRECT_DIFFUSE)
-        replaceBakeDiffuseLighting = false;
-#endif
-
         if (replaceBakeDiffuseLighting)
         {
             BuiltinData tempBuiltinData;
@@ -470,26 +477,6 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
             if (_IndirectDiffuseMode != INDIRECTDIFFUSEMODE_OFF)
             {
                 tempBuiltinData.bakeDiffuseLighting = LOAD_TEXTURE2D_X(_IndirectDiffuseTexture, posInput.positionSS).xyz * GetInverseCurrentExposureMultiplier();
-
-                #if defined(PROBE_VOLUMES_L1) || defined(PROBE_VOLUMES_L2)
-                if (_EnableProbeVolumes)
-                {
-                    // Sample APV to get data for reflection probe normalization.
-                    float3 R = reflect(-V, bsdfData.normalWS);
-                    float3 unusedBakeDiffuseLighting; // Not used
-                    float3 unusedBackBakeDiffuseLighting; // Not used
-                    EvaluateAdaptiveProbeVolume(GetAbsolutePositionWS(posInput.positionWS),
-                        bsdfData.normalWS,
-                        -bsdfData.normalWS,
-                        R,
-                        V,
-                        posInput.positionSS,
-                        builtinData.renderingLayers,
-                        unusedBakeDiffuseLighting,
-                        unusedBackBakeDiffuseLighting,
-                        lightInReflDir);
-                }
-                #endif
             }
             else
 #endif
@@ -500,13 +487,12 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
                     // Reflect normal to get lighting for reflection probe tinting
                     float3 R = reflect(-V, bsdfData.normalWS);
 
-                    EvaluateAdaptiveProbeVolume(GetAbsolutePositionWS(unmodifiedPositionWS),
+                    EvaluateAdaptiveProbeVolume(GetAbsolutePositionWS(posInput.positionWS),
                         bsdfData.normalWS,
                         -bsdfData.normalWS,
                         R,
                         V,
                         posInput.positionSS,
-                        builtinData.renderingLayers,
                         tempBuiltinData.bakeDiffuseLighting,
                         tempBuiltinData.backBakeDiffuseLighting,
                         lightInReflDir);
@@ -562,7 +548,7 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
 #if NEED_TO_CHECK_HELPER_LANE
             // On some platform helper lanes don't behave as we'd expect, therefore we prevent them from entering the loop altogether.
             // IMPORTANT! This has implications if ddx/ddy is used on results derived from lighting, however given Lightloop is called in compute we should be
-            // sure it will not happen.
+            // sure it will not happen. 
             bool isHelperLane = WaveIsHelperLane();
             while (!isHelperLane && v_envLightListOffset < envLightCount)
 #else
@@ -657,7 +643,7 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
 #if SHADEROPTIONS_AREA_LIGHTS
     if (featureFlags & LIGHTFEATUREFLAGS_AREA)
     {
-        uint lightCount, lightStart; // Start is the offset specific to the tile (or cluster)
+        uint lightCount, lightStart;
 
     #ifndef LIGHTLOOP_DISABLE_TILE_AND_CLUSTER
         GetCountAndStart(posInput, LIGHTCATEGORY_AREA, lightStart, lightCount);
@@ -666,57 +652,43 @@ void LightLoop( float3 V, PositionInputs posInput, PreLightData preLightData, BS
         lightStart = _PunctualLightCount;
     #endif
 
-        bool fastPath = false;
-    #if SCALARIZE_LIGHT_LOOP
-        uint lightStartLane0;
-        fastPath = IsFastPath(lightStart, lightStartLane0); // True if all pixels belong to the same tile (or cluster)
+        // COMPILER BEHAVIOR WARNING!
+        // If rectangle lights are before line lights, the compiler will duplicate light matrices in VGPR because they are used differently between the two types of lights.
+        // By keeping line lights first we avoid this behavior and save substantial register pressure.
+        // TODO: This is based on the current Lit.shader and can be different for any other way of implementing area lights, how to be generic and ensure performance ?
 
-        if (fastPath)
+        if (lightCount > 0)
         {
-            lightStart = lightStartLane0;
-        }
-    #endif
+            i = 0;
 
-        // Scalarized loop. All lights that are in a tile/cluster touched by any pixel in the wave are loaded (scalar load), only the one relevant to current thread/pixel are processed.
-        // For clarity, the following code will follow the convention: variables starting with s_ are meant to be wave uniform (meant for scalar register),
-        // v_ are variables that might have different value for each thread in the wave (meant for vector registers).
-        // This will perform more loads than it is supposed to, however, the benefits should offset the downside, especially given that light data accessed should be largely coherent.
-        // Note that the above is valid only if wave intriniscs are supported.
-        uint v_lightListOffset = 0;
-        uint v_lightIdx = lightStart;
+            uint      last      = lightCount - 1;
+            LightData lightData = FetchLight(lightStart, i);
 
-#if NEED_TO_CHECK_HELPER_LANE
-        // On some platform helper lanes don't behave as we'd expect, therefore we prevent them from entering the loop altogether.
-        // IMPORTANT! This has implications if ddx/ddy is used on results derived from lighting, however given Lightloop is called in compute we should be
-        // sure it will not happen.
-        bool isHelperLane = WaveIsHelperLane();
-        while (!isHelperLane && v_lightListOffset < lightCount)
-#else
-        while (v_lightListOffset < lightCount)
-#endif
-        {
-            v_lightIdx = FetchIndex(lightStart, v_lightListOffset);
-#if SCALARIZE_LIGHT_LOOP
-            uint s_lightIdx = ScalarizeElementIndex(v_lightIdx, fastPath);
-#else
-            uint s_lightIdx = v_lightIdx;
-#endif
-            if (s_lightIdx == -1)
-                break;
-
-            LightData s_lightData = FetchLight(s_lightIdx);
-
-            // If current scalar and vector light index match, we process the light. The v_lightListOffset for current thread is increased.
-            // Note that the following should really be ==, however, since helper lanes are not considered by WaveActiveMin, such helper lanes could
-            // end up with a unique v_lightIdx value that is smaller than s_lightIdx hence being stuck in a loop. All the active lanes will not have this problem.
-            if (s_lightIdx >= v_lightIdx)
+            while (i <= last && lightData.lightType == GPULIGHTTYPE_TUBE)
             {
-                v_lightListOffset++;
-                if (IsMatchingLightLayer(s_lightData.lightLayers, builtinData.renderingLayers))
+                lightData.lightType = GPULIGHTTYPE_TUBE; // Enforce constant propagation
+                lightData.cookieMode = COOKIEMODE_NONE;  // Enforce constant propagation
+
+                if (IsMatchingLightLayer(lightData.lightLayers, builtinData.renderingLayers))
                 {
-                    DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, s_lightData, bsdfData, builtinData);
+                    DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, lightData, bsdfData, builtinData);
                     AccumulateDirectLighting(lighting, aggregateLighting);
                 }
+
+                lightData = FetchLight(lightStart, min(++i, last));
+            }
+
+            while (i <= last) // GPULIGHTTYPE_RECTANGLE
+            {
+                lightData.lightType = GPULIGHTTYPE_RECTANGLE; // Enforce constant propagation
+
+                if (IsMatchingLightLayer(lightData.lightLayers, builtinData.renderingLayers))
+                {
+                    DirectLighting lighting = EvaluateBSDF_Area(context, V, posInput, preLightData, lightData, bsdfData, builtinData);
+                    AccumulateDirectLighting(lighting, aggregateLighting);
+                }
+
+                lightData = FetchLight(lightStart, min(++i, last));
             }
         }
     }

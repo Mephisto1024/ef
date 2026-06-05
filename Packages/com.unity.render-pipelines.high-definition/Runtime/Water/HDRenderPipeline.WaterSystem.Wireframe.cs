@@ -1,29 +1,43 @@
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
+
 namespace UnityEngine.Rendering.HighDefinition
 {
-    partial class WaterSystem
+    public partial class HDRenderPipeline
     {
-        internal void RenderWaterAsWireFrame(CommandBuffer cmd, HDCamera hdCamera)
+        void RenderWaterAsWireFrame(CommandBuffer cmd, HDCamera hdCamera)
         {
             // If the water is disabled, no need to render
-            if (!ShouldRenderWater(hdCamera))
+            WaterRendering settings = hdCamera.volumeStack.GetComponent<WaterRendering>();
+            if (!ShouldRenderWater(hdCamera, settings))
                 return;
 
-            WaterRendering settings = hdCamera.volumeStack.GetComponent<WaterRendering>();
+            // Copy the frustum data to the GPU (not done otherwise)
+            PropagateFrustumDataToGPU(hdCamera);
 
-            var data = new WaterRenderingData();
-            PrepareWaterRenderingData(data, hdCamera);
-            data.BindGlobal(cmd);
-
+            // Loop through the water surfaces
+            int numWaterSurfaces = WaterSurface.instanceCount;
             var waterSurfaces = WaterSurface.instancesAsArray;
-            for (int surfaceIdx = 0; surfaceIdx < data.numSurfaces; ++surfaceIdx)
+
+            for (int surfaceIdx = 0; surfaceIdx < numWaterSurfaces; ++surfaceIdx)
             {
                 // Grab the current water surface
                 WaterSurface currentWater = waterSurfaces[surfaceIdx];
-                ref var surfaceData = ref data.surfaces[surfaceIdx];
+
+                // If the resources are invalid, we cannot render this surface
+                if (!currentWater.simulation.ValidResources((int)m_WaterBandResolution, WaterConsts.k_WaterHighBandCount))
+                    continue;
 
                 // Render the water surface
-                PrepareSurfaceGBufferData(hdCamera, settings, currentWater, surfaceIdx, ref surfaceData);
-                RenderWaterSurface(cmd, data, ref surfaceData);
+                WaterRenderingParameters parameters = PrepareWaterRenderingParameters(hdCamera, settings, currentWater, surfaceIdx, surfaceIdx == m_UnderWaterSurfaceIndex);
+
+                // Render the water surface (will be rendered as wireframe because of the hidden render state)
+
+                RTHandle causticsBuffer = currentWater.simulation.gpuBuffers.causticsBuffer != null ? currentWater.simulation.gpuBuffers.causticsBuffer : TextureXR.GetBlackTexture();
+                RenderWaterSurface(cmd,
+                    currentWater.simulation.gpuBuffers.displacementBuffer, currentWater.simulation.gpuBuffers.additionalDataBuffer, causticsBuffer, TextureXR.GetBlackTexture(), TextureXR.GetBlackTexture(),
+                    null, null,
+                    m_WaterCameraHeightBuffer, m_WaterPatchDataBuffer, m_WaterIndirectDispatchBuffer, m_WaterCameraFrustrumBuffer, parameters);
             }
         }
     }

@@ -54,15 +54,8 @@ namespace UnityEngine.Rendering.HighDefinition
         RenderTexture m_TempConvertedReflectionProbeTexture;
         RenderTexture m_TempConvolvedReflectionProbeTexture;
 
-        public ReflectionProbeTextureCache(
-            HDRenderPipeline renderPipeline,
-            IBLFilterBSDF[] iblFiltersBSDF,
-            int width,
-            int height,
-            GraphicsFormat format,
-            bool decreaseResToFit,
-            int lastValidCubeMip,
-            int lastValidPlanarMip)
+        public ReflectionProbeTextureCache(HDRenderPipelineRuntimeResources defaultResources, IBLFilterBSDF[] iblFiltersBSDF, int width, int height, GraphicsFormat format,
+            bool decreaseResToFit, int lastValidCubeMip, int lastValidPlanarMip)
         {
             Assert.IsTrue(Mathf.IsPowerOfTwo(width) && Mathf.IsPowerOfTwo(height));
             Assert.IsTrue(width <= (int)ReflectionProbeTextureCacheResolution.Resolution16384x16384);
@@ -101,7 +94,8 @@ namespace UnityEngine.Rendering.HighDefinition
             m_PlanarTexelPadding = (1 << m_PlanarMipPadding) * 2;
 
             m_DecreaseResToFit = decreaseResToFit;
-            m_ConvertTextureMaterial = CoreUtils.CreateEngineMaterial(renderPipeline.runtimeShaders.blitCubeTextureFacePS);
+
+            m_ConvertTextureMaterial = CoreUtils.CreateEngineMaterial(defaultResources.shaders.blitCubeTextureFacePS);
         }
 
         private static int GetTextureID(HDProbe probe)
@@ -188,18 +182,12 @@ namespace UnityEngine.Rendering.HighDefinition
 
         private void LogErrorNoMoreSpaceOnce()
         {
-            if (m_NoMoreSpaceErrorLogged)
-                return;
+            if (!m_NoMoreSpaceErrorLogged)
+            {
+                m_NoMoreSpaceErrorLogged = true;
 
-            m_NoMoreSpaceErrorLogged = true;
-
-#if UNITY_EDITOR
-            // Avoid spamming the error frame too much, if we have more than 25 errors we dont display this issue.
-            UnityEditor.ConsoleWindowUtility.GetConsoleLogCounts(out var errorCounts, out _, out _);
-            if (errorCounts >= 25)
-                return;
-#endif
-            Debug.LogError("No more space in Reflection Probe Atlas. To solve this issue, increase the size of the Reflection Probe Atlas in the HDRP settings.");
+                Debug.LogError("No more space in Reflection Probe Atlas. To solve this issue, increase the size of the Reflection Probe Atlas in the HDRP settings.");
+            }
         }
 
         private bool NeedsUpdate(int textureId, uint textureHash, ref Vector4 scaleOffset)
@@ -216,10 +204,8 @@ namespace UnityEngine.Rendering.HighDefinition
             return needsUpdate;
         }
 
-        private RenderTexture GetTempConvertedReflectionProbeTexture(Texture texture)
+        private RenderTexture GetTempConvertedReflectionProbeTexture(Texture texture, int cubeSize)
         {
-            int cubeSize = Math.Max(texture.width, (int)Mathf.Pow(2, (int)EnvConstants.ConvolutionMipCount - 1));
-
             if (  m_TempConvertedReflectionProbeTexture == null
                || m_TmpTextureConvertedSize != cubeSize
                || m_TmpTextureConvertedFormat != m_AtlasFormat
@@ -263,7 +249,8 @@ namespace UnityEngine.Rendering.HighDefinition
 
                 if (conversionRequired)
                 {
-                    RenderTexture convertedTextureTemp = GetTempConvertedReflectionProbeTexture(texture);
+                    RenderTexture convertedTextureTemp = GetTempConvertedReflectionProbeTexture(texture, cubeSize);
+
 
                     m_ConvertTexturePropertyBlock.SetTexture(HDShaderIDs._InputTex, texture);
                     m_ConvertTexturePropertyBlock.SetFloat(HDShaderIDs._LoD, 0.0f);
@@ -326,6 +313,7 @@ namespace UnityEngine.Rendering.HighDefinition
             Assert.IsTrue((renderTexture && renderTexture.dimension == TextureDimension.Cube), "Cube Reflection Probe should always be a Cubemap Texture.");
 
             RenderTexture convolvedTextureTemp = GetTempConvolveReflectionProbeTexture(texture);
+
             filter.FilterCubemap(cmd, texture, convolvedTextureTemp);
 
             return convolvedTextureTemp;
@@ -517,6 +505,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     BlitTextureCube(cmd, scaleOffset, convolvedTextureTemp, filterIndex);
                 }
 
+
                 return true;
             }
         }
@@ -588,7 +577,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 m_TempConvertedReflectionProbeTexture = null;
             }
 
-
             if (m_TempConvolvedReflectionProbeTexture != null)
             {
                 RenderTexture.ReleaseTemporary(m_TempConvolvedReflectionProbeTexture);
@@ -641,8 +629,8 @@ namespace UnityEngine.Rendering.HighDefinition
         public void ReserveReflectionProbeSlot(HDProbe probe)
         {
             Texture texture = probe.texture;
-            Assert.IsTrue(texture.width == texture.height, "Reflection probe should be a square texture. Check the import settings of the texture, or your Texture Importer presets");
-            Assert.IsTrue(texture.dimension == TextureDimension.Tex2D || texture.dimension == TextureDimension.Cube, "Reflection probe should be a 2D or Cube texture. Check the import settings of the texture, or your Texture Importer presets");
+            Assert.IsTrue(texture.width == texture.height);
+            Assert.IsTrue(texture.dimension == TextureDimension.Tex2D || texture.dimension == TextureDimension.Cube);
 
             int textureId = GetTextureIDAndSize(probe, out int textureSize);
 

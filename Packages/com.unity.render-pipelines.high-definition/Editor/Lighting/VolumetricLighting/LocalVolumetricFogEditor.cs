@@ -1,11 +1,8 @@
-using System.Collections;
-using UnityEditor.EditorTools;
-using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
-using UnityEditor.Rendering.Utilities;
-
+using UnityEditorInternal;
+using UnityEditor.Rendering;
+using UnityEngine.Rendering;
 
 namespace UnityEditor.Rendering.HighDefinition
 {
@@ -49,7 +46,7 @@ namespace UnityEditor.Rendering.HighDefinition
             if (!HDRenderPipeline.currentAsset?.currentPlatformRenderPipelineSettings.supportVolumetrics ?? false)
             {
                 HDEditorUtils.QualitySettingsHelpBox("The current HDRP Asset does not support volumetric fog.", MessageType.Error,
-                    HDRenderPipelineUI.ExpandableGroup.Lighting, HDRenderPipelineUI.ExpandableLighting.Volumetric, "m_RenderPipelineSettings.supportVolumetrics");
+                    HDRenderPipelineUI.Expandable.Lighting, "m_RenderPipelineSettings.supportVolumetrics");
             }
 
             LocalVolumetricFogUI.Inspector.Draw(m_SerializedLocalVolumetricFog, this);
@@ -114,7 +111,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 || s_ShapeBox == null || s_ShapeBox.Equals(null))
                 return;
 
-            using (new Handles.DrawingScope(Matrix4x4.TRS(localVolumetricFog.transform.position, localVolumetricFog.transform.rotation, localVolumetricFog.effectiveScale)))
+            using (new Handles.DrawingScope(Matrix4x4.TRS(localVolumetricFog.transform.position, localVolumetricFog.transform.rotation, Vector3.one)))
             {
                 // Blend box
                 s_BlendBox.center = CenterBlendLocalPosition(localVolumetricFog);
@@ -134,7 +131,7 @@ namespace UnityEditor.Rendering.HighDefinition
         void OnSceneGUI()
         {
             //Note: for each handle to be independent when multi-selecting LocalVolumetricFog,
-            //We cannot rely here on SerializedLocalVolumetricFog which is the collection of
+            //We cannot rely  hereon SerializedLocalVolumetricFog which is the collection of
             //selected LocalVolumetricFog. Thus code is almost the same of the UI.
 
             LocalVolumetricFog localVolumetricFog = target as LocalVolumetricFog;
@@ -142,7 +139,7 @@ namespace UnityEditor.Rendering.HighDefinition
             switch (EditMode.editMode)
             {
                 case k_EditBlend:
-                    using (new Handles.DrawingScope(Matrix4x4.TRS(localVolumetricFog.transform.position, localVolumetricFog.transform.rotation, localVolumetricFog.effectiveScale)))
+                    using (new Handles.DrawingScope(Matrix4x4.TRS(localVolumetricFog.transform.position, localVolumetricFog.transform.rotation, Vector3.one)))
                     {
                         //contained must be initialized in all case
                         s_ShapeBox.center = Vector3.zero;
@@ -189,10 +186,10 @@ namespace UnityEditor.Rendering.HighDefinition
                 case k_EditShape:
                     //important: if the origin of the handle's space move along the handle,
                     //handles displacement will appears as moving two time faster.
-                    using (new Handles.DrawingScope(Matrix4x4.TRS(localVolumetricFog.transform.position, localVolumetricFog.transform.rotation, localVolumetricFog.effectiveScale)))
+                    using (new Handles.DrawingScope(Matrix4x4.TRS(Vector3.zero, localVolumetricFog.transform.rotation, Vector3.one)))
                     {
                         //contained must be initialized in all case
-                        s_ShapeBox.center = Vector3.zero;
+                        s_ShapeBox.center = Quaternion.Inverse(localVolumetricFog.transform.rotation) * localVolumetricFog.transform.position;
                         s_ShapeBox.size = localVolumetricFog.parameters.size;
 
                         Vector3 previousSize = localVolumetricFog.parameters.size;
@@ -260,30 +257,13 @@ namespace UnityEditor.Rendering.HighDefinition
                                         1.0f - (newSize.y > 0.00000001 ? (newSize.y - newUniformFade) / newSize.y : 0f),
                                         1.0f - (newSize.z > 0.00000001 ? (newSize.z - newUniformFade) / newSize.z : 0f));
                             }
+
+                            Vector3 delta = localVolumetricFog.transform.rotation * s_ShapeBox.center - localVolumetricFog.transform.position;
+                            localVolumetricFog.transform.position += delta;
                         }
                     }
                     break;
             }
         }
-    }
-
-    [EditorTool(Description, typeof(LocalVolumetricFog), toolPriority = (int)Mode)]
-    internal class LocalVolumetricFogModifyInfluenceVolumeTool : GenericEditorTool<LocalVolumetricFog>
-    {
-        private const string Description = "Modify the influence volume";
-        private const EditMode.SceneViewEditMode Mode = LocalVolumetricFogEditor.k_EditBlend;
-        private const string IconName = "PreMatCube";
-
-        protected LocalVolumetricFogModifyInfluenceVolumeTool() : base(Description, Mode, IconName) { }
-    }
-
-    [EditorTool(Description, typeof(LocalVolumetricFog), toolPriority = (int)Mode)]
-    internal class LocalVolumetricFogModifyReflectionProbeBoxTool : GenericEditorTool<LocalVolumetricFog>
-    {
-        private const string Description = "Modify the base shape";
-        private const EditMode.SceneViewEditMode Mode = LocalVolumetricFogEditor.k_EditShape;
-        private const string IconName = "EditCollider";
-
-        protected LocalVolumetricFogModifyReflectionProbeBoxTool() : base(Description, Mode, IconName) { }
     }
 }

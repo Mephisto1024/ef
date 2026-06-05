@@ -8,7 +8,7 @@ Shader "Hidden/PostProcessing/SubpixelMorphologicalAntialiasing"
 
     HLSLINCLUDE
 
-    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
     #pragma multi_compile_fragment SMAA_PRESET_LOW SMAA_PRESET_MEDIUM SMAA_PRESET_HIGH
     #pragma editor_sync_compilation
 
@@ -23,7 +23,6 @@ Shader "Hidden/PostProcessing/SubpixelMorphologicalAntialiasing"
         // Edge detection
         Pass
         {
-            Name "Edge detection"
             Stencil
             {
                 WriteMask [_StencilMask]
@@ -44,7 +43,6 @@ Shader "Hidden/PostProcessing/SubpixelMorphologicalAntialiasing"
         // Blend Weights Calculation
         Pass
         {
-            Name "Blend Weights Calculation"
             Stencil
             {
                 WriteMask[_StencilMask]
@@ -66,7 +64,6 @@ Shader "Hidden/PostProcessing/SubpixelMorphologicalAntialiasing"
         // Neighborhood Blending
         Pass
         {
-            Name "Neighborhood Blending"
             HLSLPROGRAM
 
                 #pragma vertex VertNeighbor

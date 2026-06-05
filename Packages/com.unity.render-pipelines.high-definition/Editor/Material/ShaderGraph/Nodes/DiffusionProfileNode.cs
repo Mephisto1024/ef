@@ -24,9 +24,9 @@ namespace UnityEditor.Rendering.HighDefinition
             UpdateNodeAfterDeserialization();
         }
 
-        public override string documentationURL => NodeUtils.GetDocumentationString("Diffusion-Profile");
+        public override string documentationURL => Documentation.GetPageLink("SGNode-Diffusion-Profile");
 
-        [SerializeField, Obsolete("Use m_DiffusionProfileAsset instead. #from(2021.1)")]
+        [SerializeField, Obsolete("Use m_DiffusionProfileAsset instead.")]
         UnityEditor.ShaderGraph.Drawing.Controls.PopupList m_DiffusionProfile = new UnityEditor.ShaderGraph.Drawing.Controls.PopupList();
 
         // Helper class to serialize an asset inside a shader graph

@@ -61,7 +61,7 @@ This example code uses a `ClampedFloatParameter` that you can clamp to a range. 
 - The second parameter represents the minimum value to clamp the property to.
 - The third parameter represents the maximum value to clamp the property to.
 
-HDRP calls the `IsActive()` function before the `Render` function to process the effect. If this function returns `false`, HDRP doesn't process the effect. It's good practice to check every property configuration where the effect either breaks or doesn't do anything. In this example, `IsActive()` makes sure that HDRP can find the `GrayScale.shader` and that the intensity is greater than 0.
+HDRP calls the `IsActive()` function before the `Render` function to process the effect. If this function returns `false`, HDRP doesn't process the effect. It's good practice to check every property configuration where the effect either breaks or doesn'thing. In this example, `IsActive()` makes sure that HDRP can find the `GrayScale.shader` and that the intensity is greater than 0.
 
 The **injectionPoint** override allows you to specify where in the pipeline HDRP executes the effect. Choose from the following injection points:
 
@@ -71,7 +71,7 @@ The **injectionPoint** override allows you to specify where in the pipeline HDRP
 - **AfterPostProcessBlurs.**
 - **AfterPostProcess.**
 
-To learn when in the render pipeline HDRP can execute custom post-processing passes, refer to [Execution order](rendering-execution-order.md).
+To learn when in the render pipeline HDRP can execute custom post-processing passes, refer to [Excecution order](rendering-excecution-order.md).
 
 **Note**: When you enable [Temporal antialiasing (TAA)](Anti-Aliasing.md#TAA), HDRP applies TAA between the injection points **BeforeTAA** and **beforePostProcess**. When you use [Depth Of Field](Post-Processing-Depth-of-Field.md) and enable its **Physically Based** property, HDRP performs a second TAA pass to perform temporal accumulation for this effect.
 
@@ -229,4 +229,4 @@ sealed class GrayScaleEditor : VolumeComponentEditor
 }
 ```
 
-This custom editor isn't useful as it produces the same result as the editor that Unity creates. Custom Volume component editors also support an [additonal properties toggle](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@17.2/manual/advanced-properties.html). To add it, you have to set the `hasAdvancedMode` override to true. Then, inside `OnInspectorGUI`, you can use the `isInAdvancedMode` Boolean to display more properties.
+This custom editor isn't useful as it produces the same result as the editor that Unity creates. Custom Volume component editors also support an [additonal properties toggle](expose-all-additional-properties.md). To add it, you have to set the `hasAdvancedMode` override to true. Then, inside `OnInspectorGUI`, you can use the `isInAdvancedMode` Boolean to display more properties.

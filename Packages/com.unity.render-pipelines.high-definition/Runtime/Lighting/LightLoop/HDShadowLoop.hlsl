@@ -100,7 +100,7 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
 #if NEED_TO_CHECK_HELPER_LANE
         // On some platform helper lanes don't behave as we'd expect, therefore we prevent them from entering the loop altogether.
         // IMPORTANT! This has implications if ddx/ddy is used on results derived from lighting, however given Lightloop is called in compute we should be
-        // sure it will not happen.
+        // sure it will not happen. 
         bool isHelperLane = WaveIsHelperLane();
         while (!isHelperLane && v_lightListOffset < lightCount)
 #else
@@ -128,30 +128,11 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
                     float3 L;
                     float4 distances; // {d, d^2, 1/d, d_proj}
                     GetPunctualLightVectors(posInput.positionWS, s_lightData, L, distances);
-
-                    // Projector lights (box, pyramid) always have cookies, so we can perform clipping inside the if().
-                    float lightinBounds = 1.0;
-                    if (s_lightData.lightType == GPULIGHTTYPE_PROJECTOR_PYRAMID || s_lightData.lightType == GPULIGHTTYPE_PROJECTOR_BOX)
-                    {
-                        float3 lightToSample = posInput.positionWS - s_lightData.positionRWS;
-                        float3x3 lightToWorld = float3x3(s_lightData.right, s_lightData.up, s_lightData.forward);
-                        float3 positionLS   = mul(lightToSample, transpose(lightToWorld));
-
-                        // Perform orthographic or perspective projection.
-                        float  perspectiveZ = (s_lightData.lightType != GPULIGHTTYPE_PROJECTOR_BOX) ? positionLS.z : 1.0;
-                        float2 positionCS   = positionLS.xy / perspectiveZ;
-
-                        float z = positionLS.z;
-                        float r = s_lightData.range;
-
-                        // Box lights have no range attenuation, so we must clip manually.
-                        lightinBounds = Max3(abs(positionCS.x), abs(positionCS.y), abs(z - 0.5 * r) - 0.5 * r + 1) <= s_lightData.boxLightSafeExtent ?  1 : 0;
-                    }
-
-                    if (distances.x < s_lightData.range
-                        && PunctualLightAttenuation(distances, s_lightData.rangeAttenuationScale, s_lightData.rangeAttenuationBias, s_lightData.angleScale, s_lightData.angleOffset) > 0.0
-                        && lightinBounds > 0.0
-                        && L.y > 0.0)
+                    float lightRadSqr = s_lightData.size.x;
+                    if (distances.x < s_lightData.range &&
+                        PunctualLightAttenuation(distances, s_lightData.rangeAttenuationScale, s_lightData.rangeAttenuationBias,
+                                                            s_lightData.angleScale,            s_lightData.angleOffset) > 0.0 &&
+                        L.y > 0.0)
                     {
 #if defined(SCREEN_SPACE_SHADOWS_ON) && !defined(_SURFACE_TYPE_TRANSPARENT)
                         if ((s_lightData.screenSpaceShadowIndex & SCREEN_SPACE_SHADOW_INDEX_MASK) != INVALID_SCREEN_SPACE_SHADOW)
@@ -217,53 +198,47 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
 
                 float shadowArea = 1.0f;
 
-                // If the point to shade is in the positive hemisphere of the area light, we can read the shadow.
-                if (dot(lightData.forward, posInput.positionWS) > dot(lightData.forward, lightData.positionRWS))
+                if (IsMatchingLightLayer(lightData.lightLayers, renderLayer))
                 {
-                    if (IsMatchingLightLayer(lightData.lightLayers, renderLayer))
-                    {
 #if defined(SCREEN_SPACE_SHADOWS_ON) && !defined(_SURFACE_TYPE_TRANSPARENT)
-                        if ((lightData.screenSpaceShadowIndex & SCREEN_SPACE_SHADOW_INDEX_MASK) != INVALID_SCREEN_SPACE_SHADOW)
-                        {
-                            shadowArea = GetScreenSpaceShadow(posInput, lightData.screenSpaceShadowIndex);
-                        }
-                        else
+                    if ((lightData.screenSpaceShadowIndex & SCREEN_SPACE_SHADOW_INDEX_MASK) != INVALID_SCREEN_SPACE_SHADOW)
+                    {
+                        shadowArea = GetScreenSpaceShadow(posInput, lightData.screenSpaceShadowIndex);
+                    }
+                    else
 #endif
-                        if ( lightData.shadowIndex >= 0 )
+                    {
+                        float3 L;
+                        float4 distances; // {d, d^2, 1/d, d_proj}
+                        GetPunctualLightVectors(posInput.positionWS, lightData, L, distances);
+                        float lightRadSqr = lightData.size.x;
+                        float shadowP;
+
+                        float coef = 0.0f;
+                        float3 unL = lightData.positionRWS - posInput.positionWS;
+                        if (dot(lightData.forward, unL) < FLT_EPS)
                         {
-                            float3 L;
-                            float4 distances; // {d, d^2, 1/d, d_proj}
-                            GetPunctualLightVectors(posInput.positionWS, lightData, L, distances);
-                            float lightRadSqr = lightData.size.x;
-                            float shadowP;
+                            float3x3 lightToWorld = float3x3(lightData.right, lightData.up, -lightData.forward);
+                            unL = mul(unL, transpose(lightToWorld));
 
-                            float coef = 0.0f;
-                            float3 unL = lightData.positionRWS - posInput.positionWS;
-                            if (dot(lightData.forward, unL) < FLT_EPS)
-                            {
-                                float3x3 lightToWorld = float3x3(lightData.right, lightData.up, -lightData.forward);
-                                unL = mul(unL, transpose(lightToWorld));
+                            float halfWidth   = lightData.size.x*0.5;
+                            float halfHeight  = lightData.size.y*0.5;
 
-                                float halfWidth   = lightData.size.x*0.5;
-                                float halfHeight  = lightData.size.y*0.5;
+                            float  range      = lightData.range;
+                            float3 invHalfDim = rcp(float3(range + halfWidth,
+                                                           range + halfHeight,
+                                                           range));
 
-                                float  range      = lightData.range;
-                                float3 invHalfDim = rcp(float3(range + halfWidth,
-                                                               range + halfHeight,
-                                                               range));
+                            coef = EllipsoidalDistanceAttenuation(unL, invHalfDim,
+                                                                       lightData.rangeAttenuationScale,
+                                                                       lightData.rangeAttenuationBias);
+                        }
 
-                                coef = EllipsoidalDistanceAttenuation(unL, invHalfDim,
-                                                                           lightData.rangeAttenuationScale,
-                                                                           lightData.rangeAttenuationBias);
-                            }
-
-                            if (distances.x < lightData.range && coef > 0.0)
-                            {
-                                shadowArea = GetRectAreaShadowAttenuation(shadowContext, posInput.positionSS, posInput.positionWS, normalWS, lightData.shadowIndex, normalize(lightData.positionRWS), length(lightData.positionRWS));
-                            }
+                        if (distances.x < lightData.range && coef > 0.0)
+                        {
+                            shadowArea = GetRectAreaShadowAttenuation(shadowContext, posInput.positionSS, posInput.positionWS, normalWS, lightData.shadowIndex, normalize(lightData.positionRWS), length(lightData.positionRWS));
                         }
                     }
-
 #ifdef SHADOW_LOOP_MULTIPLY
                     shadow *= lerp(lightData.shadowTint, float3(1, 1, 1), shadowArea);
 #elif defined(SHADOW_LOOP_AVERAGE)

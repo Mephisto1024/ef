@@ -7,7 +7,7 @@ namespace UnityEngine.Rendering.HighDefinition
     public struct CameraPositionSettings
     {
         /// <summary>Default value.</summary>
-        [Obsolete("Use CameraPositionSettings.NewDefault() instead. #from(2019.3)")]
+        [Obsolete("Since 2019.3, use CameraPositionSettings.NewDefault() instead.")]
         public static readonly CameraPositionSettings @default = default;
         /// <summary>Default value.</summary>
         /// <returns>The default value.</returns>

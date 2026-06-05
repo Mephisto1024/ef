@@ -40,16 +40,16 @@ namespace UnityEditor.Rendering.HighDefinition
 
         static GUIStyle s_PreLabel;
 
-        static string[] s_CurveNames =
+        static GUIContent[] s_Curves =
         {
-            "Master",
-            "Red",
-            "Green",
-            "Blue",
-            "Hue Vs Hue",
-            "Hue Vs Sat",
-            "Sat Vs Sat",
-            "Lum Vs Sat"
+            new GUIContent("Master"),
+            new GUIContent("Red"),
+            new GUIContent("Green"),
+            new GUIContent("Blue"),
+            new GUIContent("Hue Vs Hue"),
+            new GUIContent("Hue Vs Sat"),
+            new GUIContent("Sat Vs Sat"),
+            new GUIContent("Lum Vs Sat")
         };
 
         public override void OnEnable()
@@ -128,28 +128,9 @@ namespace UnityEditor.Rendering.HighDefinition
             overrideProp.boolValue = GUILayout.Toggle(overrideProp.boolValue, EditorGUIUtility.TrTextContent("Override"), EditorStyles.toolbarButton);
         }
 
-        string MakeCurveSelectionPopupLabel(int id)
-        {
-            string label = s_CurveNames[id];
-            const string overrideSuffix = " (Overriding)";
-            switch (id)
-            {
-                case 0: if (m_Master.overrideState.boolValue) label += overrideSuffix; break;
-                case 1: if (m_Red.overrideState.boolValue) label += overrideSuffix; break;
-                case 2: if (m_Green.overrideState.boolValue) label += overrideSuffix; break;
-                case 3: if (m_Blue.overrideState.boolValue) label += overrideSuffix; break;
-                case 4: if (m_HueVsHue.overrideState.boolValue) label += overrideSuffix; break;
-                case 5: if (m_HueVsSat.overrideState.boolValue) label += overrideSuffix; break;
-                case 6: if (m_SatVsSat.overrideState.boolValue) label += overrideSuffix; break;
-                case 7: if (m_LumVsSat.overrideState.boolValue) label += overrideSuffix; break;
-            }
-            return label;
-        }
-
         int DoCurveSelectionPopup(int id)
         {
-            var label = MakeCurveSelectionPopupLabel(id);
-            GUILayout.Label(label, EditorStyles.toolbarPopup, GUILayout.MaxWidth(150f));
+            GUILayout.Label(s_Curves[id], EditorStyles.toolbarPopup, GUILayout.MaxWidth(150f));
 
             var lastRect = GUILayoutUtility.GetLastRect();
             var e = Event.current;
@@ -158,15 +139,13 @@ namespace UnityEditor.Rendering.HighDefinition
             {
                 var menu = new GenericMenu();
 
-                for (int i = 0; i < s_CurveNames.Length; i++)
+                for (int i = 0; i < s_Curves.Length; i++)
                 {
                     if (i == 4)
                         menu.AddSeparator("");
 
                     int current = i; // Capture local for closure
-
-                    var menuLabel = MakeCurveSelectionPopupLabel(i);
-                    menu.AddItem(new GUIContent(menuLabel), current == id, () =>
+                    menu.AddItem(s_Curves[i], current == id, () =>
                     {
                         m_SelectedCurve.intValue = current;
                         serializedObject.ApplyModifiedProperties();
@@ -330,7 +309,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
                     for (int i = 1; i < hLines; i++)
                     {
-                        var offset = gridOffset * i * Vector2.right;
+                        var offset = i * Vector2.right * gridOffset;
                         offset.x += gridPadding;
                         Handles.DrawLine(innerRect.position + offset, new Vector2(innerRect.x, innerRect.yMax - 1) + offset);
                     }
@@ -341,7 +320,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
                     for (int i = 1; i < vLines; i++)
                     {
-                        var offset = gridOffset * i * Vector2.up;
+                        var offset = i * Vector2.up * gridOffset;
                         offset.y += gridPadding;
                         Handles.DrawLine(innerRect.position + offset, new Vector2(innerRect.xMax - 1, innerRect.y) + offset);
                     }

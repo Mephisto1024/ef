@@ -1,6 +1,6 @@
-# Upgrade Materials between HDRP versions
+# Upgrading Materials between HDRP versions
 
-You might need to upgrade materials for them to work between different versions of the High Definition Render Pipeline (HDRP). This page describes how to upgrade materials and fix issues.
+Between different versions of the High Definition Render Pipeline (HDRP), you might need to upgrade materials for them to work. This page describes how to upgrade materials and how to fix issues.
 
 ## Automatic Material Upgrade
 

@@ -1,7 +1,11 @@
 using System;
-using UnityEngine;
-using UnityEngine.UIElements;
+using System.Collections.Generic;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
+using UnityEditor.ShaderGraph;
+using UnityEngine.UIElements;
+using UnityEditor.UIElements;
+using UnityEngine;
 
 // We share the name of the properties in the UI to avoid duplication
 using static UnityEditor.Rendering.HighDefinition.SurfaceOptionUIBlock.Styles;
@@ -24,6 +28,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
 
         class Styles
         {
+            public static GUIContent fragmentNormalSpace = new GUIContent("Fragment Normal Space", "Select the space use for normal map in Fragment shader in this shader graph.");
             public static GUIContent doubleSidedModeText = new GUIContent("Double Sided Mode", "Select the double sided mode to use with this Material.");
         }
 
@@ -61,10 +66,8 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
 
             if (systemData.surfaceType == SurfaceType.Transparent)
             {
-                AddProperty(blendModeText, () => systemData.blendingMode, (newValue) => systemData.blendingMode = newValue);
+                AddProperty(blendModeText, () => systemData.blendMode, (newValue) => systemData.blendMode = newValue);
                 AddProperty(enableTransparentFogText, () => builtinData.transparencyFog, (newValue) => builtinData.transparencyFog = newValue);
-                if (renderingPassValue == HDRenderQueue.RenderQueueType.PreRefraction)
-                    AddProperty(perPixelSortingText, () => builtinData.transparentPerPixelSorting, (newValue) => builtinData.transparentPerPixelSorting = newValue);
                 AddProperty(transparentZTestText, () => systemData.zTest, (newValue) => systemData.zTest = newValue);
                 if (renderingPassValue != HDRenderQueue.RenderQueueType.LowTransparent)
                     AddProperty(zWriteEnableText, () => systemData.transparentZWrite, (newValue) => systemData.transparentZWrite = newValue);
@@ -102,7 +105,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
             else
                 AddProperty(doubleSidedEnableText, () => systemData.doubleSidedMode != DoubleSidedMode.Disabled, (newValue) => systemData.doubleSidedMode = newValue ? DoubleSidedMode.Enabled : DoubleSidedMode.Disabled);
             if (lightingData != null)
-                AddProperty(fragmentNormalSpace, () => lightingData.normalDropOffSpace, (newValue) => lightingData.normalDropOffSpace = newValue);
+                AddProperty(Styles.fragmentNormalSpace, () => lightingData.normalDropOffSpace, (newValue) => lightingData.normalDropOffSpace = newValue);
 
             // Misc Cont.
             if (lightingData != null)

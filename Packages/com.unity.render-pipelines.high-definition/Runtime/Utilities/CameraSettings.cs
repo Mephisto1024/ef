@@ -68,7 +68,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public struct BufferClearing
         {
             /// <summary>Default value.</summary>
-            [Obsolete("Use BufferClearing.NewDefault() instead. #from(2019.3)")]
+            [Obsolete("Since 2019.3, use BufferClearing.NewDefault() instead.")]
             public static readonly BufferClearing @default = default;
             /// <summary>Default value.</summary>
             /// <returns>The default value.</returns>
@@ -91,69 +91,24 @@ namespace UnityEngine.Rendering.HighDefinition
             public bool clearDepth;
         }
 
-        /// <summary>
-        /// Defines the settings for querying and evaluating volumes within the framework.
-        /// This structure contains options for filtering volumes by <see cref="LayerMask"/> and customizing the location
-        /// of volume evaluations through an optional <see cref="Transform"/> anchor override.
-        /// These settings control how volumes are processed and how they interact with the scene's camera or other objects.
-        /// </summary>
-        /// <remarks>
-        /// The <see cref="Volumes"/> struct is used for controlling volume behavior, including selecting which volumes
-        /// to query using the <see cref="LayerMask"/> and overriding the default evaluation anchor. It is useful when
-        /// customizing volume queries and evaluation locations within a scene.
-        /// </remarks>
+        /// <summary>Defines how the volume framework is queried.</summary>
         [Serializable]
         public struct Volumes
         {
-            /// <summary>
-            /// Default value for volume settings. This is the default configuration used before any customizations are applied.
-            /// </summary>
-            /// <remarks>
-            /// The default value uses a <see cref="LayerMask"/> of -1 (which includes all layers) and a null override
-            /// for the anchor (indicating no anchor override).
-            /// </remarks>
-            [Obsolete("This field is obsolete use Volumes.NewDefault() instead. #from(2019.3) #breakingFrom(6000.1)", true)]
+            /// <summary>Default value.</summary>
+            [Obsolete("Since 2019.3, use Volumes.NewDefault() instead.")]
             public static readonly Volumes @default = default;
-
-            /// <summary>
-            /// Creates a new default <see cref="Volumes"/> instance with predefined settings.
-            /// The default configuration includes a <see cref="LayerMask"/> that includes all layers and a null anchor override.
-            /// </summary>
-            /// <returns>The default <see cref="Volumes"/> configuration.</returns>
-            /// <example>
-            /// <code>
-            /// Volumes defaultVolumes = Volumes.NewDefault();
-            /// </code>
-            /// </example>
-            /// <remarks>
-            /// This method returns a fresh instance of <see cref="Volumes"/> with default values. It can be used to initialize
-            /// the volume settings before applying specific customizations like setting the <see cref="LayerMask"/> or overriding
-            /// the evaluation anchor.
-            /// </remarks>
+            /// <summary>Default value.</summary>
+            /// <returns>The default value.</returns>
             public static Volumes NewDefault() => new Volumes
             {
                 layerMask = -1,
                 anchorOverride = null
             };
 
-            /// <summary>
-            /// The <see cref="LayerMask"/> used to filter which volumes should be evaluated.
-            /// This setting allows you to control which layers are considered during volume evaluation.
-            /// </summary>
-            /// <remarks>
-            /// A <see cref="LayerMask"/> of -1 includes all layers, while setting specific values allows you to limit evaluation
-            /// to certain layers.
-            /// </remarks>
+            /// <summary>The <see cref="LayerMask"/> to use for the volumes.</summary>
             public LayerMask layerMask;
-
-            /// <summary>
-            /// If not null, specifies a custom location for evaluating the volumes.
-            /// This allows for overriding the default anchor point for volume processing.
-            /// </summary>
-            /// <remarks>
-            /// If <see cref="anchorOverride"/> is set to null, the default evaluation location is used. This property provides
-            /// additional flexibility in controlling where volumes are processed within the scene.
-            /// </remarks>
+            /// <summary>If not null, define the location of the evaluation of the volume framework.</summary>
             public Transform anchorOverride;
         }
 
@@ -171,7 +126,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public const float MinFarClipPlane = 1e-4f;
 
             /// <summary>Default value.</summary>
-            [Obsolete("Use Frustum.NewDefault() instead. #from(2019.3)")]
+            [Obsolete("Since 2019.3, use Frustum.NewDefault() instead.")]
             public static readonly Frustum @default = default;
             /// <summary>Default value.</summary>
             /// <returns>The default value.</returns>
@@ -275,7 +230,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public struct Culling
         {
             /// <summary>Default value.</summary>
-            [Obsolete("Use Culling.NewDefault() instead. #from(2019.3)")]
+            [Obsolete("Since 2019.3, use Culling.NewDefault() instead.")]
             public static readonly Culling @default = default;
             /// <summary>Default value.</summary>
             /// <returns>The default value.</returns>
@@ -295,7 +250,7 @@ namespace UnityEngine.Rendering.HighDefinition
         }
 
         /// <summary>Default value.</summary>
-        [Obsolete("Use CameraSettings.defaultCameraSettingsNonAlloc instead. #from(2019.3)")]
+        [Obsolete("Since 2019.3, use CameraSettings.defaultCameraSettingsNonAlloc instead.")]
         public static readonly CameraSettings @default = default;
         /// <summary>Default value.</summary>
         /// <returns>The default value and allocate ~250B of garbage.</returns>
@@ -303,7 +258,7 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             bufferClearing = BufferClearing.NewDefault(),
             culling = Culling.NewDefault(),
-            renderingPathCustomFrameSettings = FrameSettingsDefaults.Get(FrameSettingsRenderType.Camera),
+            renderingPathCustomFrameSettings = FrameSettings.NewDefaultCamera(),
             frustum = Frustum.NewDefault(),
             customRenderingSettings = false,
             volumes = Volumes.NewDefault(),
@@ -397,12 +352,12 @@ namespace UnityEngine.Rendering.HighDefinition
 
         [SerializeField]
         [FormerlySerializedAs("renderingPath")]
-        [Obsolete("For data migration. #from(2022.1)")]
+        [Obsolete("For data migration")]
         internal int m_ObsoleteRenderingPath;
 #pragma warning disable 618 // Type or member is obsolete
         [SerializeField]
         [FormerlySerializedAs("frameSettings")]
-        [Obsolete("For data migration. #from(2022.1)")]
+        [Obsolete("For data migration")]
         internal ObsoleteFrameSettings m_ObsoleteFrameSettings;
 #pragma warning restore 618
 

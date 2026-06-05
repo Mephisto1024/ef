@@ -28,8 +28,6 @@ namespace UnityEngine.Rendering.HighDefinition
             PlanarResolutionScalability,
             /// <summary>Version Step.</summary>
             UpdateMSAA,
-            /// <summary>Version Step.</summary>
-            AddProbeImportance,
         }
 
         /// <summary>
@@ -92,10 +90,6 @@ namespace UnityEngine.Rendering.HighDefinition
             MigrationStep.New(Version.UpdateMSAA, (HDProbe data) =>
             {
                 FrameSettings.MigrateMSAA(ref data.m_ProbeSettings.cameraSettings.renderingPathCustomFrameSettings, ref data.m_ProbeSettings.cameraSettings.renderingPathCustomFrameSettingsOverrideMask);
-            }),
-            MigrationStep.New(Version.AddProbeImportance, (HDProbe data) =>
-            {
-                data.m_ProbeSettings.lighting.importance = (data.m_ProbeSettings.type == ProbeSettings.ProbeType.PlanarProbe)? 64 : 1;
             })
         );
 
@@ -105,37 +99,37 @@ namespace UnityEngine.Rendering.HighDefinition
 
         // Legacy fields for HDProbe
         /// <summary>Obsolete field</summary>
-        [SerializeField, FormerlySerializedAs("m_InfiniteProjection"), Obsolete("For Data Migration. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("m_InfiniteProjection"), Obsolete("For Data Migration")]
         protected bool m_ObsoleteInfiniteProjection = true;
 
         /// <summary>Obsolete field</summary>
-        [SerializeField, FormerlySerializedAs("m_InfluenceVolume"), Obsolete("For Data Migration. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("m_InfluenceVolume"), Obsolete("For Data Migration")]
         protected InfluenceVolume m_ObsoleteInfluenceVolume;
 
 #pragma warning disable 618 // Type or member is obsolete
-        [SerializeField, FormerlySerializedAs("m_FrameSettings"), Obsolete("For Data Migration. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("m_FrameSettings"), Obsolete("For Data Migration")]
         ObsoleteFrameSettings m_ObsoleteFrameSettings = null;
 #pragma warning restore 618
 
         /// <summary>Obsolete field</summary>
         [SerializeField, FormerlySerializedAs("m_Multiplier"), FormerlySerializedAs("dimmer")]
-        [FormerlySerializedAs("m_Dimmer"), FormerlySerializedAs("multiplier"), Obsolete("For Data Migration. #from(2021.1)")]
+        [FormerlySerializedAs("m_Dimmer"), FormerlySerializedAs("multiplier"), Obsolete("For Data Migration")]
         protected float m_ObsoleteMultiplier = 1.0f;
         /// <summary>Obsolete field</summary>
         [SerializeField, FormerlySerializedAs("m_Weight"), FormerlySerializedAs("weight")]
-        [Obsolete("For Data Migration. #from(2021.1)")]
+        [Obsolete("For Data Migration")]
         [Range(0.0f, 1.0f)]
         protected float m_ObsoleteWeight = 1.0f;
 
         /// <summary>Obsolete field</summary>
-        [SerializeField, FormerlySerializedAs("m_Mode"), Obsolete("For Data Migration. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("m_Mode"), Obsolete("For Data Migration")]
         protected ProbeSettings.Mode m_ObsoleteMode = ProbeSettings.Mode.Baked;
 
-        [SerializeField, FormerlySerializedAs("lightLayers"), Obsolete("For Data Migration. #from(2021.1)")]
-        RenderingLayerMask m_ObsoleteLightLayers = RenderingLayerMask.LightLayerDefault;
+        [SerializeField, FormerlySerializedAs("lightLayers"), Obsolete("For Data Migration")]
+        LightLayerEnum m_ObsoleteLightLayers = LightLayerEnum.LightLayerDefault;
 
         /// <summary>Obsolete field</summary>
-        [SerializeField, FormerlySerializedAs("m_CaptureSettings"), Obsolete("For Data Migration. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("m_CaptureSettings"), Obsolete("For Data Migration")]
         internal ObsoleteCaptureSettings m_ObsoleteCaptureSettings;
     }
 }

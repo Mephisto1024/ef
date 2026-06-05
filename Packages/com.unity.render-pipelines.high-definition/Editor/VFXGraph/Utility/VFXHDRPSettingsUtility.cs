@@ -5,17 +5,21 @@ namespace UnityEditor.VFX.HDRP
 {
     static class VFXHDRPSettingsUtility
     {
-        public static void RefreshVfxErrorsIfNeeded()
+        public static void RefreshVfxErrorsIfNeeded(ref bool needRefreshVfxErrors)
         {
-            foreach (var vfxWindow in VFXViewWindow.GetAllWindows())
+            if (needRefreshVfxErrors)
             {
-                if (vfxWindow != null  && vfxWindow.graphView != null )
+                foreach (var vfxWindow in VFXViewWindow.GetAllWindows())
                 {
-                    var vfxGraph = vfxWindow.graphView.controller.graph;
-                    foreach (var output in vfxGraph.children.OfType<VFXDecalHDRPOutput>())
-                        output.RefreshErrors();
+                    if (vfxWindow != null && vfxWindow.graphView != null)
+                    {
+                        var vfxGraph = vfxWindow.graphView.controller.graph;
+                        foreach (var output in vfxGraph.children.OfType<VFXDecalHDRPOutput>())
+                            output.RefreshErrors();
+                    }
                 }
             }
+            needRefreshVfxErrors = false;
         }
     }
 }

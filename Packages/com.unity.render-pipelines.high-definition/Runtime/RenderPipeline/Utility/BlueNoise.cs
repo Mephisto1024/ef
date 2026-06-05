@@ -1,6 +1,5 @@
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -35,46 +34,19 @@ namespace UnityEngine.Rendering.HighDefinition
         Texture2DArray m_TextureArray16L;
         Texture2DArray m_TextureArray16RGB;
 
-        static readonly System.Random m_Random = new System.Random();
+        HDRenderPipelineRuntimeResources m_RenderPipelineResources;
 
-        DitheredTextureSet m_DitheredTextureSet1SPP;
-        DitheredTextureSet m_DitheredTextureSet8SPP;
-        DitheredTextureSet m_DitheredTextureSet256SPP;
+        static readonly System.Random m_Random = new System.Random();
 
         /// <summary>
         /// Creates a new instance of the blue noise texture bank.
         /// </summary>
         /// <param name="resources">A reference to the render pipeline resources asset.</param>
-        internal BlueNoise(HDRenderPipeline renderPipeline)
+        internal BlueNoise(HDRenderPipelineRuntimeResources resources)
         {
-            var textures = renderPipeline.runtimeTextures;
-
-            InitTextures(16, TextureFormat.Alpha8, textures.blueNoise16LTex, out m_Textures16L, out m_TextureArray16L);
-            InitTextures(16, TextureFormat.RGB24, textures.blueNoise16RGBTex, out m_Textures16RGB, out m_TextureArray16RGB);
-
-            m_DitheredTextureSet1SPP = new DitheredTextureSet
-            {
-                owenScrambled256Tex = RTHandles.Alloc(textures.owenScrambled256Tex),
-                scramblingTile      = RTHandles.Alloc(textures.scramblingTile1SPP),
-                rankingTile         = RTHandles.Alloc(textures.rankingTile1SPP),
-                scramblingTex       = RTHandles.Alloc(textures.scramblingTex)
-            };                        
-
-            m_DitheredTextureSet8SPP = new DitheredTextureSet
-            {
-                owenScrambled256Tex = RTHandles.Alloc(textures.owenScrambled256Tex),
-                scramblingTile      = RTHandles.Alloc(textures.scramblingTile8SPP),
-                rankingTile         = RTHandles.Alloc(textures.rankingTile8SPP),
-                scramblingTex       = RTHandles.Alloc(textures.scramblingTex)
-            };
-
-            m_DitheredTextureSet256SPP = new DitheredTextureSet
-            {
-                owenScrambled256Tex = RTHandles.Alloc(textures.owenScrambled256Tex),
-                scramblingTile      = RTHandles.Alloc(textures.scramblingTile256SPP),
-                rankingTile         = RTHandles.Alloc(textures.rankingTile256SPP),
-                scramblingTex       = RTHandles.Alloc(textures.scramblingTex)
-            };
+            m_RenderPipelineResources = resources;
+            InitTextures(16, TextureFormat.Alpha8, resources.textures.blueNoise16LTex, out m_Textures16L, out m_TextureArray16L);
+            InitTextures(16, TextureFormat.RGB24, resources.textures.blueNoise16RGBTex, out m_Textures16RGB, out m_TextureArray16RGB);
         }
 
         /// <summary>
@@ -116,10 +88,8 @@ namespace UnityEngine.Rendering.HighDefinition
             Assert.IsTrue(len > 0);
 
             destination = new Texture2D[len];
-            destinationArray = new Texture2DArray(size, size, len, format, false, true)
-            {
-                hideFlags = HideFlags.HideAndDontSave
-            };
+            destinationArray = new Texture2DArray(size, size, len, format, false, true);
+            destinationArray.hideFlags = HideFlags.HideAndDontSave;
 
             for (int i = 0; i < len; i++)
             {
@@ -140,50 +110,67 @@ namespace UnityEngine.Rendering.HighDefinition
         // Structure that holds all the dithered sampling texture that shall be binded at dispatch time.
         internal struct DitheredTextureSet
         {
-            public RTHandle owenScrambled256Tex;
-            public RTHandle scramblingTile;
-            public RTHandle rankingTile;
-            public RTHandle scramblingTex;
+            public Texture2D owenScrambled256Tex;
+            public Texture2D scramblingTile;
+            public Texture2D rankingTile;
+            public Texture2D scramblingTex;
         }
 
-        // Structure that holds the Render Graph handles to the dithered sampling texture that have been loaded
-        // at a given Render Graph execution using ImportResources()
-        internal struct DitheredTextureHandleSet
+        internal void BindDitheredRNGData1SPP(CommandBuffer cmd)
         {
-            public TextureHandle owenScrambled256Tex;
-            public TextureHandle scramblingTile;
-            public TextureHandle rankingTile;
-            public TextureHandle scramblingTex;
+            cmd.SetGlobalTexture(HDShaderIDs._OwenScrambledTexture, m_RenderPipelineResources.textures.owenScrambled256Tex);
+            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTileXSPP, m_RenderPipelineResources.textures.scramblingTile1SPP);
+            cmd.SetGlobalTexture(HDShaderIDs._RankingTileXSPP, m_RenderPipelineResources.textures.rankingTile1SPP);
+            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTexture, m_RenderPipelineResources.textures.scramblingTex);
         }
 
-        internal DitheredTextureSet DitheredTextureSet1SPP() => m_DitheredTextureSet1SPP;
+        internal void BindDitheredRNGData8SPP(CommandBuffer cmd)
+        {
+            cmd.SetGlobalTexture(HDShaderIDs._OwenScrambledTexture, m_RenderPipelineResources.textures.owenScrambled256Tex);
+            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTileXSPP, m_RenderPipelineResources.textures.scramblingTile8SPP);
+            cmd.SetGlobalTexture(HDShaderIDs._RankingTileXSPP, m_RenderPipelineResources.textures.rankingTile8SPP);
+            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTexture, m_RenderPipelineResources.textures.scramblingTex);
+        }
 
-        internal DitheredTextureSet DitheredTextureSet8SPP() => m_DitheredTextureSet8SPP;
+        internal DitheredTextureSet DitheredTextureSet1SPP()
+        {
+            DitheredTextureSet ditheredTextureSet = new DitheredTextureSet();
+            ditheredTextureSet.owenScrambled256Tex = m_RenderPipelineResources.textures.owenScrambled256Tex;
+            ditheredTextureSet.scramblingTile = m_RenderPipelineResources.textures.scramblingTile1SPP;
+            ditheredTextureSet.rankingTile = m_RenderPipelineResources.textures.rankingTile1SPP;
+            ditheredTextureSet.scramblingTex = m_RenderPipelineResources.textures.scramblingTex;
+            return ditheredTextureSet;
+        }
 
-        internal DitheredTextureSet DitheredTextureSet256SPP() => m_DitheredTextureSet256SPP;
+        internal DitheredTextureSet DitheredTextureSet8SPP()
+        {
+            DitheredTextureSet ditheredTextureSet = new DitheredTextureSet();
+            ditheredTextureSet.owenScrambled256Tex = m_RenderPipelineResources.textures.owenScrambled256Tex;
+            ditheredTextureSet.scramblingTile = m_RenderPipelineResources.textures.scramblingTile8SPP;
+            ditheredTextureSet.rankingTile = m_RenderPipelineResources.textures.rankingTile8SPP;
+            ditheredTextureSet.scramblingTex = m_RenderPipelineResources.textures.scramblingTex;
+            return ditheredTextureSet;
+        }
+
+        internal DitheredTextureSet DitheredTextureSet256SPP()
+        {
+            DitheredTextureSet ditheredTextureSet = new DitheredTextureSet();
+            ditheredTextureSet.owenScrambled256Tex = m_RenderPipelineResources.textures.owenScrambled256Tex;
+            ditheredTextureSet.scramblingTile = m_RenderPipelineResources.textures.scramblingTile256SPP;
+            ditheredTextureSet.rankingTile = m_RenderPipelineResources.textures.rankingTile256SPP;
+            ditheredTextureSet.scramblingTex = m_RenderPipelineResources.textures.scramblingTex;
+            return ditheredTextureSet;
+        }
+
+        internal void BindDitheredRNGData256SPP(CommandBuffer cmd)
+        {
+            cmd.SetGlobalTexture(HDShaderIDs._OwenScrambledTexture, m_RenderPipelineResources.textures.owenScrambled256Tex);
+            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTileXSPP, m_RenderPipelineResources.textures.scramblingTile256SPP);
+            cmd.SetGlobalTexture(HDShaderIDs._RankingTileXSPP, m_RenderPipelineResources.textures.rankingTile256SPP);
+            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTexture, m_RenderPipelineResources.textures.scramblingTex);
+        }
 
         internal static void BindDitheredTextureSet(CommandBuffer cmd, DitheredTextureSet ditheredTextureSet)
-        {
-            cmd.SetGlobalTexture(HDShaderIDs._OwenScrambledTexture, ditheredTextureSet.owenScrambled256Tex);
-            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTileXSPP, ditheredTextureSet.scramblingTile);
-            cmd.SetGlobalTexture(HDShaderIDs._RankingTileXSPP, ditheredTextureSet.rankingTile);
-            cmd.SetGlobalTexture(HDShaderIDs._ScramblingTexture, ditheredTextureSet.scramblingTex);
-        }
-
-        internal static DitheredTextureHandleSet ImportSetToRenderGraph(RenderGraph renderGraph, DitheredTextureSet ditheredTextureSet)
-        {
-            var handles = new DitheredTextureHandleSet();
-
-            handles.owenScrambled256Tex = renderGraph.ImportTexture(ditheredTextureSet.owenScrambled256Tex);
-            handles.scramblingTile = renderGraph.ImportTexture(ditheredTextureSet.scramblingTile);
-            handles.rankingTile = renderGraph.ImportTexture(ditheredTextureSet.rankingTile);
-            handles.scramblingTex = renderGraph.ImportTexture(ditheredTextureSet.scramblingTex);
-
-            return handles;
-        }
-
-        // ComputeCommandBuffer API is more restrictive than UnsafeCommandBuffer and requires RG texture handles to check if Global state is affected
-        internal static void BindDitheredTextureSet(ComputeCommandBuffer cmd, DitheredTextureHandleSet ditheredTextureSet)
         {
             cmd.SetGlobalTexture(HDShaderIDs._OwenScrambledTexture, ditheredTextureSet.owenScrambled256Tex);
             cmd.SetGlobalTexture(HDShaderIDs._ScramblingTileXSPP, ditheredTextureSet.scramblingTile);

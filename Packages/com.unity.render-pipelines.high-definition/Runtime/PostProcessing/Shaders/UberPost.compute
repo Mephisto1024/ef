@@ -3,11 +3,10 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/ScreenCoordOverride.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DynamicScalingClamping.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ScreenCoordOverride.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/PostProcessing/Shaders/UberPostFeatures.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/PostProcessing/Shaders/BloomCommon.hlsl"
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma kernel Uber
 
@@ -76,7 +75,7 @@ CBUFFER_END
 
 #define PostExposure            _LogLut3D_Params.z
 
-#define NeedLUT                 _LogLut3D_Params.w
+#define NeedLUT		            _LogLut3D_Params.w
 
 #define BloomTint               _BloomTint.xyz
 #define BloomIntensity          _BloomParams.x
@@ -87,7 +86,7 @@ CBUFFER_END
 #define DirtOffset              _BloomDirtScaleOffset.zw
 
 #define OutputLogEnabled        _DebugFlags.x
-#define IsSearchingHierarchy    _DebugFlags.w
+#define IsSearchingHierarchy	_DebugFlags.w
 
 #define AlphaScale              _AlphaScaleBias.x
 #define AlphaBias               _AlphaScaleBias.y
@@ -245,14 +244,14 @@ void Uber(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     // Alpha mask
 #ifdef ENABLE_ALPHA
-        if (IsSearchingHierarchy == 0)
-        {
-            // Post processing is not applied on pixels with zero alpha
-            // The alpha scale and bias control how steep is the transition between the post-processed and plain regions
-            float alpha = inputColor.a * AlphaScale + AlphaBias;
-            // Saturate is necessary to avoid issues when additive blending pushes the alpha over 1.
-            color.xyz = lerp(inputColor.xyz, color.xyz, saturate(alpha));
-        }
+		if (IsSearchingHierarchy == 0)
+		{
+			// Post processing is not applied on pixels with zero alpha
+			// The alpha scale and bias control how steep is the transition between the post-processed and plain regions
+			float alpha = inputColor.a * AlphaScale + AlphaBias;
+			// Saturate is necessary to avoid issues when additive blending pushes the alpha over 1.
+			color.xyz = lerp(inputColor.xyz, color.xyz, saturate(alpha));
+		}
 #endif
 
 #ifdef GAMMA2_OUTPUT

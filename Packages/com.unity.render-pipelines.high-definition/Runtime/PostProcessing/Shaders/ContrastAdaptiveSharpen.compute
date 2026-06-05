@@ -2,7 +2,7 @@
 #pragma kernel KInitialize
 
 #pragma multi_compile _ HDR_INPUT
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
@@ -25,6 +25,7 @@ float Sharpness;
 float4 _HDROutputParams;
 #define _PaperWhite               _HDROutputParams.z
 #define _OneOverPaperWhite        _HDROutputParams.w
+
 
 TEXTURE2D_X(_InputTexture);
 RW_TEXTURE2D_X(float4, _OutputTexture);

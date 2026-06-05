@@ -1,18 +1,16 @@
 # Micro Shadows
 
-Micro shadows are shadows that the High Definition Render Pipeline (HDRP) simulates for small details embedded in the Material of a GameObject, but not in its Mesh geometry.
-
-HDRP uses the details from the normal map, the ambient occlusion map, and specular occlusion to estimate the shadows those details would cast if they were meshes.
+Micro shadows are shadows that the High Definition Render Pipeline (HDRP) simulates for small details embedded in the Material of a GameObject, but not in its Mesh geometry. HDRP uses the details from the normal map and the ambient occlusion map to estimate the shadows those maps would cast if they were Meshes.
 
 In this image, the different layers of details in the Material shadow each other.
 
-![A ground texture with micro shadows enabled and disabled. With micro shadows enabled, the twigs and moss cast more realistic-looking shadows.](Images/OverrideMicroShadows1.png)
+![](Images/OverrideMicroShadows1.png)
 
 Micro shadows at 0.85 opacity on a mossy ground material viewed from the top.
 
-## Use Micro Shadows
+## Using Micro Shadows
 
-HDRP uses the [Volume](understand-volumes.md) framework to generate **Micro Shadows**, so to enable and modify **Micro Shadow** properties, you must add a **Micro Shadows** override to a [Volume](understand-volumes.md) in your Scene. To add **Micro Shadows** to a Volume:
+HDRP uses the [Volume](Volumes.md) framework to generate **Micro Shadows**, so to enable and modify **Micro Shadow** properties, you must add a **Micro Shadows** override to a [Volume](Volumes.md) in your Scene. To add **Micro Shadows** to a Volume:
 
 1. Select the Volume component in the Scene or Hierarchy to view it in the Inspector
 2. In the Inspector, go to **Add Override** > **Shadowing** and select **Micro Shadows**. HDRP now processes **Micro Shadows** for any Camera this Volume affects.
@@ -22,6 +20,8 @@ Micro shadowing only works with directional [Lights](Light-Component.md). If you
 [!include[](snippets/volume-override-api.md)]
 
 ## Properties
+
+![](Images/OverrideMicroShadows2.png)
 
 [!include[](snippets/Volume-Override-Enable-Properties.md)]
 

@@ -10,33 +10,29 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    class ComputeVertexData_Water : AbstractMaterialNode, IGeneratesBodyCode, IMayRequirePosition, IMayRequireNormal
+    [Title("Utility", "High Definition Render Pipeline", "Water", "ComputeVertexPosition_Water (Preview)")]
+    class ComputeVertexPosition_Water : AbstractMaterialNode, IGeneratesBodyCode, IMayRequirePosition
     {
-        public ComputeVertexData_Water()
+        public ComputeVertexPosition_Water()
         {
-            name = "Compute Water Vertex Data (Legacy)";
+            name = "Compute Water Vertex Position (Preview)";
             UpdateNodeAfterDeserialization();
         }
 
-        public override string documentationURL => Documentation.GetPageLink("ComputeVertexData_Water");
+        public override string documentationURL => Documentation.GetPageLink("ComputeVertexPosition_Water");
 
-        const int kPositionOSOutputSlotId = 0;
-        const string kPositionOSOutputSlotName = "PositionOS";
-
-        const int kNormalOSOutputSlotId = 1;
-        const string kNormalOSOutputSlotName = "NormalOS";
+        const int kPositionWSOutputSlotId = 0;
+        const string kPositionWSOutputSlotName = "PositionWS";
 
         public override bool hasPreview { get { return false; } }
 
         public sealed override void UpdateNodeAfterDeserialization()
         {
-            AddSlot(new Vector3MaterialSlot(kPositionOSOutputSlotId, kPositionOSOutputSlotName, kPositionOSOutputSlotName, SlotType.Output, Vector3.zero));
-            AddSlot(new Vector3MaterialSlot(kNormalOSOutputSlotId, kNormalOSOutputSlotName, kNormalOSOutputSlotName, SlotType.Output, Vector3.zero));
+            AddSlot(new Vector3MaterialSlot(kPositionWSOutputSlotId, kPositionWSOutputSlotName, kPositionWSOutputSlotName, SlotType.Output, Vector3.zero));
 
             RemoveSlotsNameNotMatching(new[]
             {
-                kPositionOSOutputSlotId,
-                kNormalOSOutputSlotId,
+                kPositionWSOutputSlotId,
             });
         }
 
@@ -44,37 +40,20 @@ namespace UnityEditor.Rendering.HighDefinition
         {
             if (generationMode == GenerationMode.ForReals)
             {
-                sb.AppendLine("$precision3 {0} = IN.ObjectSpacePosition;",
-                  GetVariableNameForSlot(kPositionOSOutputSlotId),
-                  CoordinateSpace.Object.ToVariableName(InterpolatorType.Position));
-
-                sb.AppendLine("$precision3 {0} = IN.ObjectSpaceNormal;",
-                  GetVariableNameForSlot(kNormalOSOutputSlotId),
+                sb.AppendLine("$precision3 {0} = GetWaterVertexPosition(IN.WorldSpacePosition);",
+                  GetVariableNameForSlot(kPositionWSOutputSlotId),
                   CoordinateSpace.Object.ToVariableName(InterpolatorType.Position));
             }
             else
             {
                 sb.AppendLine("$precision3 {0} = 0.0;",
-                 GetVariableNameForSlot(kPositionOSOutputSlotId));
-
-                sb.AppendLine("$precision3 {0} = 0.0;",
-                    GetVariableNameForSlot(kNormalOSOutputSlotId));
+                 GetVariableNameForSlot(kPositionWSOutputSlotId));
             }
         }
 
         public NeededCoordinateSpace RequiresPosition(ShaderStageCapability stageCapability = ShaderStageCapability.Vertex)
         {
             return NeededCoordinateSpace.World;
-        }
-
-        public NeededCoordinateSpace RequiresNormal(ShaderStageCapability stageCapability = ShaderStageCapability.Vertex)
-        {
-            return NeededCoordinateSpace.World;
-        }
-
-        public override void ValidateNode()
-        {
-            owner.messageManager?.AddOrAppendError(owner, objectId, new ShaderMessage("This node is deprecated and will be released in a future version. Please refer to the Water Samples for the new version.", ShaderCompilerMessageSeverity.Warning));
         }
     }
 }

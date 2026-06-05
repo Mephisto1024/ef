@@ -10,7 +10,7 @@ Shader "Hidden/HDRP/CombineLighting"
     {
         HLSLINCLUDE
         #pragma target 4.5
-        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
         // #pragma enable_d3d11_debug_symbols
 
         #pragma vertex Vert
@@ -64,9 +64,7 @@ Shader "Hidden/HDRP/CombineLighting"
             float4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float3 color = LOAD_TEXTURE2D_X(_IrradianceSource, input.positionCS.xy).rgb;
-                // avoid to additive blend the alpha which tends to make it above 1 and cause issues in later passes.
-                return float4(color, 0);
+                return LOAD_TEXTURE2D_X(_IrradianceSource, input.positionCS.xy);
             }
             ENDHLSL
         }
@@ -90,9 +88,7 @@ Shader "Hidden/HDRP/CombineLighting"
             float4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                float3 color = LOAD_TEXTURE2D_X(_IrradianceSource, input.positionCS.xy).rgb * GetCurrentExposureMultiplier();
-                // avoid to additive blend the alpha which tends to make it above 1 and cause issues in later passes.
-                return float4(color, 0);
+                return LOAD_TEXTURE2D_X(_IrradianceSource, input.positionCS.xy) * GetCurrentExposureMultiplier();
             }
             ENDHLSL
         }

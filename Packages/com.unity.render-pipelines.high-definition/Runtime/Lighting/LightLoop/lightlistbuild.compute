@@ -12,17 +12,17 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition-config/Runtime/ShaderConfig.cs.hlsl"
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureXR.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/TextureXR.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/ShaderBase.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/LightLoop.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/LightingConvexHullUtils.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/LightCullUtils.hlsl"
 
-#if !defined(SHADER_API_XBOXONE) && !defined(SHADER_API_PSSL) && !defined(SHADER_API_SWITCH) && !defined(SHADER_API_GAMECORE) && !defined(SHADER_API_SWITCH2)
+#if !defined(SHADER_API_XBOXONE) && !defined(SHADER_API_PSSL) && !defined(SHADER_API_SWITCH) && !defined(SHADER_API_GAMECORE)
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/SortingComputeUtils.hlsl"
 #endif
 
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #define FINE_PRUNING_ENABLED
 #define PERFORM_SPHERICAL_INTERSECTION_TESTS
@@ -37,6 +37,10 @@ StructuredBuffer<SFiniteLightBound> g_data : register( t3 );
 StructuredBuffer<uint> g_vBigTileLightList : register( t4 );        // don't support Buffer yet in unity
 #endif
 
+#if defined(SHADER_API_MOBILE) || defined(SHADER_API_SWITCH)
+#define PLATFORM_LANE_COUNT 32
+#endif
+
 #ifdef PLATFORM_LANE_COUNT                                          // We can infer the size of a wave. This is currently not possible on non-consoles, so we have to fallback to a sensible default in those cases.
 #define NR_THREADS              PLATFORM_LANE_COUNT
 #else
@@ -49,9 +53,7 @@ StructuredBuffer<uint> g_vBigTileLightList : register( t4 );        // don't sup
 RWStructuredBuffer<uint> g_vLightList : register( u0 );             // don't support RWBuffer yet in unity
 
 #define CATEGORY_LIST_SIZE          LIGHTCATEGORY_COUNT
-#define MAX_NR_VISIBLE_LIGHTS       4096                            // correspond to m_MaxLightsOnScreen in LightLoop.cs
 
-groupshared unsigned int ldsTilePassList[MAX_NR_VISIBLE_LIGHTS/32];
 groupshared unsigned int coarseList[LIGHT_LIST_MAX_COARSE_ENTRIES];
 groupshared unsigned int prunedList[LIGHT_LIST_MAX_COARSE_ENTRIES];     // temporarily support room for all 64 while in LDS
 
@@ -135,35 +137,15 @@ void FinePruneLights(uint threadID, int iNrCoarseLights, uint2 viTilLL, float vL
 #endif
 #endif
 
-#ifdef USE_TWO_PASS_TILED_LIGHTING
-uint FetchBigTileLightIndex(uint lightStart, uint lightOffset)
-{
-    const uint lightOffsetPlusOne = lightOffset + 1; // Add +1 as first slot is reserved to store number of light
-    // Light index are store on 16bit
-    return (g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE * lightStart / 2 + (lightOffsetPlusOne >> 1)] >> ((lightOffsetPlusOne & 1) * 16)) & 0xffff;
-}
-#endif
-
 [numthreads(NR_THREADS, 1, 1)]
 void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadID : SV_GroupIndex, uint3 u3GroupID : SV_GroupID)
 {
     UNITY_XR_ASSIGN_VIEW_INDEX(dispatchThreadId.z);
     uint2 tileIDX = u3GroupID.xy;
     uint t=threadID;
-    int i;
 
-    UNITY_UNROLLX(LIGHT_LIST_MAX_COARSE_ENTRIES)
-    for(i=t; i<LIGHT_LIST_MAX_COARSE_ENTRIES; i+=NR_THREADS)
-        if(i<LIGHT_LIST_MAX_COARSE_ENTRIES)
-            prunedList[i]=0;
-
-    const bool lightSortRequired = g_iNrVisibLights > LIGHT_LIST_MAX_COARSE_ENTRIES;  // Uniform runtime branch
-    if (lightSortRequired)
-    {
-        UNITY_UNROLLX((MAX_NR_VISIBLE_LIGHTS/32) / NR_THREADS)
-        for(i=t; i<MAX_NR_VISIBLE_LIGHTS/32; i+=NR_THREADS)
-            ldsTilePassList[i]=0;
-    }
+    if(t<LIGHT_LIST_MAX_COARSE_ENTRIES)
+        prunedList[t]=0;
 
     uint iWidth = g_viDimensions.x;
     uint iHeight = g_viDimensions.y;
@@ -198,7 +180,7 @@ void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadI
     {
         // Fetch depths and calculate min/max
         UNITY_UNROLL
-        for(i = 0; i < PIXEL_PER_THREAD; i++)
+        for(int i = 0; i < PIXEL_PER_THREAD; i++)
         {
             int idx = i * NR_THREADS + t;
             uint2 uCrd = min( uint2(viTilLL.x+(idx&0xf), viTilLL.y+(idx>>4)), uint2(iWidth-1, iHeight-1) );
@@ -214,11 +196,7 @@ void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadI
         InterlockedMax(ldsZMax, asuint(dpt_ma));
         InterlockedMin(ldsZMin, asuint(dpt_mi));
 
-        // For some platforms we always need GroupMemoryBarrierWithGroupSync() otherwise results are incorrect.
-		// Reason is under investigation, related discussions:
-		// https://unity.slack.com/archives/C02C8FWPNHE/p1704321597295329
-		// https://unity.slack.com/archives/G3JUQKYV8/p1705081617447289
-#if NR_THREADS > PLATFORM_LANE_COUNT || defined(SHADER_API_SWITCH) || defined(SHADER_API_SWITCH2)
+#if NR_THREADS > PLATFORM_LANE_COUNT || defined(SHADER_API_SWITCH) // not sure why Switch needs the barrier (it will not be correct without)
         GroupMemoryBarrierWithGroupSync();
 #endif
     }
@@ -236,11 +214,11 @@ void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadI
     int NrBigTilesX = (nrTilesX + ((1 << log2BigTileToTileRatio) -1 )) >> log2BigTileToTileRatio;
     int NrBigTilesY = (nrTilesY + ((1 << log2BigTileToTileRatio) - 1)) >> log2BigTileToTileRatio;
     const int bigTileBase = unity_StereoEyeIndex * NrBigTilesX * NrBigTilesY;
-    const uint bigTileIdx = bigTileBase + (tileIDX.y>>log2BigTileToTileRatio)*NrBigTilesX + (tileIDX.x>>log2BigTileToTileRatio);       // map the idx to 64x64 tiles
-    int nrBigTileLights = g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE * bigTileIdx / 2 + 0] & 0xFFFF;
+    const int bigTileIdx = bigTileBase + (tileIDX.y>>log2BigTileToTileRatio)*NrBigTilesX + (tileIDX.x>>log2BigTileToTileRatio);       // map the idx to 64x64 tiles
+    int nrBigTileLights = g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE*bigTileIdx+0];
     for(int l0=(int) t; l0<(int) nrBigTileLights; l0 += NR_THREADS)
     {
-        int l = FetchBigTileLightIndex(bigTileIdx, l0);
+        int l = g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE*bigTileIdx+l0+1];
 #else
     for(int l=(int) t; l<(int) g_iNrVisibLights; l += NR_THREADS)
     {
@@ -253,40 +231,14 @@ void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadI
         {
             unsigned int uInc = 1;
             unsigned int uIndex;
-            unsigned int ul = l;
             InterlockedAdd(lightOffs, uInc, uIndex);
-            if (lightSortRequired)
-                InterlockedOr(ldsTilePassList[ul >> 5], 1u << (ul & (32 - 1)));     // ldsTilePassList[ul/32] |= 1u << (ul % 32);
-            else
-                if(uIndex<LIGHT_LIST_MAX_COARSE_ENTRIES) coarseList[uIndex] = l;        // add to light list
+            if(uIndex<LIGHT_LIST_MAX_COARSE_ENTRIES) coarseList[uIndex] = l;        // add to light list
         }
     }
 
 #ifdef FINE_PRUNING_ENABLED
     if(t<LIGHT_FPTL_VISIBILITY_DWORD_COUNTS) ldsDoesLightIntersect[t] = 0;
 #endif
-
-    if (lightSortRequired)
-    {
-#if NR_THREADS > PLATFORM_LANE_COUNT
-        GroupMemoryBarrierWithGroupSync();
-#endif
-        // Ascending sort to prevent unpredictable light list when the number of visible lights is greater than the coarse entries.
-        if(t==0)
-        {
-            int c=0;
-            for (int ii = 0; ii < MAX_NR_VISIBLE_LIGHTS/32 && c < LIGHT_LIST_MAX_COARSE_ENTRIES; ii++)
-            {
-                unsigned int mask = ldsTilePassList[ii];
-                while (mask != 0u && c < LIGHT_LIST_MAX_COARSE_ENTRIES)
-                {
-                    unsigned int l = firstbitlow(mask);
-                    mask &= ~(1u << l);
-                    coarseList[c++] = ii * 32 + l;
-                }
-            }
-        }
-    }
 
 #if NR_THREADS > PLATFORM_LANE_COUNT
     GroupMemoryBarrierWithGroupSync();
@@ -300,8 +252,7 @@ void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadI
 
 #ifndef FINE_PRUNING_ENABLED
     {
-        UNITY_UNROLL
-        for(i=t; i<LIGHT_LIST_MAX_COARSE_ENTRIES; i+=NR_THREADS) if(i<iNrCoarseLights) prunedList[i] = coarseList[i];
+        if((int)t<iNrCoarseLights) prunedList[t] = coarseList[t];
         if(t==0) ldsNrLightsFinal=iNrCoarseLights;
     }
 #else
@@ -323,7 +274,7 @@ void TileLightListGen(uint3 dispatchThreadId : SV_DispatchThreadID, uint threadI
 
 
     int nrLightsCombinedList = min(ldsNrLightsFinal,LIGHT_LIST_MAX_COARSE_ENTRIES);
-    for(i=t; i<nrLightsCombinedList; i+=NR_THREADS)
+    for(int i=t; i<nrLightsCombinedList; i+=NR_THREADS)
     {
         const int lightBoundIndex = GenerateLightCullDataIndex(prunedList[i], g_iNrVisibLights, unity_StereoEyeIndex);
 
@@ -597,81 +548,44 @@ void FinePruneLights(uint threadID, int iNrCoarseLights, uint2 viTilLL, float vL
         else
             break;
 
-        // Imlicit division by 32, to pick the correct array index.
-        // E.g 37th light devided by 32 = 1.15 (rounded to 1), so we pick uLightsFlags[1] (which represents the lights from 32 to 64).
         uLightsFlags[l >> 5] |= lightValid << (l&31);
     }
 
-    // Merge results from all threads into shared memory.
-    // `InterlockedOr` performs a bitwise OR between `ldsDoesLightIntersect` and `uLightsFlags`.
-    // This allows multiple threads to update `ldsDoesLightIntersect` without collision.
     {
         [unroll(LIGHT_FPTL_VISIBILITY_DWORD_COUNTS)]
         for (uint ii = 0; ii < LIGHT_FPTL_VISIBILITY_DWORD_COUNTS; ++ii)
             InterlockedOr(ldsDoesLightIntersect[ii], uLightsFlags[ii]);
     }
 
-    // For some platforms we always need GroupMemoryBarrierWithGroupSync() otherwise results are incorrect.
-	// Reason is under investigation, related discussions:
-	// https://unity.slack.com/archives/C02C8FWPNHE/p1704321597295329
-	// https://unity.slack.com/archives/G3JUQKYV8/p1705081617447289
-#if NR_THREADS > PLATFORM_LANE_COUNT || defined(SHADER_API_SWITCH) || defined(SHADER_API_SWITCH2)
+#if NR_THREADS > PLATFORM_LANE_COUNT
     GroupMemoryBarrierWithGroupSync();
 #endif
 
     {
-        // Reset the total number of lights for the tile.
-        if (t == 0)
-            ldsNrLightsFinal = 0;
+        uint localCount = 0;
+        [unroll(LIGHT_FPTL_VISIBILITY_DWORD_COUNTS)]
+        for (uint ii = 0; ii < LIGHT_FPTL_VISIBILITY_DWORD_COUNTS; ++ii)
+            localCount += countbits(ldsDoesLightIntersect[ii]);
 
-        // Split the job into multiple passes to ensure all lights are processed even if NR_THREADS is smaller than SHADEROPTIONS_FPTLMAX_LIGHT_COUNT.
-        // A thread will possibly processes many lights.
+        if (t == 0) ldsNrLightsFinal = localCount;
+    
         #define MAX_LIGHT_WRITE_LOOP_CNT (((SHADEROPTIONS_FPTLMAX_LIGHT_COUNT+1) + NR_THREADS - 1)/NR_THREADS)
         [unroll(MAX_LIGHT_WRITE_LOOP_CNT)]
         for (uint it = 0; it < MAX_LIGHT_WRITE_LOOP_CNT; ++it)
         {
-            // Retrieve the light index for the current thread and current iteration.
-            uint lightIndex = t + it * NR_THREADS;
-
-            // Check if the mask of the current light is valid (intersection with the tile).
-            uint lightsMask = ldsDoesLightIntersect[lightIndex >> 5];
-
-            // Select only the current light bit i in the block of 32.
-            uint localMask = (1u << (lightIndex & 31));
-
-            // If the thread index is in the light list and the mask is valid.
-            if (lightIndex < (uint)iNrCoarseLights && (localMask & lightsMask) != 0u)
+            uint i = t + it * NR_THREADS;
+            uint lightsMask = ldsDoesLightIntersect[i >> 5];
+            uint localMask = (1u << (i & 31));
+            if(i<(uint) iNrCoarseLights && (localMask & lightsMask) != 0u)
             {
-                // ldsDoesLightIntersect[k] contains the valid lights for each block of 32 lights.
-                // We sum the number of enabled bits (countbits()) in all blocks before the block i.
-                // backOffset represents the number of valid lights before the block where i is located.
                 uint backOffset = 0;
                 [unroll(LIGHT_FPTL_VISIBILITY_DWORD_COUNTS)]
                 for (uint k = 0u; k < LIGHT_FPTL_VISIBILITY_DWORD_COUNTS; ++k)
-                    if (k < (lightIndex >> 5))
+                    if (k < (i >> 5))
                         backOffset += countbits(ldsDoesLightIntersect[k]);
 
-                // Count the number of valid lights (set bits) in the current 32-bit block before the current lightIndex.
-                uint lightsInActualBlock = countbits((localMask - 1u) & lightsMask);
-
-                // Determine the index of the current light by calculating how many lights were stored before it.
-                // This ensures that lights are packed correctly without gaps.
-                uint uIndex = backOffset + lightsInActualBlock;
-
-                // Ensure the computed index does not exceed the max allowed light entries.
-                if (uIndex < LIGHT_LIST_MAX_COARSE_ENTRIES)
-                {
-                    // InterlockedAdd ensures atomic and ordered writing to prunedList, preventing threads from overwriting each other's values.
-                    // Increment ldsNrLightsFinal (represents the total number of lights for the tile).
-                    unsigned int uInc = 1;
-                    unsigned int finalPrunedLightIndex;
-                    InterlockedAdd(ldsNrLightsFinal, uInc, finalPrunedLightIndex);
-
-                    // Add the light to the prune list. If the index varies due to desynchronization (e.g without the previous InterlockedAdd),
-                    // it can causes flickering (mostly seen on Metal and Apple GPUs).
-                    if (finalPrunedLightIndex < LIGHT_LIST_MAX_COARSE_ENTRIES)
-                        prunedList[finalPrunedLightIndex] = coarseList[lightIndex];
-                }
+                uint uIndex = backOffset + countbits((localMask - 1u) & lightsMask);
+                if(uIndex<LIGHT_LIST_MAX_COARSE_ENTRIES) prunedList[uIndex] = coarseList[i];
             }
         }
     }

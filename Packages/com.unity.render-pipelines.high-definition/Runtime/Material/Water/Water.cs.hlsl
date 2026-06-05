@@ -23,10 +23,8 @@
 #define DEBUGVIEW_WATER_BSDFDATA_ROUGHNESS (1657)
 #define DEBUGVIEW_WATER_BSDFDATA_CAUSTICS (1658)
 #define DEBUGVIEW_WATER_BSDFDATA_FOAM (1659)
-#define DEBUGVIEW_WATER_BSDFDATA_FOAM_COLOR (1660)
-#define DEBUGVIEW_WATER_BSDFDATA_TIP_THICKNESS (1661)
-#define DEBUGVIEW_WATER_BSDFDATA_FRONT_FACE (1662)
-#define DEBUGVIEW_WATER_BSDFDATA_SURFACE_INDEX (1663)
+#define DEBUGVIEW_WATER_BSDFDATA_TIP_THICKNESS (1660)
+#define DEBUGVIEW_WATER_BSDFDATA_SURFACE_INDEX (1661)
 
 //
 // UnityEngine.Rendering.HighDefinition.Water+SurfaceData:  static fields
@@ -40,7 +38,6 @@
 #define DEBUGVIEW_WATER_SURFACEDATA_FOAM (1606)
 #define DEBUGVIEW_WATER_SURFACEDATA_TIP_THICKNESS (1607)
 #define DEBUGVIEW_WATER_SURFACEDATA_CAUSTICS (1608)
-#define DEBUGVIEW_WATER_SURFACEDATA_REFRACTED_POSITION_WS (1609)
 
 // Generated from UnityEngine.Rendering.HighDefinition.Water+BSDFData
 // PackingRules = Exact
@@ -54,9 +51,7 @@ struct BSDFData
     float roughness;
     float caustics;
     float foam;
-    float3 foamColor;
     float tipThickness;
-    uint frontFace;
     uint surfaceIndex;
 };
 
@@ -71,7 +66,6 @@ struct SurfaceData
     float foam;
     float tipThickness;
     float caustics;
-    float3 refractedPositionWS;
 };
 
 //
@@ -112,14 +106,8 @@ void GetGeneratedBSDFDataDebug(uint paramId, BSDFData bsdfdata, inout float3 res
         case DEBUGVIEW_WATER_BSDFDATA_FOAM:
             result = bsdfdata.foam.xxx;
             break;
-        case DEBUGVIEW_WATER_BSDFDATA_FOAM_COLOR:
-            result = bsdfdata.foamColor;
-            break;
         case DEBUGVIEW_WATER_BSDFDATA_TIP_THICKNESS:
             result = bsdfdata.tipThickness.xxx;
-            break;
-        case DEBUGVIEW_WATER_BSDFDATA_FRONT_FACE:
-            result = GetIndexColor(bsdfdata.frontFace);
             break;
         case DEBUGVIEW_WATER_BSDFDATA_SURFACE_INDEX:
             result = GetIndexColor(bsdfdata.surfaceIndex);
@@ -161,9 +149,6 @@ void GetGeneratedSurfaceDataDebug(uint paramId, SurfaceData surfacedata, inout f
             break;
         case DEBUGVIEW_WATER_SURFACEDATA_CAUSTICS:
             result = surfacedata.caustics.xxx;
-            break;
-        case DEBUGVIEW_WATER_SURFACEDATA_REFRACTED_POSITION_WS:
-            result = surfacedata.refractedPositionWS;
             break;
     }
 }

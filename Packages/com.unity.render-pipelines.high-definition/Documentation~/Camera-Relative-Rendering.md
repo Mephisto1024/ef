@@ -1,8 +1,12 @@
-# Camera-relative rendering
+# **Camera-relative rendering**
 
 Camera-relative rendering allows the High Definition Render Pipeline (HDRP) to render distant GameObjects (with large world space coordinates) in a more robust and numerically stable way compared to the built-in render pipeline.
 
 Absolute precision of floating point numbers decreases as numbers become larger. This means that GameObject coordinates become increasingly less precise the further the GameObject is from the origin of the Scene. The Mesh faces of distant GameObjects that are close to one another may appear in the same place and produce [z-fighting](Glossary.md#ZFighting) artifacts. To fix this issue, camera-relative rendering replaces the world origin with the position of the Camera.
+
+## Using Camera-relative rendering
+
+Camera-relative rendering is enabled by default in the ShaderConfig.cs file (in your Project window go to **Packages > High Definition RP Config > Runtime > ShaderLibrary** and click on **ShaderConfig.cs**). To disable this feature, set `CameraRelativeRendering` to `0`, and then generate Shader includes to update the ShaderConfig.cs.hlsl file (menu: **Edit > Render Pipeline** and click **Generate Shader Includes)**.
 
 ## How Camera-relative rendering works
 
@@ -12,19 +16,7 @@ If you view the source files for pre-built HDRP Shaders, the view and view-proje
 
 **Exception**: `_WorldSpaceCameraPos` is never Camera-relative because HDRP uses it for coordinate space conversion.
 
-## Using Camera-relative rendering
-
-Camera-relative rendering is enabled by default in the ShaderConfig.cs file (in your Project window go to **Packages > High Definition RP Config > Runtime > ShaderLibrary** and click on **ShaderConfig.cs**). To disable this feature, set `CameraRelativeRendering` to `0`, and then generate Shader includes to update the ShaderConfig.cs.hlsl file (menu: **Edit > Render Pipeline** and click **Generate Shader Includes)**.
-
-To disable camera-relative rendering:
-
-1. In the Project window, go to **Packages** > **High Definition Render Pipeline Config** > **Runtime**.
-
-1. Open the `ShaderConfig.cs` file, then set `CameraRelativeRendering` to `0`.
-
-1. From the main menu, select **Edit** > **Render Pipeline** > **Generate Shader Includes** to generate shader includes and update the `ShaderConfig.cs.hlsl` file
-
-## Examples
+## **Examples**
 
 If you enable Camera-relative rendering:
 

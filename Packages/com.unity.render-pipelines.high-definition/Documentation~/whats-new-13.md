@@ -10,7 +10,7 @@ This page contains an overview of new features, improvements, and issues resolve
 
 From 13.x, you can use new APIs to run shader validation steps from a script at runtime, both in the editor and in standalone builds. You can use this to change the keyword state or properties of a Material, to enable or disable HDRP shader features on the Material.
 
-For more information, see the [Modify materials at runtime documentation](modify-materials-at-runtime.md).
+For more information, see the [Material Scripting API documentation](Material-API).
 
 #### Diffusion Profiles
 
@@ -20,12 +20,16 @@ See all the available properties in the [scripting reference](xref:UnityEngine.R
 
 #### Lights
 
+![](Images/HDRPFeatures-IESProfile.png)
+
 From 13.x, you can access a light IES profile in the editor in the following ways:
 
 * Use [HDLightUtils](xref:UnityEditor.Rendering.HighDefinition.HDLightUtils)
 * Manually set the [IES texture](xref:UnityEngine.Rendering.HighDefinition.HDAdditionalLightData) at runtime or in the Editor.
 
 ### Material Variants
+
+![](Images/material-variants.png)
 
 HDRP 13.x supports Material Variants for all Shaders and Shader Graphs. You can use Material Variants to create a set of predefined variations of a Material, in which you can override specific properties.
 
@@ -71,7 +75,7 @@ The full ACES tonemapper is more resource intensive than the approximation but i
 
 ### Depth Of Field
 
-![A courtyard with the camera close-up on a golden orb with the Unity logo. The orb is sharp but the background is blurry.](Images/depth-of-field.png)
+![](Images/depth-of-field.png)
 
 HDRP 13.x includes optimizations for the physically based depth of field effect that significantly speed up render GPU time, without visibly reducing the image quality. For example, HDRP computes image regions that are out-of-focus at a lower resolution, while in-focus regions keep the full resolution.
 

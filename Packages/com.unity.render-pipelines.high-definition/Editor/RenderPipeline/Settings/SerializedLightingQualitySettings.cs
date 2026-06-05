@@ -30,15 +30,17 @@ namespace UnityEditor.Rendering.HighDefinition
         public SerializedProperty RTRMinSmoothness;
         public SerializedProperty RTRSmoothnessFadeStart;
         public SerializedProperty RTRRayLength;
+        public SerializedProperty RTRClampValue;
         public SerializedProperty RTRFullResolution;
         public SerializedProperty RTRRayMaxIterations;
         public SerializedProperty RTRDenoise;
-        public SerializedProperty RTRDenoiserRadiusDimmer;
-        public SerializedProperty RTRDenoiserAntiFlicker;
+        public SerializedProperty RTRDenoiserRadius;
+        public SerializedProperty RTRSmoothDenoising;
 
         // Ray Traced Global Illumination
         public SerializedProperty RTGIRayLength;
         public SerializedProperty RTGIFullResolution;
+        public SerializedProperty RTGIClampValue;
         public SerializedProperty RTGIRaySteps;
         public SerializedProperty RTGIDenoise;
         public SerializedProperty RTGIHalfResDenoise;
@@ -83,15 +85,17 @@ namespace UnityEditor.Rendering.HighDefinition
             RTRMinSmoothness = root.Find((GlobalLightingQualitySettings s) => s.RTRMinSmoothness);
             RTRSmoothnessFadeStart = root.Find((GlobalLightingQualitySettings s) => s.RTRSmoothnessFadeStart);
             RTRRayLength = root.Find((GlobalLightingQualitySettings s) => s.RTRRayLength);
+            RTRClampValue = root.Find((GlobalLightingQualitySettings s) => s.RTRClampValue);
             RTRFullResolution = root.Find((GlobalLightingQualitySettings s) => s.RTRFullResolution);
             RTRRayMaxIterations = root.Find((GlobalLightingQualitySettings s) => s.RTRRayMaxIterations);
             RTRDenoise = root.Find((GlobalLightingQualitySettings s) => s.RTRDenoise);
-            RTRDenoiserRadiusDimmer = root.Find((GlobalLightingQualitySettings s) => s.RTRDenoiserRadiusDimmer);
-            RTRDenoiserAntiFlicker = root.Find((GlobalLightingQualitySettings s) => s.RTRDenoiserAntiFlicker);
+            RTRDenoiserRadius = root.Find((GlobalLightingQualitySettings s) => s.RTRDenoiserRadius);
+            RTRSmoothDenoising = root.Find((GlobalLightingQualitySettings s) => s.RTRSmoothDenoising);
 
             // Ray Traced Global Illumination
             RTGIRayLength = root.Find((GlobalLightingQualitySettings s) => s.RTGIRayLength);
             RTGIFullResolution = root.Find((GlobalLightingQualitySettings s) => s.RTGIFullResolution);
+            RTGIClampValue = root.Find((GlobalLightingQualitySettings s) => s.RTGIClampValue);
             RTGIRaySteps = root.Find((GlobalLightingQualitySettings s) => s.RTGIRaySteps);
             RTGIDenoise = root.Find((GlobalLightingQualitySettings s) => s.RTGIDenoise);
             RTGIHalfResDenoise = root.Find((GlobalLightingQualitySettings s) => s.RTGIHalfResDenoise);

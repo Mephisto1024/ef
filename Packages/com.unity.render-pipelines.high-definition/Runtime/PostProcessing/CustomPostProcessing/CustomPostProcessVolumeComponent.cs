@@ -13,8 +13,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
         internal string typeName;
 
-        internal string passName { get; private set; }
-
         // Keep track of all the instances alive of the custom post process component so we can release them when needed
         internal static HashSet<CustomPostProcessVolumeComponent> instances = new HashSet<CustomPostProcessVolumeComponent>();
 
@@ -73,9 +71,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 m_IsInitialized = true;
                 typeName = GetType().Name;
                 instances.Add(this);
-
-                // By default custom post process volume name is empty, so we take the type name instead for debug markers.
-                passName = string.IsNullOrEmpty(name) ? typeName : name;
             }
         }
 

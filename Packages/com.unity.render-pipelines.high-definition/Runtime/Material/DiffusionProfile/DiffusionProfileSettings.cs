@@ -19,54 +19,28 @@ namespace UnityEngine.Rendering.HighDefinition
         Max = 1000
     }
 
-    enum DefaultSssDownsampleSteps
-    {
-        Low = 0,
-        Medium = 0,
-        High = 0,
-        Max = 2
-    }
-
     [Serializable]
     class DiffusionProfile : IEquatable<DiffusionProfile>
     {
         public enum TexturingMode : uint
         {
-            [InspectorName("Pre and Post-Scatter")]
-            [Tooltip("Partially applies the albedo to the Material twice, before and after the subsurface scattering pass, for a softer look.")]
             PreAndPostScatter = 0,
-            [InspectorName("Post-Scatter")]
-            [Tooltip("Applies the albedo to the Material after the subsurface scattering pass, so the contents of the albedo texture aren't blurred.")]
             PostScatter = 1
         }
 
         public enum TransmissionMode : uint
         {
-            [InspectorName("Thick Object")]
-            [Tooltip("Select this mode for geometrically thick objects. This mode uses shadow maps.")]
             Regular = 0,
-            [InspectorName("Thin Object")]
-            [Tooltip("Select this mode for thin, double-sided geometry, such as paper or leaves.")]
             ThinObject = 1
         }
 
         [ColorUsage(false, false)]
         public Color scatteringDistance; // Per color channel (no meaningful units)
         [Min(0.0f)]
-        public float scatteringDistanceMultiplier;
+        public float scatteringDistanceMultiplier = 1.0f;
         [ColorUsage(false, true)]
         public Color transmissionTint;           // HDR color
-        [Tooltip("Specifies when HDRP applies the albedo of the Material.")]
         public TexturingMode texturingMode;
-        [Range(1.0f, 2.0f)]
-        public Vector2 smoothnessMultipliers;
-        [Range(0.0f, 1.0f), Tooltip("Amount of mixing between the primary and secondary specular lobes.")]
-        public float lobeMix;
-        [Range(1.0f, 3.0f), Tooltip("Exponent on the cosine component of the diffuse lobe.\nHelps to simulate surfaces with strong subsurface scattering.")]
-        public float diffuseShadingPower;
-        [ColorUsage(false, false)]
-        [Tooltip("The color used when a subsurface scattering sample encounters a border. A border is defined by a material not having the same diffusion profile.")]
-        public Color borderAttenuationColor;
         public TransmissionMode transmissionMode;
         public Vector2 thicknessRemap;             // X = min, Y = max (in millimeters)
         public float worldScale;                 // Size of the world unit in meters
@@ -91,14 +65,10 @@ namespace UnityEngine.Rendering.HighDefinition
             scatteringDistanceMultiplier = 1;
             transmissionTint = Color.white;
             texturingMode = TexturingMode.PreAndPostScatter;
-            smoothnessMultipliers = Vector2.one;
-            lobeMix = 0.5f;
-            diffuseShadingPower = 1.0f;
             transmissionMode = TransmissionMode.ThinObject;
             thicknessRemap = new Vector2(0f, 5f);
             worldScale = 1f;
             ior = 1.4f; // Typical value for skin specular reflectance
-            borderAttenuationColor = Color.black;
         }
 
         internal void Validate()
@@ -107,15 +77,6 @@ namespace UnityEngine.Rendering.HighDefinition
             thicknessRemap.x = Mathf.Clamp(thicknessRemap.x, 0f, thicknessRemap.y);
             worldScale = Mathf.Max(worldScale, 0.001f);
             ior = Mathf.Clamp(ior, 1.0f, 2.0f);
-
-            // Default values for serializable classes do not work, they are set to 0
-            // if we detect this case, we initialize them to the right default
-            if (diffuseShadingPower == 0.0f)
-            {
-                smoothnessMultipliers = Vector2.one;
-                lobeMix = 0.5f;
-                diffuseShadingPower = 1.0f;
-            }
 
             UpdateKernel();
         }
@@ -232,7 +193,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 transmissionTint == other.transmissionTint &&
                 texturingMode == other.texturingMode &&
                 transmissionMode == other.transmissionMode &&
-                borderAttenuationColor == other.borderAttenuationColor &&
                 thicknessRemap == other.thicknessRemap &&
                 worldScale == other.worldScale &&
                 ior == other.ior;
@@ -242,8 +202,7 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// Class for Diffusion Profile settings
     /// </summary>
-    [HDRPHelpURLAttribute("diffusion-profile-reference")]
-    [Icon("Packages/com.unity.render-pipelines.high-definition/Editor/Icons/Processed/DiffusionProfile Icon.asset")]
+    [HDRPHelpURLAttribute("Diffusion-Profile")]
     public partial class DiffusionProfileSettings : ScriptableObject
     {
         [SerializeField]
@@ -253,8 +212,6 @@ namespace UnityEngine.Rendering.HighDefinition
         [NonSerialized] internal Vector4 shapeParamAndMaxScatterDist;                // RGB = S = 1 / D, A = d = RgbMax(D)
         [NonSerialized] internal Vector4 transmissionTintAndFresnel0;                // RGB = color, A = fresnel0
         [NonSerialized] internal Vector4 disabledTransmissionTintAndFresnel0;        // RGB = black, A = fresnel0 - For debug to remove the transmission
-        [NonSerialized] internal Vector4 dualLobeAndDiffusePower;                    // R = Smoothness A, G = Smoothness B, B = Lobe Mix, A = Diffuse Power - 1 (to have 0 as neutral value)
-        [NonSerialized] internal Vector4 borderAttenuationColorMultiplier;                     // RGB = color, A = not used
         [NonSerialized] internal int updateCount;
 
         /// <summary>
@@ -297,59 +254,12 @@ namespace UnityEngine.Rendering.HighDefinition
         }
 
         /// <summary>
-        /// Multiplier for the primary specular lobe. This multiplier is clamped between 1 and 2.
-        /// </summary>
-        public float primarySmoothnessMultiplier
-        {
-            get => profile.smoothnessMultipliers.y;
-            set { profile.smoothnessMultipliers.y = Mathf.Clamp(value, 1, 2); UpdateCache(); }
-        }
-
-        /// <summary>
-        /// Multiplier for the secondary specular lobe. This multiplier is clamped between 0 and 1.
-        /// </summary>
-        public float secondarySmoothnessMultiplier
-        {
-            get => profile.smoothnessMultipliers.x;
-            set { profile.smoothnessMultipliers.x = Mathf.Clamp(value, 0, 1); UpdateCache(); }
-        }
-
-        /// <summary>
-        /// Amount of mixing between the primary and secondary specular lobes.
-        /// </summary>
-        public float lobeMix
-        {
-            get => profile.lobeMix;
-            set { profile.lobeMix = value; UpdateCache(); }
-        }
-
-        /// <summary>
-        /// Exponent on the cosine component of the diffuse lobe.\nHelps to simulate non lambertian surfaces.
-        /// </summary>
-        public float diffuseShadingPower
-        {
-            get => profile.diffuseShadingPower;
-            set { profile.diffuseShadingPower = value; UpdateCache(); }
-        }
-
-        /// <summary>
         /// Color which tints transmitted light. Alpha is ignored.
         /// </summary>
         public Color transmissionTint
         {
             get => profile.transmissionTint;
             set { profile.transmissionTint = value; profile.Validate(); UpdateCache(); }
-        }
-
-        /// <summary>
-        /// Color used when the diffusion profile samples encounters a different diffusion profile index.
-        /// Setting this color to black have the same effect as occluding the subsurface scattering.
-        /// This property only works if the "Support Border Attenuation" property is enabled in the HDRP asset.
-        /// </summary>
-        public Color borderAttenuationColor
-        {
-            get => profile.borderAttenuationColor;
-            set { profile.borderAttenuationColor = value; profile.Validate(); UpdateCache(); }
         }
 
         void OnEnable()
@@ -402,9 +312,6 @@ namespace UnityEngine.Rendering.HighDefinition
             fresnel0 *= fresnel0; // square
             transmissionTintAndFresnel0 = new Vector4(profile.transmissionTint.r * 0.25f, profile.transmissionTint.g * 0.25f, profile.transmissionTint.b * 0.25f, fresnel0); // Premultiplied
             disabledTransmissionTintAndFresnel0 = new Vector4(0.0f, 0.0f, 0.0f, fresnel0);
-            float smoothnessB = profile.lobeMix == 0.0f ? 1.0f : profile.smoothnessMultipliers.y; // this helps shader determine if dual lobe is active
-            dualLobeAndDiffusePower = new Vector4(profile.smoothnessMultipliers.x, smoothnessB, profile.lobeMix, profile.diffuseShadingPower - 1.0f);
-            borderAttenuationColorMultiplier = profile.borderAttenuationColor;
 
             updateCount++;
         }

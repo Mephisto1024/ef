@@ -3,7 +3,7 @@
 //--------------------------------------------------------------------------------------------------
 
 // #pragma enable_d3d11_debug_symbols
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma kernel VolumetricLighting
 
@@ -12,8 +12,7 @@
 #pragma multi_compile _ ENABLE_ANISOTROPY
 #pragma multi_compile _ VL_PRESET_OPTIMAL
 #pragma multi_compile _ SUPPORT_LOCAL_LIGHTS
-#pragma multi_compile _ SUPPORT_WATER_ABSORPTION
-#pragma multi_compile _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
+#pragma multi_compile PROBE_VOLUMES_OFF PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
 
 // Don't want contact shadows
 #define LIGHT_EVALUATION_NO_CONTACT_SHADOWS // To define before LightEvaluation.hlsl
@@ -31,13 +30,17 @@
 #define PREFER_HALF             0
 #define GROUP_SIZE_1D           8
 #define SHADOW_USE_DEPTH_BIAS   0 // Too expensive, not particularly effective
-#define PUNCTUAL_SHADOW_ULTRA_LOW  // Different options are too expensive.
-#define DIRECTIONAL_SHADOW_ULTRA_LOW  // Different options are too expensive.
+#define SHADOW_ULTRA_LOW          // Different options are too expensive.
 #define AREA_SHADOW_LOW           // Different options are too expensive.
 #define SHADOW_AUTO_FLIP_NORMAL 0 // No normal information, so no need to flip
 #define SHADOW_VIEW_BIAS        1 // Prevents light leaking through thin geometry. Not as good as normal bias at grazing angles, but cheaper and independent from the geometry.
 #define USE_DEPTH_BUFFER        1 // Accounts for opaque geometry along the camera ray
 #define SAMPLE_PROBE_VOLUMES    1 && (defined(PROBE_VOLUMES_L1) || defined(PROBE_VOLUMES_L2))
+
+// Filter out lights that are not meant to be affecting volumetric once per thread rather than per voxel. This has the downside that it limits the max processable lights to MAX_SUPPORTED_LIGHTS
+// which might be lower than the max number of lights that might be in the big tile.
+#define PRE_FILTER_LIGHT_LIST   1 && defined(USE_BIG_TILE_LIGHTLIST)
+
 
 #define SHADOW_DATA_NOT_GUARANTEED_SCALAR // We are not looping over shadows in a scalarized fashion. If we will at some point, remove this define.
 
@@ -69,7 +72,6 @@
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightEvaluation.hlsl"
 
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/BuiltinGIUtilities.hlsl"
-#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Water/Shaders/UnderWaterUtilities.hlsl"
 
 //--------------------------------------------------------------------------------------------------
 // Inputs & outputs
@@ -85,6 +87,18 @@ StructuredBuffer<float4> _VolumetricAmbientProbeBuffer;
 //--------------------------------------------------------------------------------------------------
 // Implementation
 //--------------------------------------------------------------------------------------------------
+
+#if PRE_FILTER_LIGHT_LIST
+
+#if MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE > 48
+#define MAX_SUPPORTED_LIGHTS 48
+#else
+#define MAX_SUPPORTED_LIGHTS MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE
+#endif
+
+groupshared int gs_localLightList[GROUP_SIZE_1D*GROUP_SIZE_1D][MAX_SUPPORTED_LIGHTS];
+
+#endif
 
 // Ambient probe for volumetric contains a convolution with Cornette Shank phase function so it needs to sample a different buffer.
 real3 EvaluateVolumetricAmbientProbe(real3 normalWS)
@@ -155,7 +169,7 @@ float ComputeHistoryWeight()
 // Computes the light integral (in-scattered radiance) within the voxel.
 // Multiplication by the scattering coefficient and the phase function is performed outside.
 VoxelLighting EvaluateVoxelLightingDirectional(LightLoopContext context, uint featureFlags, PositionInputs posInput, float3 centerWS,
-                                               JitteredRay ray, float t0, float t1, float dt, float rndVal, float extinction, float anisotropy, bool underWater)
+                                               JitteredRay ray, float t0, float t1, float dt, float rndVal, float extinction, float anisotropy)
 {
     VoxelLighting lighting;
     ZERO_INITIALIZE(VoxelLighting, lighting);
@@ -198,10 +212,6 @@ VoxelLighting EvaluateVoxelLightingDirectional(LightLoopContext context, uint fe
             context.shadowValue = GetDirectionalShadowAttenuation(context.shadowContext,
                                                                   posInput.positionSS, posInput.positionWS, shadowN,
                                                                   light.shadowIndex, L);
-
-            // Apply the volumetric cloud shadow if relevant
-            if (_VolumetricCloudsShadowOriginToggle.w == 1.0)
-                context.shadowValue *= EvaluateVolumetricCloudsShadows(light, posInput.positionWS);
         }
     }
     else
@@ -224,28 +234,6 @@ VoxelLighting EvaluateVoxelLightingDirectional(LightLoopContext context, uint fe
         if (light.volumetricLightDimmer > 0)
         {
             float4 lightColor = EvaluateLight_Directional(context, posInput, light);
-
-            #if SUPPORT_WATER_ABSORPTION
-            // Evaluate caustics for underwater
-            if (underWater)
-            {
-                // Project caustics as a cookie, taking account refraction otherwise it doesn't look right when sun is low
-                WaterSurfaceProfile prof = _WaterSurfaceProfiles[_UnderWaterSurfaceIndex];
-                float3 fwd = refract(light.forward, prof.upDirection, 1.0 / 1.333);
-                float3 tangent = normalize(cross(fwd, float3(0.0, 1.0, 0.0)));
-                float3 bitangent = cross(tangent, fwd);
-                float3 posWS = GetAbsolutePositionWS(posInput.positionWS) * _UnderWaterCausticsTilingFactor;
-                float2 positionNDC = float2(dot(posWS, tangent), dot(posWS, bitangent)) * 0.5 + 0.5;
-                float caustic = SAMPLE_TEXTURE2D_LOD(_WaterCausticsDataBuffer, s_linear_repeat_sampler, positionNDC, 0).r;
-
-                lightColor.a *= 1.0 + caustic * _UnderWaterCausticsIntensity;
-
-                // Simulate light absorption from depth
-                float distanceToSurface = max(-dot(posInput.positionWS, prof.upDirection) - GetWaterCameraHeight(), 0);
-                lightColor.a *= exp(-distanceToSurface * _UnderWaterScatteringExtinction.w);
-            }
-            #endif
-
             // The volumetric light dimmer, unlike the regular light dimmer, is not pre-multiplied.
             lightColor.a *= light.volumetricLightDimmer;
             lightColor.rgb *= lightColor.a; // Composite
@@ -307,8 +295,13 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
         // This loop does not process box lights.
         for (; lightOffset < lightCount; lightOffset++)
         {
+#if PRE_FILTER_LIGHT_LIST
+            uint lightIndex = gs_localLightList[groupIdx][lightOffset];
+#else
             uint lightIndex = FetchIndex(lightStart, lightOffset);
+#endif
             LightData light = _LightDatas[lightIndex];
+
 
             if (light.lightType >= GPULIGHTTYPE_PROJECTOR_BOX) { break; }
 
@@ -316,7 +309,7 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
             light.contactShadowMask  = 0;
             light.shadowDimmer       = light.volumetricShadowDimmer;
 
-            bool sampleLight = true;
+            bool sampleLight = (light.volumetricLightDimmer > 0);
 
             float tEntr = t0;
             float tExit = t1;
@@ -342,7 +335,7 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
                 float3 coneAxisX = lenMul * light.right;
                 float3 coneAxisY = lenMul * light.up;
 
-                sampleLight = IntersectRayCone(ray.originWS, ray.jitterDirWS,
+                sampleLight = sampleLight && IntersectRayCone(ray.originWS, ray.jitterDirWS,
                                                               light.positionRWS, light.forward,
                                                               coneAxisX, coneAxisY,
                                                               t0, t1, tEntr, tExit);
@@ -351,15 +344,10 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
             // Is it worth evaluating the light?
             if (sampleLight)
             {
-                // Each froxel in the VBuffer is curved following a spherical shape around the camera position
-                // To compute the arc length of the froxel, we can take the arc length of a forxel at 1m from the camera and multiply it by
-                // the distance to the current froxel.
-                float voxelArcLength = _HalfVoxelArcLength * tEntr;
-                // Modify the light radius to ensure that it's at least the size of the froxel, reducing the aliasing close to the center of the light.
-                light.size.x = max(light.size.x, voxelArcLength);
+                float lightSqRadius = light.size.x;
 
                 float t, distSq, rcpPdf;
-                ImportanceSamplePunctualLight(rndVal, light.positionRWS, light.size.x,
+                ImportanceSamplePunctualLight(rndVal, light.positionRWS, lightSqRadius,
                                               ray.originWS, ray.jitterDirWS,
                                               tEntr, tExit,
                                               t, distSq, rcpPdf);
@@ -414,7 +402,11 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
         // This loop only processes box lights.
         for (; lightOffset < lightCount; lightOffset++)
         {
+#if PRE_FILTER_LIGHT_LIST
+            uint lightIndex = gs_localLightList[groupIdx][lightOffset];
+#else
             uint lightIndex = FetchIndex(lightStart, lightOffset);
+#endif
             LightData light = _LightDatas[lightIndex];
 
             if (light.lightType != GPULIGHTTYPE_PROJECTOR_BOX) { break; }
@@ -423,7 +415,7 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
             light.contactShadowMask  = 0;
             light.shadowDimmer       = light.volumetricShadowDimmer;
 
-            bool sampleLight = true;
+            bool sampleLight = (light.volumetricLightDimmer > 0);
 
             // Convert the box light from OBB to AABB.
             // 'light.right' and 'light.up' vectors are pre-scaled on the CPU by (2/w) and (2/h).
@@ -436,7 +428,7 @@ VoxelLighting EvaluateVoxelLightingLocal(LightLoopContext context, uint groupIdx
             float3 boxPt1 = float3( 1,  1, light.range);
 
             float tEntr, tExit;
-            sampleLight = IntersectRayAABB(o, d, boxPt0, boxPt1, t0, t1, tEntr, tExit);
+            sampleLight = sampleLight && IntersectRayAABB(o, d, boxPt0, boxPt1, t0, t1, tEntr, tExit);
 
             // Is it worth evaluating the light?
             if (sampleLight)
@@ -539,7 +531,42 @@ void FillVolumetricLightingBuffer(LightLoopContext context, uint featureFlags,
     // Offset for stereo rendering
     tileIndex += unity_StereoEyeIndex * _NumTileBigTileX * _NumTileBigTileY;
 
-    GetBigTileLightCountAndStart(tileIndex, lightCount, lightStart);
+    // The "big tile" list contains the number of objects contained within the tile followed by the
+    // list of object indices. Note that while objects are already sorted by type, we don't know the
+    // number of each type of objects (e.g. lights), so we should remember to break out of the loop.
+    lightCount = g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE * tileIndex];
+    // On Metal for unknow reasons it seems we have bad value sometimes causing freeze / crash. This min here prevent it.
+    lightCount = min(lightCount, MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE);
+    lightStart = MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE * tileIndex + 1;
+
+    // For now, iterate through all the objects to determine the correct range.
+    // TODO: precompute this, of course.
+    {
+        uint offset = 0;
+
+        int validLightCount = 0;
+
+        for (; offset < lightCount; offset++)
+        {
+            uint objectIndex = FetchIndex(lightStart, offset);
+#if PRE_FILTER_LIGHT_LIST
+            LightData light = _LightDatas[objectIndex];
+            if (light.volumetricLightDimmer > 0 && validLightCount < MAX_SUPPORTED_LIGHTS && objectIndex < _EnvLightIndexShift)
+            {
+                gs_localLightList[groupIdx][validLightCount++] = objectIndex;
+            }
+#else
+            validLightCount++;
+#endif
+            if (objectIndex >= _EnvLightIndexShift)
+            {
+                // We have found the last local analytical light.
+                break;
+            }
+        }
+
+        lightCount = validLightCount;
+    }
 
 #else  // USE_BIG_TILE_LIGHTLIST
 
@@ -557,19 +584,6 @@ void FillVolumetricLightingBuffer(LightLoopContext context, uint featureFlags,
     // The probe is already pre-convolved with the phase function.
     // Note: anisotropic, no jittering.
     float3 probeInScatteredRadiance = EvaluateVolumetricAmbientProbe(ray.centerDirWS);
-
-    float waterDistance = FLT_MIN;
-    #if SUPPORT_WATER_ABSORPTION
-    float2 posSS = posInput.positionNDC.xy * _ScreenSize.xy;
-    bool underWater = posInput.positionWS.y < _UnderWaterUpHeight.w || IsUnderWater(posSS.xy);
-    if (underWater && (GetStencilValue(LOAD_TEXTURE2D_X(_StencilTexture, posInput.positionSS.xy)) & STENCILUSAGE_WATER_SURFACE) != 0)
-    {
-        waterDistance = LinearEyeDepth(LOAD_TEXTURE2D_X(_RefractiveDepthBuffer, posSS).r, _ZBufferParams);
-        waterDistance = waterDistance * rcp(dot(ray.centerDirWS, GetViewForwardDir()));
-    }
-    else
-        waterDistance = underWater ? FLT_MAX : 0.0f;
-    #endif
 
     float3 totalRadiance = 0;
     float  opticalDepth  = 0;
@@ -642,7 +656,7 @@ void FillVolumetricLightingBuffer(LightLoopContext context, uint featureFlags,
         {
             VoxelLighting lighting = EvaluateVoxelLightingDirectional(context, featureFlags, posInput,
                                                                       centerWS, ray, t0, t1, dt, rndVal,
-                                                                      extinction, anisotropy, t < waterDistance);
+                                                                      extinction, anisotropy);
 
             aggregateLighting.radianceNoPhase  += lighting.radianceNoPhase;
             aggregateLighting.radianceComplete += lighting.radianceComplete;

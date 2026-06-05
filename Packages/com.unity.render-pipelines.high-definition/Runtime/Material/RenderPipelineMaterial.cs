@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
 
 namespace UnityEngine.Rendering.HighDefinition
@@ -9,11 +8,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public virtual bool IsDefferedMaterial() { return false; }
 
         // Regular interface
-        public virtual void Build(HDRenderPipeline renderPipeline) { }
-
-        // Optionally build resources offline (in editor).
-        public virtual void BuildOffline(ref List<RenderTexture> resourceList) { }
-
+        public virtual void Build(HDRenderPipelineAsset hdAsset, HDRenderPipelineRuntimeResources defaultResources) { }
         public virtual void Cleanup() { }
 
         // Following function can be use to initialize GPU resource (once or each frame) and bind them

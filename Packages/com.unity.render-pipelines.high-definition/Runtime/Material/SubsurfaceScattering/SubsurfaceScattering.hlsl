@@ -160,8 +160,6 @@ bool TestLightingForSSS(float3 subsurfaceLighting)
 // profile because the thick flag is not set (for pixels that have transmission, we force the flags in a per-pixel
 // material feature)).
 #define MATERIALFEATUREFLAGS_TRANSMISSION_MODE_THICK_OBJECT     ((MATERIALFEATUREFLAGS_SSS_TRANSMISSION_START) << 3)
-#define MATERIALFEATUREFLAGS_SSS_DUAL_LOBE                      ((MATERIALFEATUREFLAGS_SSS_TRANSMISSION_START) << 4)
-#define MATERIALFEATUREFLAGS_SSS_DIFFUSE_POWER                  ((MATERIALFEATUREFLAGS_SSS_TRANSMISSION_START) << 5)
 
 // 15 degrees
 #define TRANSMISSION_WRAP_ANGLE (PI/12)
@@ -174,8 +172,7 @@ void FillMaterialSSS(uint diffusionProfileIndex, float subsurfaceMask, inout BSD
     bsdfData.diffusionProfileIndex = diffusionProfileIndex;
     bsdfData.fresnel0 = _TransmissionTintsAndFresnel0[diffusionProfileIndex].a;
     bsdfData.subsurfaceMask = subsurfaceMask;
-    if (subsurfaceMask != 0)
-        bsdfData.materialFeatures |= MATERIALFEATUREFLAGS_SSS_OUTPUT_SPLIT_LIGHTING;
+    bsdfData.materialFeatures |= MATERIALFEATUREFLAGS_SSS_OUTPUT_SPLIT_LIGHTING;
     bsdfData.materialFeatures |= GetSubsurfaceScatteringTexturingMode(diffusionProfileIndex) << MATERIALFEATUREFLAGS_SSS_TEXTURING_MODE_OFFSET;
 }
 
@@ -187,28 +184,8 @@ bool ShouldOutputSplitLighting(BSDFData bsdfData)
 float3 GetModifiedDiffuseColorForSSS(BSDFData bsdfData)
 {
     // Subsurface scattering mode
-    if (bsdfData.subsurfaceMask != 0)
-    {
-        uint   texturingMode = (bsdfData.materialFeatures >> MATERIALFEATUREFLAGS_SSS_TEXTURING_MODE_OFFSET) & 3;
-        return ApplySubsurfaceScatteringTexturingMode(texturingMode, bsdfData.diffuseColor);
-    }
-    else
-    {
-        return bsdfData.diffuseColor;
-    }
-}
-
-bool GetDualLobeParameters(uint diffusionProfileIndex, out float multiplierA, out float multiplierB, out float lobeMix)
-{
-    multiplierA = _DualLobeAndDiffusePower[diffusionProfileIndex].r;
-    multiplierB = _DualLobeAndDiffusePower[diffusionProfileIndex].g;
-    lobeMix     = _DualLobeAndDiffusePower[diffusionProfileIndex].b;
-    return multiplierA != multiplierB; // if both multipliers are equal, there is no dual lobe
-}
-
-float GetDiffusePower(uint diffusionProfileIndex)
-{
-    return _DualLobeAndDiffusePower[diffusionProfileIndex].a;
+    uint   texturingMode = (bsdfData.materialFeatures >> MATERIALFEATUREFLAGS_SSS_TEXTURING_MODE_OFFSET) & 3;
+    return ApplySubsurfaceScatteringTexturingMode(texturingMode, bsdfData.diffuseColor);
 }
 
 #endif
@@ -216,7 +193,7 @@ float GetDiffusePower(uint diffusionProfileIndex)
 #ifdef MATERIAL_INCLUDE_TRANSMISSION
 
 // Assume that bsdfData.diffusionProfileIndex is init
-void FillMaterialTransmission(uint diffusionProfileIndex, float thickness, float3 transmissionMask, inout BSDFData bsdfData)
+void FillMaterialTransmission(uint diffusionProfileIndex, float thickness, float transmissionMask, inout BSDFData bsdfData)
 {
     float2 remap = _WorldScalesAndFilterRadiiAndThicknessRemaps[diffusionProfileIndex].zw;
 

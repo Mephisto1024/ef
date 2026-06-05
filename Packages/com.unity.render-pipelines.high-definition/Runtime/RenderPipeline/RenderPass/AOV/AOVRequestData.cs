@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -32,7 +32,7 @@ namespace UnityEngine.Rendering.HighDefinition
     public struct AOVRequestData
     {
         /// <summary>Default frame pass settings.</summary>
-        [Obsolete("Use AOVRequestData.NewDefault() instead. #from(2019.3)")]
+        [Obsolete("Since 2019.3, use AOVRequestData.NewDefault() instead.")]
         public static readonly AOVRequestData @default = default;
         /// <summary>
         /// Instantiate a new AOV request data with default values.
@@ -217,18 +217,15 @@ namespace UnityEngine.Rendering.HighDefinition
             if (index == -1)
                 return;
 
-            using (var builder = renderGraph.AddUnsafePass<PushCameraTexturePassData>("Push AOV Camera Texture", out var passData, ProfilingSampler.Get(HDProfileId.AOVOutput + (int)aovBufferId)))
+            using (var builder = renderGraph.AddRenderPass<PushCameraTexturePassData>("Push AOV Camera Texture", out var passData, ProfilingSampler.Get(HDProfileId.AOVOutput + (int)aovBufferId)))
             {
-                passData.source = source;
+                passData.source = builder.ReadTexture(source);
                 passData.target = targets[index];
 
-                builder.UseTexture(passData.source, AccessFlags.Read);
-                builder.AllowPassCulling(false);
-
                 builder.SetRenderFunc(
-                    (PushCameraTexturePassData data, UnsafeGraphContext ctx) =>
+                    (PushCameraTexturePassData data, RenderGraphContext ctx) =>
                     {
-                        Blitter.BlitCameraTexture(CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd), data.source, data.target);
+                        HDUtils.BlitCameraTexture(ctx.cmd, data.source, data.target);
                     });
             }
         }
@@ -267,12 +264,11 @@ namespace UnityEngine.Rendering.HighDefinition
             if (index == -1)
                 return;
 
-            using (var builder = renderGraph.AddUnsafePass<PushCustomPassTexturePassData>("Push Custom Pass Texture", out var passData))
+            using (var builder = renderGraph.AddRenderPass<PushCustomPassTexturePassData>("Push Custom Pass Texture", out var passData))
             {
                 if (m_CustomPassAOVBuffers[index].outputType == CustomPassAOVBuffers.OutputType.Camera)
                 {
-                    passData.source = cameraSource;
-                    builder.UseTexture(passData.source, AccessFlags.Read);
+                    passData.source = builder.ReadTexture(cameraSource);
                     passData.customPassSource = null;
                 }
                 else
@@ -281,16 +277,13 @@ namespace UnityEngine.Rendering.HighDefinition
                 }
                 passData.target = targets[index];
 
-                builder.AllowPassCulling(false);
-
                 builder.SetRenderFunc(
-                    (PushCustomPassTexturePassData data, UnsafeGraphContext ctx) =>
+                    (PushCustomPassTexturePassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         if (data.customPassSource != null)
-                            Blitter.BlitCameraTexture(natCmd, data.customPassSource, data.target);
+                            HDUtils.BlitCameraTexture(ctx.cmd, data.customPassSource, data.target);
                         else
-                            Blitter.BlitCameraTexture(natCmd, data.source, data.target);
+                            HDUtils.BlitCameraTexture(ctx.cmd, data.source, data.target);
                     });
             }
         }

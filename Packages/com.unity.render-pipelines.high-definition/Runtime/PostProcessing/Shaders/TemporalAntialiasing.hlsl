@@ -58,16 +58,13 @@
     #define MV_DILATION DEPTH_DILATION
 #endif
 
-#ifndef TEMPORAL_CONTRAST
-    #define TEMPORAL_CONTRAST 1
-#endif
 
 static float2 NeighbourOffsets[8];
 
 void SetNeighbourOffsets(float4 neighbourOffsets[4])
 {
-    UNITY_UNROLL for (uint i = 0; i < 16; ++i)
-        NeighbourOffsets[i / 2][i % 2] = neighbourOffsets[i / 4][i % 4];
+    UNITY_UNROLL for (int i = 0; i < 16; ++i)
+        NeighbourOffsets[i/2][i%2] = neighbourOffsets[i/4][i%4];
 }
 
 float2 ClampAndScaleForBilinearWithCustomScale(float2 uv, float2 scale)
@@ -491,8 +488,11 @@ void VarianceNeighbourhood(inout NeighbourhoodSamples samples, float historyLuma
     // and high temporal contrast, we let the history to be closer to be unclipped. To achieve, the min/max bounds
     // are extended artificially more.
 #if ANTI_FLICKER
-    float aggressiveStdDevLuma = GetLuma(stdDev) * 0.5;
+    stDevMultiplier = 1.5;
+
+    float aggressiveStdDevLuma = GetLuma(stdDev)* 0.5;
     aggressiveClampedHistoryLuma = clamp(historyLuma, GetLuma(moment1) - aggressiveStdDevLuma, GetLuma(moment1) + aggressiveStdDevLuma);
+    float temporalContrast = saturate(abs(colorLuma - aggressiveClampedHistoryLuma) / Max3(0.15, colorLuma, aggressiveClampedHistoryLuma));
 #if ANTI_FLICKER_MV_DEPENDENT
     const float maxFactorScale = 2.25f; // when stationary
     const float minFactorScale = 0.8f; // when moving more than slightly
@@ -501,15 +501,9 @@ void VarianceNeighbourhood(inout NeighbourhoodSamples samples, float historyLuma
 #else
     float localizedAntiFlicker = antiFlickerParams.x;
 #endif
-
-#if TEMPORAL_CONTRAST
     // TODO: Because we use a very aggressivley clipped history to compute the temporal contrast (hopefully cutting a chunk of ghosting)
     // can we be more aggressive here, being a bit more confident that the issue is from flickering? To investigate.
-    float temporalContrast = saturate(abs(colorLuma - aggressiveClampedHistoryLuma) / Max3(0.15, colorLuma, aggressiveClampedHistoryLuma));
     stDevMultiplier += lerp(0.0, localizedAntiFlicker, smoothstep(0.05, antiFlickerParams.y, temporalContrast));
-#else
-    stDevMultiplier += localizedAntiFlicker;
-#endif
 
 #endif
 
@@ -593,9 +587,9 @@ CTYPE FilterCentralColor(NeighbourhoodSamples samples, float centralWeight, floa
 {
     CTYPE filtered = samples.central * centralWeight;
 
-    for (uint i = 0; i < NEIGHBOUR_COUNT; ++i)
+    for (int i = 0; i < NEIGHBOUR_COUNT; ++i)
     {
-        float w = weights[i / 4][i % 4];
+        float w = weights[i/4][i%4];
         filtered += samples.neighbours[i] * w;
     }
 

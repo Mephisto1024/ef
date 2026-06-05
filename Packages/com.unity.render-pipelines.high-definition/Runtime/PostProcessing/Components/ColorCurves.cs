@@ -5,8 +5,7 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds settings for the Color Adjustments effect.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Post-processing/Color Curves")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Post-processing/Color Curves", typeof(HDRenderPipeline))]
     [HDRPHelpURLAttribute("Post-Processing-Color-Curves")]
     public sealed class ColorCurves : VolumeComponent, IPostProcessComponent
     {

@@ -33,7 +33,7 @@
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RaytracingIntersection.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RaytracingSampling.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RayTracingCommon.hlsl"
-#include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/Common/RayTracingHelpers.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/Common/RaytracingHelpers.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/ScreenSpaceLighting/ScreenSpaceLighting.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/Common/AtmosphericScatteringRayTracing.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Debug/RayCountManager.cs.hlsl"
@@ -44,12 +44,12 @@ TEXTURE2D_X(_DepthTexture);
 TEXTURE2D_X(_SsrClearCoatMaskTexture);
 
 // Flag value that defines if a given pixel recieves reflections or not
-TYPED_TEXTURE2D_X(uint2, _StencilTexture);
+TEXTURE2D_X_UINT2(_StencilTexture);
 int _SsrStencilBit;
 
 // Output structure of the reflection raytrace shader
-RW_TEXTURE2D_X(float4, _RayTracingLightingTextureRW);
-RW_TEXTURE2D_X(float, _RayTracingDistanceTextureRW);
+RW_TEXTURE2D_X(float4, _SsrLightingTextureRW);
+RW_TEXTURE2D_X(float4, _SsrHitPointTexture);
 
 [shader("miss")]
 void MissShaderReflections(inout RayIntersection rayIntersection : SV_RayPayload)
@@ -100,8 +100,7 @@ void RayGenIntegration()
     uint2 currentCoord = uint2(LaunchIndex.x, LaunchDim.y - LaunchIndex.y - 1);
 
     // Clear the output color texture
-    _RayTracingLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(0.0, 0.0, 0.0, 0.0);
-    _RayTracingDistanceTextureRW[COORD_TEXTURE2D_X(currentCoord)] = 0.0;
+    _SsrLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(0.0, 0.0, 0.0, 0.0);
 
     // Read the depth value
     float depthValue = LOAD_TEXTURE2D_X(_DepthTexture, currentCoord).r;
@@ -143,13 +142,12 @@ void RayGenIntegration()
 
     // Variable that accumulate the radiance
     float3 finalColor = float3(0.0, 0.0, 0.0);
-    float averageDistance = 0.0;
 
     // Loop through the samples and add their contribution
     for (int sampleIndex = 0; sampleIndex < realSampleCount; ++sampleIndex)
     {
         // Compute the current sample index
-        int globalSampleIndex = _RayTracingReflectionFrameIndex * realSampleCount + sampleIndex;
+        int globalSampleIndex = _RaytracingFrameIndex * realSampleCount + sampleIndex;
 
         // Generate the new sample (follwing values of the sequence)
         float2 theSample;
@@ -218,23 +216,16 @@ void RayGenIntegration()
 
         // Contribute to the pixel
         finalColor += sampleColor;
-        averageDistance += rayIntersection.t;
     }
 
    	// Normalize the value
-    if (realSampleCount != 0.0)
-    {
-        float normalizationFactor = 1.0 / realSampleCount;
-        finalColor *= normalizationFactor;
-        averageDistance *= normalizationFactor;
-    }
+    finalColor *= 1.0 / realSampleCount;
 
     // We also need to compute the fade factor for this sample
     float weightValue = _RaytracingReflectionSmoothnessFadeStart == _RaytracingReflectionMinSmoothness ? 1.0 : saturate((perceptualSmoothness - _RaytracingReflectionMinSmoothness) / (_RaytracingReflectionSmoothnessFadeStart -_RaytracingReflectionMinSmoothness));
 
     // We store the sampled color and the weight that shall be used for it (1.0)
-    _RayTracingLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(finalColor, weightValue);
-    _RayTracingDistanceTextureRW[COORD_TEXTURE2D_X(currentCoord)] = averageDistance;
+    _SsrLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(finalColor, weightValue);
 }
 
 [shader("raygeneration")]
@@ -250,7 +241,7 @@ void RayGenIntegrationTransparent()
     uint2 currentCoord = uint2(LaunchIndex.x, LaunchDim.y - LaunchIndex.y - 1);
 
     // Clear the output color texture
-    _RayTracingLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(0.0, 0.0, 0.0, 0.0);
+    _SsrLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(0.0, 0.0, 0.0, 0.0);
 
     // Read the depth value
     float depthValue  = LOAD_TEXTURE2D_X(_DepthTexture, currentCoord).r;
@@ -321,6 +312,5 @@ void RayGenIntegrationTransparent()
     TraceRay(_RaytracingAccelerationStructure, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, RAYTRACINGRENDERERFLAG_REFLECTION, 0, 1, 0, rayDescriptor, rayIntersection);
 
     // We store the sampled color and the weight that shall be used for it (1.0)
-    _RayTracingLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(rayIntersection.color, 1.0);
-    _RayTracingDistanceTextureRW[COORD_TEXTURE2D_X(currentCoord)] = rayIntersection.t;
+    _SsrLightingTextureRW[COORD_TEXTURE2D_X(currentCoord)] = float4(rayIntersection.color, 1.0);
 }

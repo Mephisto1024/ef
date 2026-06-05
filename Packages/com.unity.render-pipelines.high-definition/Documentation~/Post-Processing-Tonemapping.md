@@ -2,11 +2,9 @@
 
 Tonemapping is the process of remapping HDR values of an image in a range suitable to display on screen.
 
-To use Tonemapping, refer to [High Dynamic Range (HDR) and tonemapping](HDR-Output.md).
+## Using Tonemapping
 
-## Use Tonemapping
-
-**Tonemapping** uses the [Volume](understand-volumes.md) framework, so to enable and modify **Tonemapping** properties, you must add a **Tonemapping** override to a [Volume](understand-volumes.md) in your Scene. To add **Tonemapping** to a Volume:
+**Tonemapping** uses the [Volume](Volumes.md) framework, so to enable and modify **Tonemapping** properties, you must add a **Tonemapping** override to a [Volume](Volumes.md) in your Scene. To add **Tonemapping** to a Volume:
 
 1. In the Scene or Hierarchy view, select a GameObject that contains a Volume component to view it in the Inspector.
 2. In the Inspector, go to **Add Override** > **Post-processing** and select **Tonemapping**. HDRP now applies **Tonemapping** to any Camera this Volume affects.
@@ -15,7 +13,7 @@ To use Tonemapping, refer to [High Dynamic Range (HDR) and tonemapping](HDR-Outp
 
 ## Properties
 
-![The tonemapping component properties.](Images/Post-processingTonemapping1.png)
+![](Images/Post-processingTonemapping1.png)
 
 | **Property**          | **Description**                                              |
 | --------------------- | ------------------------------------------------------------ |

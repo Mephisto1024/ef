@@ -25,20 +25,12 @@ SurfaceDescriptionInputs FragInputsToSurfaceDescriptionInputs(FragInputs input, 
     $SurfaceDescriptionInputs.TangentSpaceViewDirection:                    float3x3 tangentSpaceTransform =                    float3x3(output.WorldSpaceTangent,output.WorldSpaceBiTangent,output.WorldSpaceNormal);
     $SurfaceDescriptionInputs.TangentSpaceViewDirection:                    output.TangentSpaceViewDirection =                  TransformWorldToTangent(output.WorldSpaceViewDirection, tangentSpaceTransform);
     $SurfaceDescriptionInputs.WorldSpacePosition:                           output.WorldSpacePosition =                         input.positionRWS;
-#if SHADERPASS != SHADERPASS_FOG_VOLUME_VOXELIZATION
     $SurfaceDescriptionInputs.ObjectSpacePosition:                          output.ObjectSpacePosition =                        TransformWorldToObject(input.positionRWS);
-#else
-    $SurfaceDescriptionInputs.ObjectSpacePosition:                          output.ObjectSpacePosition =                        TransformWorldToObjectFog(input.positionRWS);
-#endif
     $SurfaceDescriptionInputs.ViewSpacePosition:                            output.ViewSpacePosition =                          TransformWorldToView(input.positionRWS);
     $SurfaceDescriptionInputs.TangentSpacePosition:                         output.TangentSpacePosition =                       float3(0.0f, 0.0f, 0.0f);
     $SurfaceDescriptionInputs.AbsoluteWorldSpacePosition:                   output.AbsoluteWorldSpacePosition =                 GetAbsolutePositionWS(input.positionRWS);
     $SurfaceDescriptionInputs.WorldSpacePositionPredisplacement:            output.WorldSpacePositionPredisplacement =          input.positionPredisplacementRWS;
-#if SHADERPASS != SHADERPASS_FOG_VOLUME_VOXELIZATION
     $SurfaceDescriptionInputs.ObjectSpacePositionPredisplacement:           output.ObjectSpacePositionPredisplacement =         TransformWorldToObject(input.positionPredisplacementRWS);
-#else
-    $SurfaceDescriptionInputs.ObjectSpacePositionPredisplacement:           output.ObjectSpacePositionPredisplacement =         TransformWorldToObjectFog(input.positionPredisplacementRWS);
-#endif
     $SurfaceDescriptionInputs.ViewSpacePositionPredisplacement:             output.ViewSpacePositionPredisplacement =           TransformWorldToView(input.positionPredisplacementRWS);
     $SurfaceDescriptionInputs.TangentSpacePositionPredisplacement:          output.TangentSpacePositionPredisplacement =        float3(0.0f, 0.0f, 0.0f);
     $SurfaceDescriptionInputs.AbsoluteWorldSpacePositionPredisplacement:    output.AbsoluteWorldSpacePositionPredisplacement =  GetAbsolutePositionWS(input.positionPredisplacementRWS);
@@ -57,13 +49,8 @@ SurfaceDescriptionInputs FragInputsToSurfaceDescriptionInputs(FragInputs input, 
     $SurfaceDescriptionInputs.uv1:                                          output.uv1 =                                        input.texCoord1;
     $SurfaceDescriptionInputs.uv2:                                          output.uv2 =                                        input.texCoord2;
     $SurfaceDescriptionInputs.uv3:                                          output.uv3 =                                        input.texCoord3;
-    $SurfaceDescriptionInputs.uv4:                                          output.uv4 =                                        input.texCoord4;
-    $SurfaceDescriptionInputs.uv5:                                          output.uv5 =                                        input.texCoord5;
-    $SurfaceDescriptionInputs.uv6:                                          output.uv6 =                                        input.texCoord6;
-    $SurfaceDescriptionInputs.uv7:                                          output.uv7 =                                        input.texCoord7;
     $SurfaceDescriptionInputs.VertexColor:                                  output.VertexColor =                                input.color;
     $SurfaceDescriptionInputs.FaceSign:                                     output.FaceSign =                                   input.isFrontFace;
-    $SurfaceDescriptionInputs.InstanceID:                                   output.InstanceID =                                 input.instanceID;
     $SurfaceDescriptionInputs.TimeParameters:                               output.TimeParameters =                             _TimeParameters.xyz; // This is mainly for LW as HD overwrite this value
 
     // splice point to copy frag inputs custom interpolator pack into the SDI

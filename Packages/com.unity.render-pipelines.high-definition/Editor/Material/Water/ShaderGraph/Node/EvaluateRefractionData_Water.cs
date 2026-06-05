@@ -10,12 +10,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Water", "EvaluateRefractionData_Water")]
+    [Title("Utility", "High Definition Render Pipeline", "Water", "EvaluateRefractionData_Water (Preview)")]
     class EvaluateRefractionData_Water : AbstractMaterialNode, IGeneratesBodyCode, IMayRequirePosition, IMayRequireNDCPosition, IMayRequireViewDirection
     {
         public EvaluateRefractionData_Water()
         {
-            name = "Evaluate Refraction Data Water";
+            name = "Evaluate Refraction Data Water (Preview)";
             UpdateNodeAfterDeserialization();
         }
 
@@ -69,21 +69,22 @@ namespace UnityEditor.Rendering.HighDefinition
                 // Declare the variables that will hold the value
                 sb.AppendLine("$precision3 refractedPos;");
                 sb.AppendLine("$precision2 distordedNDC;");
+                sb.AppendLine("$precision refractedDistance;");
                 sb.AppendLine("$precision3 absorptionTint;");
 
-                string positionWS = $"IN.{CoordinateSpace.World.ToVariableName(InterpolatorType.Position)}";
+                string positionAWS = $"IN.{CoordinateSpace.World.ToVariableName(InterpolatorType.Position)}";
                 string normalWS = GetSlotValue(kNormalWSInputSlotId, generationMode);
                 string lfNormalWS = GetSlotValue(kLowFrequencyNormalWSInputSlotId, generationMode);
                 string screenPos = ScreenSpaceType.Default.ToValueAsVariable();
                 string viewWS = $"IN.{CoordinateSpace.World.ToVariableName(InterpolatorType.ViewDirection)}";
                 string faceSign = $"IN.{StructFields.SurfaceDescriptionInputs.FaceSign.name}";
 
-                sb.AppendLine("ComputeWaterRefractionParams({0}, {1}.xy, {2}, {3}, {4}, {5}, false, _WaterUpDirection.xyz, _MaxRefractionDistance, _WaterExtinction.xyz, refractedPos, distordedNDC, absorptionTint);",
-                    positionWS,
-                    screenPos,
-                    viewWS,
+                sb.AppendLine("ComputeWaterRefractionParams({0}, {1}, {2}, {3}.xy, {4}, {5}, _MaxRefractionDistance, _TransparencyColor.xyz, _OutScatteringCoefficient, refractedPos, distordedNDC, refractedDistance, absorptionTint);",
+                    positionAWS,
                     normalWS,
                     lfNormalWS,
+                    screenPos,
+                    viewWS,
                     faceSign
                 );
 

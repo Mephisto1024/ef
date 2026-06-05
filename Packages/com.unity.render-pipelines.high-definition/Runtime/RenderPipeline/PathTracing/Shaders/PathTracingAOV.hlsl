@@ -9,15 +9,10 @@ struct AOVData
     float3 normal;
 };
 
-bool NeedAOVData(PathPayload payload)
-{
-    return payload.segmentID == 0 && IsOutputFlagOn(payload, OUTPUT_FLAG_AOV);
-}
-
 void WriteAOVData(AOVData aovData, float3 positionWS, inout PathPayload payload)
 {
     // Check if we have anything to write to the payload
-    if (!NeedAOVData(payload))
+    if (payload.segmentID || !any(payload.aovMotionVector))
         return;
 
     // Compute motion vector (from pixel coordinates and world position passed as inputs)

@@ -1,4 +1,4 @@
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma multi_compile_local _ USE_SECOND_CLOUD_LAYER
 
@@ -8,6 +8,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Sky/SkyUtils.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Sky/PhysicallyBasedSky/PhysicallyBasedSkyCommon.hlsl"
 
 #ifndef USE_SECOND_CLOUD_LAYER
     #define NUM_LAYERS  1
@@ -21,7 +23,8 @@
 #define FORWARD_ECCENTRICITY    0.7
 #define BACKWARD_ECCENTRICITY   0.3
 #define MULTI_SCATTERING        0.75
-#define _HighestAltitude        (_LowestAltitude + 800)
+#define EARTH_RADIUS            6378100.0
+#define _Thickness 800
 
 TEXTURE2D(_CloudMapA);
 SAMPLER(sampler_CloudMapA);
@@ -40,14 +43,11 @@ float _Resolution;
 
 #define _SunDirection       _Params.xyz
 #define _UpperHemisphere    (_Params.w > 0)
-#define _PlanetaryRadius    abs(_Params.w)
 #define _Opacities          _Params1[data.index]
 #define _Rotation(index)    _Params2[index].x
 #define _LightingSteps      _Params2[data.index].y
 #define _SigmaT             _Params2[data.index].z
-#define _LowestAltitude     (_Params2[data.index].w + _PlanetaryRadius)
-
-#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Sky/CloudUtils.hlsl"
+#define _Altitude           _Params2[data.index].w
 
 struct LayerSamplingData
 {
@@ -61,11 +61,18 @@ struct LayerSamplingData
 
 void GetCloudVolumeIntersection(LayerSamplingData data, float3 dir, out float rangeStart, out float range)
 {
-    float tEntry, tExit;
-    IntersectCloudVolume(float3(0, _PlanetaryRadius, 0), dir, _LowestAltitude, _HighestAltitude, tEntry, tExit);
+    float rangeEnd;
+    rangeStart = -IntersectSphere(_Altitude + EARTH_RADIUS, -dir.y, EARTH_RADIUS).x;
+    rangeEnd = -IntersectSphere(_Altitude + _Thickness + EARTH_RADIUS, -dir.y, EARTH_RADIUS).x;
+    range = rangeEnd - rangeStart;
+}
 
-    rangeStart = tEntry;
-    range = tExit - tEntry;
+float GetCloudVolumeIntersection_Light(LayerSamplingData data, float3 originWS, float3 dir)
+{
+    float3 startPS = originWS + float3(0, EARTH_RADIUS, 0);
+    float lenStartPS = length(startPS), rcpLenStartPS = rcp(lenStartPS);
+    float cosChi = dot(-dir, startPS * rcpLenStartPS);
+    return -IntersectSphere(_Altitude + _Thickness + EARTH_RADIUS, cosChi, lenStartPS, rcpLenStartPS).x;
 }
 
 float3 InverseLatLong(float2 uv, float upperHemisphereOnly)
@@ -109,9 +116,8 @@ float EvaluateSunLuminance(LayerSamplingData data, float3 positionWS, float phas
 {
     const int _NumLightSteps = (int)_LightingSteps;
 
-    bool hit;
-    float luminance = 0.0, extinction = 0.0, totalLightDistance;
-    ExitCloudVolume(positionWS + float3(0, _PlanetaryRadius, 0), data.sunDirection, _HighestAltitude, totalLightDistance);
+    float luminance = 0.0, extinction = 0.0;
+    float totalLightDistance = GetCloudVolumeIntersection_Light(data, positionWS, data.sunDirection);
     totalLightDistance = clamp(totalLightDistance, 0, 500);
 
     // Compute the size of the current step

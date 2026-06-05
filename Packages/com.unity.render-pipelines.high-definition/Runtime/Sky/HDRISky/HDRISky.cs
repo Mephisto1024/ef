@@ -6,10 +6,9 @@ namespace UnityEngine.Rendering.HighDefinition
     /// HDRI Sky Volume Component.
     /// This component setups HDRI sky for rendering.
     /// </summary>
-    [VolumeComponentMenu("Sky/HDRI Sky")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
+    [VolumeComponentMenuForRenderPipeline("Sky/HDRI Sky", typeof(HDRenderPipeline))]
     [SkyUniqueID((int)SkyType.HDRI)]
-    [HDRPHelpURL("create-an-hdri-sky")]
+    [HDRPHelpURLAttribute("Override-HDRI-Sky")]
     public partial class HDRISky : SkySettings
     {
         /// <summary>
@@ -28,6 +27,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>Cubemap used to render the HDRI sky.</summary>
         [Tooltip("Specify the cubemap HDRP uses to render the sky.")]
         public CubemapParameter hdriSky = new CubemapParameter(null);
+
         /// <summary>Distortion mode.</summary>
         [Tooltip("Distortion mode to simulate sky movement.\nIn Scene View, requires Always Refresh to be enabled.")]
         public VolumeParameter<DistortionMode> distortionMode = new VolumeParameter<DistortionMode>();
@@ -41,11 +41,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public WindOrientationParameter scrollOrientation = new WindOrientationParameter();
         /// <summary>Speed of the distortion. This value can be relative to the Global Wind Speed defined in the Visual Environment.</summary>
         public WindSpeedParameter scrollSpeed = new WindSpeedParameter();
-        /// <summary>Sets the initial rotation of the sun to allow us to rotate the sun with the sky if the sun is locked</summary>
-        public FloatParameter sunInitialRotation = new FloatParameter(float.NegativeInfinity);
-        /// <summary> Locks the sun to the backplate rotation</summary>
-        [Tooltip("Enable to have the sun locked to the rotation")]
-        public BoolParameter lockSun = new BoolParameter(false);
+
         /// <summary>Enable Backplate to have it visible.</summary>
         [AdditionalProperty]
         [Tooltip("Enable or disable the backplate.")]

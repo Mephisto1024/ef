@@ -53,8 +53,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 return true;
 
             // Variant of light layer only exist in GBuffer pass, so we test it here
-            bool outputLayers = hdrpAsset.currentPlatformRenderPipelineSettings.supportLightLayers || hdrpAsset.currentPlatformRenderPipelineSettings.renderingLayerMaskBuffer;
-            if (inputData.shaderKeywordSet.IsEnabled(m_RenderingLayers) && isGBufferPass && !outputLayers)
+            if (inputData.shaderKeywordSet.IsEnabled(m_LightLayers) && isGBufferPass && !hdrpAsset.currentPlatformRenderPipelineSettings.supportLightLayers)
                 return true;
 
             // This test include all Lit variant from Shader Graph (Because we check "DepthOnly" pass)

@@ -85,8 +85,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.Tonemapping);
-
             bool hdrInPlayerSettings = UnityEditor.PlayerSettings.allowHDRDisplaySupport;
 
             PropertyField(m_Mode);

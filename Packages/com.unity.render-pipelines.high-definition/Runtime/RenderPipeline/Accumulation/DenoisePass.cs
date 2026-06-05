@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 // Enable the denoising code path only on windows 64
 #if UNITY_64 && ENABLE_UNITY_DENOISING_PLUGIN && (UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN)
@@ -17,22 +17,16 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             public ComputeShader blitAndExposeCS;
             public int blitAndExposeKernel;
-            public int blitAddAndExposeKernel;
-            public int accumAndExposeKernel;
             public TextureHandle color;
-            public TextureHandle volumetricFogHistory;
             public TextureHandle normalAOV;
             public TextureHandle albedoAOV;
             public TextureHandle motionVectorAOV;
             public TextureHandle outputTexture;
-            public TextureHandle denoisedHistory;
-            public TextureHandle denoisedVolumetricFogHistory;
+            public TextureHandle denoiseHistory;
             public SubFrameManager subFrameManager;
-            public ScriptableRenderContext renderContext;
 
             public int camID;
             public bool useAOV;
-            public bool denoiseVolumetricFog;
             public bool temporal;
             public bool async;
 
@@ -41,7 +35,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public int slices;
         }
 
-        void RenderDenoisePass(RenderGraph renderGraph, ScriptableRenderContext renderContext, HDCamera hdCamera, TextureHandle outputTexture)
+        void RenderDenoisePass(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle outputTexture)
         {
 #if UNITY_64 && ENABLE_UNITY_DENOISING_PLUGIN && (UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN)
             // Early exit if there is no denoising
@@ -50,21 +44,15 @@ namespace UnityEngine.Rendering.HighDefinition
                 return;
             }
 
-            using (var builder = renderGraph.AddUnsafePass<RenderDenoisePassData>("Denoise Pass", out var passData))
+            using (var builder = renderGraph.AddRenderPass<RenderDenoisePassData>("Denoise Pass", out var passData))
             {
-                passData.blitAndExposeCS = runtimeShaders.blitAndExposeCS;
+                passData.blitAndExposeCS = m_Asset.renderPipelineResources.shaders.blitAndExposeCS;
                 passData.blitAndExposeKernel = passData.blitAndExposeCS.FindKernel("KMain");
                 passData.subFrameManager = m_SubFrameManager;
                 // Note: for now we enable AOVs when temporal is enabled, because this seems to work better with Optix.
                 passData.useAOV = m_PathTracingSettings.useAOVs.value || m_PathTracingSettings.temporal.value;
                 passData.temporal = m_PathTracingSettings.temporal.value && hdCamera.camera.cameraType == CameraType.Game && m_SubFrameManager.isRecording;
                 passData.async = m_PathTracingSettings.asyncDenoising.value && hdCamera.camera.cameraType == CameraType.SceneView;
-                passData.denoiseVolumetricFog = m_PathTracingSettings.separateVolumetrics.value;
-                if (passData.denoiseVolumetricFog)
-                {
-                    passData.blitAddAndExposeKernel = passData.blitAndExposeCS.FindKernel("KAddMain");
-                    passData.accumAndExposeKernel = passData.blitAndExposeCS.FindKernel("KAccumMain");
-                }
 
                 // copy camera params
                 passData.camID = hdCamera.camera.GetInstanceID();
@@ -72,168 +60,95 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.height = hdCamera.actualHeight;
                 passData.slices = hdCamera.viewCount;
 
-                passData.renderContext = renderContext;
-
                 // Grab the history buffer
-                TextureHandle ptAccumulation = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingOutput));
-                TextureHandle denoisedHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingDenoised)
-                    ?? hdCamera.AllocHistoryFrameRT((int)HDCameraFrameHistoryType.PathTracingDenoised, PathTracingHistoryBufferAllocatorFunction, 1));
+                TextureHandle ptAccumulation = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracing));
+                TextureHandle denoiseHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.DenoiseHistory)
+                    ?? hdCamera.AllocHistoryFrameRT((int)HDCameraFrameHistoryType.DenoiseHistory, PathTracingHistoryBufferAllocatorFunction, 1));
 
-                passData.color = ptAccumulation;
-                builder.UseTexture(passData.color, AccessFlags.ReadWrite);
-                passData.outputTexture = outputTexture;
-                builder.UseTexture(passData.outputTexture, AccessFlags.Write);
-                passData.denoisedHistory = denoisedHistory;
-                builder.UseTexture(passData.denoisedHistory, AccessFlags.Read);
+                passData.color = builder.ReadWriteTexture(ptAccumulation);
+                passData.outputTexture = builder.WriteTexture(outputTexture);
+                passData.denoiseHistory = builder.ReadTexture(denoiseHistory);
 
                 if (passData.useAOV)
                 {
-                    TextureHandle albedoHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingAlbedo));
-                    TextureHandle normalHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingNormal));
+                    TextureHandle albedoHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.AlbedoAOV));
 
-                    passData.albedoAOV = albedoHistory;
-                    builder.UseTexture(passData.albedoAOV, AccessFlags.Read);
-                    passData.normalAOV = normalHistory;
-                    builder.UseTexture(passData.normalAOV, AccessFlags.Read);
+                    TextureHandle normalHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.NormalAOV));
+
+                    passData.albedoAOV = builder.ReadTexture(albedoHistory);
+                    passData.normalAOV = builder.ReadTexture(normalHistory);
                 }
 
                 if (passData.temporal)
                 {
-                    TextureHandle motionVectorHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingMotionVector));
-                    passData.motionVectorAOV = motionVectorHistory;
-                    builder.UseTexture(passData.motionVectorAOV, AccessFlags.Read);
-                }
-
-                if (passData.denoiseVolumetricFog)
-                {
-                    TextureHandle volumetricFogHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingVolumetricFog));
-                    TextureHandle denoisedVolumetricFogHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.PathTracingVolumetricFogDenoised)
-                                                                             ?? hdCamera.AllocHistoryFrameRT((int)HDCameraFrameHistoryType.PathTracingVolumetricFogDenoised, PathTracingHistoryBufferAllocatorFunction, 1));
-                    passData.volumetricFogHistory = volumetricFogHistory;
-                    builder.UseTexture(passData.volumetricFogHistory, AccessFlags.Read);
-                    passData.denoisedVolumetricFogHistory = denoisedVolumetricFogHistory;
-                    builder.UseTexture(passData.denoisedVolumetricFogHistory, AccessFlags.Read);
+                    TextureHandle motionVectorHistory = renderGraph.ImportTexture(hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.MotionVectorAOV));
+                    passData.motionVectorAOV = builder.ReadTexture(motionVectorHistory);
                 }
 
                 builder.SetRenderFunc(
-                (RenderDenoisePassData data, UnsafeGraphContext ctx) =>
+                (RenderDenoisePassData data, RenderGraphContext ctx) =>
                 {
-                    var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                     CameraData camData = data.subFrameManager.GetCameraData(data.camID);
-                    bool wasDenoisedResultRendered = false;
 
                     // If we don't have any pending async denoise and we don't do temporal denoising, dispose any existing denoiser state
-                    if (camData.colorDenoiserData.denoiser.type != DenoiserType.None && m_PathTracingSettings.temporal.value != true && camData.colorDenoiserData.activeRequest == false)
+                    if (camData.denoiser.type != DenoiserType.None && m_PathTracingSettings.temporal.value != true && camData.activeDenoiseRequest == false)
                     {
-                        camData.colorDenoiserData.Dispose();
-                        m_SubFrameManager.SetCameraData(data.camID, camData);
-                    }
-                    if (camData.volumetricFogDenoiserData.denoiser.type != DenoiserType.None && data.denoiseVolumetricFog != true && camData.volumetricFogDenoiserData.activeRequest == false)
-                    {
-                        camData.volumetricFogDenoiserData.Dispose();
+                        camData.denoiser.DisposeDenoiser();
                         m_SubFrameManager.SetCameraData(data.camID, camData);
                     }
 
-                    camData.colorDenoiserData.denoiser.Init((DenoiserType)m_PathTracingSettings.denoising.value, data.width, data.height);
-                    if (data.denoiseVolumetricFog)
-                    {
-                        camData.volumetricFogDenoiserData.denoiser.Init((DenoiserType)m_PathTracingSettings.denoising.value, data.width, data.height);
-                    }
+                    camData.denoiser.Init((DenoiserType)m_PathTracingSettings.denoising.value, data.width, data.height);
 
-                    if (camData.currentIteration >= (data.subFrameManager.subFrameCount) && camData.colorDenoiserData.denoiser.type != DenoiserType.None)
+                    if (camData.currentIteration >= (data.subFrameManager.subFrameCount) && camData.denoiser.type != DenoiserType.None)
                     {
-                        // Are we ready to launch a denoise request for the color result?
-                        if (!camData.colorDenoiserData.validHistory)
+                        if (!camData.validDenoiseHistory)
                         {
-                            if (!camData.colorDenoiserData.activeRequest)
+                            if (!camData.activeDenoiseRequest)
                             {
-                                camData.colorDenoiserData.denoiser.DenoiseRequest(natCmd, "color", data.color);
+                                camData.denoiser.DenoiseRequest(ctx.cmd, "color", data.color);
 
                                 if (data.useAOV)
                                 {
-                                    camData.colorDenoiserData.denoiser.DenoiseRequest(natCmd, "albedo", data.albedoAOV);
-                                    camData.colorDenoiserData.denoiser.DenoiseRequest(natCmd, "normal", data.normalAOV);
+                                    camData.denoiser.DenoiseRequest(ctx.cmd, "albedo", data.albedoAOV);
+                                    camData.denoiser.DenoiseRequest(ctx.cmd, "normal", data.normalAOV);
                                 }
 
                                 if (data.temporal)
                                 {
-                                    camData.colorDenoiserData.denoiser.DenoiseRequest(natCmd, "flow", data.motionVectorAOV);
+                                    camData.denoiser.DenoiseRequest(ctx.cmd, "flow", data.motionVectorAOV);
                                 }
-
-                                camData.colorDenoiserData.InitRequest();
+                                camData.activeDenoiseRequest = true;
+                                camData.discardDenoiseRequest = false;
                             }
 
                             if (!data.async)
                             {
-                                camData.colorDenoiserData.denoiser.WaitForCompletion(data.renderContext, natCmd);
+                                camData.denoiser.WaitForCompletion(ctx.renderContext, ctx.cmd);
 
-                                Denoiser.State ret = camData.colorDenoiserData.denoiser.GetResults(natCmd, data.denoisedHistory);
-                                camData.colorDenoiserData.EndRequest(ret == Denoiser.State.Success);
+                                Denoiser.State ret = camData.denoiser.GetResults(ctx.cmd, data.denoiseHistory);
+                                camData.validDenoiseHistory = (ret == Denoiser.State.Success);
+                                camData.activeDenoiseRequest = false;
                             }
                             else
                             {
-                                if (camData.colorDenoiserData.activeRequest && camData.colorDenoiserData.denoiser.QueryCompletion() != Denoiser.State.Executing)
+                                if (camData.activeDenoiseRequest && camData.denoiser.QueryCompletion() != Denoiser.State.Executing)
                                 {
-                                    Denoiser.State ret = camData.colorDenoiserData.denoiser.GetResults(natCmd, data.denoisedHistory);
-                                    camData.colorDenoiserData.EndRequest(ret == Denoiser.State.Success && camData.colorDenoiserData.discardRequest == false);
+                                    Denoiser.State ret = camData.denoiser.GetResults(ctx.cmd, data.denoiseHistory);
+                                    camData.validDenoiseHistory = (ret == Denoiser.State.Success) && (camData.discardDenoiseRequest == false);
+                                    camData.activeDenoiseRequest = false;
                                 }
                             }
 
                             m_SubFrameManager.SetCameraData(data.camID, camData);
                         }
 
-                        // Are we ready to launch a denoise request for the volumetrics result?
-                        if (!camData.volumetricFogDenoiserData.validHistory && data.denoiseVolumetricFog)
+                        if (camData.validDenoiseHistory)
                         {
-                            if (!camData.volumetricFogDenoiserData.activeRequest)
-                            {
-                                camData.volumetricFogDenoiserData.denoiser.DenoiseRequest(natCmd, "color", data.volumetricFogHistory);
-                                camData.volumetricFogDenoiserData.InitRequest();
-                            }
-
-                            if (!data.async)
-                            {
-                                camData.volumetricFogDenoiserData.denoiser.WaitForCompletion(data.renderContext, natCmd);
-
-
-                                Denoiser.State ret = camData.volumetricFogDenoiserData.denoiser.GetResults(natCmd, data.denoisedVolumetricFogHistory);
-                                camData.volumetricFogDenoiserData.EndRequest(ret == Denoiser.State.Success);
-                            }
-                            else
-                            {
-                                if (camData.volumetricFogDenoiserData.activeRequest && camData.volumetricFogDenoiserData.denoiser.QueryCompletion() != Denoiser.State.Executing)
-                                {
-                                    Denoiser.State ret = camData.volumetricFogDenoiserData.denoiser.GetResults(natCmd, data.denoisedVolumetricFogHistory);
-                                    camData.volumetricFogDenoiserData.EndRequest(ret == Denoiser.State.Success && camData.volumetricFogDenoiserData.discardRequest == false);
-                                }
-                            }
-
-                            m_SubFrameManager.SetCameraData(data.camID, camData);
+                            // Blit the denoised image from the history buffer and apply exposure.
+                            ctx.cmd.SetComputeTextureParam(data.blitAndExposeCS, data.blitAndExposeKernel, HDShaderIDs._InputTexture, data.denoiseHistory);
+                            ctx.cmd.SetComputeTextureParam(data.blitAndExposeCS, data.blitAndExposeKernel, HDShaderIDs._OutputTexture, data.outputTexture);
+                            ctx.cmd.DispatchCompute(data.blitAndExposeCS, data.blitAndExposeKernel, (data.width + 7) / 8, (data.height + 7) / 8, data.slices);
                         }
-
-                        if (camData.colorDenoiserData.validHistory && (camData.volumetricFogDenoiserData.validHistory || !data.denoiseVolumetricFog))
-                        {
-                            int kernel = data.blitAndExposeKernel;
-
-                            // Blit the denoised image from the history buffer and apply exposure. If we have denoised volumetrics, add it back as well.
-                            if (camData.volumetricFogDenoiserData.validHistory && data.denoiseVolumetricFog)
-                            {
-                                kernel = data.blitAddAndExposeKernel;
-                                natCmd.SetComputeTextureParam(data.blitAndExposeCS, kernel, HDShaderIDs._InputTexture2, data.denoisedVolumetricFogHistory);
-                            }
-                            natCmd.SetComputeTextureParam(data.blitAndExposeCS, kernel, HDShaderIDs._InputTexture, data.denoisedHistory);
-                            natCmd.SetComputeTextureParam(data.blitAndExposeCS, kernel, HDShaderIDs._OutputTexture, data.outputTexture);
-                            natCmd.DispatchCompute(data.blitAndExposeCS, kernel, (data.width + 7) / 8, (data.height + 7) / 8, data.slices);
-                            wasDenoisedResultRendered = true;
-                        }
-                    }
-
-                    if (data.denoiseVolumetricFog && !wasDenoisedResultRendered)
-                    {
-                        // Just add the volumetrics output on top of the color output to show a full picture to the user while the final denoising is ready to display
-                        natCmd.SetComputeTextureParam(data.blitAndExposeCS, data.accumAndExposeKernel, HDShaderIDs._InputTexture, data.volumetricFogHistory);
-                        natCmd.SetComputeTextureParam(data.blitAndExposeCS, data.accumAndExposeKernel, HDShaderIDs._OutputTexture, data.outputTexture);
-                        natCmd.DispatchCompute(data.blitAndExposeCS, data.accumAndExposeKernel, (data.width + 7) / 8, (data.height + 7) / 8, data.slices);
                     }
                 });
             }

@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Rendering.HighDefinition;
 using UnityEditor.ShaderGraph;
+
 using static UnityEngine.Rendering.HighDefinition.HDMaterial;
 using static UnityEngine.Rendering.HighDefinition.HDMaterialProperties;
 using static UnityEditor.Rendering.HighDefinition.HDFields;
@@ -40,11 +41,6 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         public override void Setup(ref TargetSetupContext context)
         {
             context.AddAssetDependency(kSourceCodeGuid, AssetCollection.Flags.SourceDependency);
-            if (TargetsVFX())
-            {
-                var inspector = typeof(VFXShaderGraphGUILit).FullName;
-                context.AddCustomEditorForRenderPipeline(inspector, typeof(HDRenderPipelineAsset));
-            }
             base.Setup(ref context);
         }
 
@@ -102,44 +98,34 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         {
             base.CollectPassKeywords(ref pass);
 
-            if (!pass.IsShadow())
-                pass.keywords.Add(CoreKeywordDescriptors.DisableDecals);
+            pass.keywords.Add(CoreKeywordDescriptors.DisableDecals);
+            pass.keywords.Add(CoreKeywordDescriptors.DisableSSR);
+            pass.keywords.Add(CoreKeywordDescriptors.DisableSSRTransparent);
+            // pass.keywords.Add(CoreKeywordDescriptors.EnableGeometricSpecularAA);
 
-            if (pass.lightMode == HDShaderPassNames.s_MotionVectorsStr)
-                pass.keywords.Add(CoreKeywordDescriptors.WriteDecalBufferMotionVector);
-            else if (pass.IsDepthOrMV())
-                pass.keywords.Add(CoreKeywordDescriptors.WriteDecalBufferDepthOnly);
+            if (pass.IsDepthOrMV())
+            {
+                pass.keywords.Add(CoreKeywordDescriptors.WriteDecalBuffer);
+            }
 
             if (pass.IsLightingOrMaterial())
             {
-                pass.keywords.Add(CoreKeywordDescriptors.DisableSSR);
-                if (pass.lightMode != HDShaderPassNames.s_GBufferStr)
-                    pass.keywords.Add(CoreKeywordDescriptors.DisableSSRTransparent);
                 pass.keywords.Add(CoreKeywordDescriptors.Lightmap);
                 pass.keywords.Add(CoreKeywordDescriptors.DirectionalLightmapCombined);
                 pass.keywords.Add(CoreKeywordDescriptors.ProbeVolumes);
                 pass.keywords.Add(CoreKeywordDescriptors.DynamicLightmap);
-                pass.keywords.Add(CoreKeywordDescriptors.LightmapBicubicSampling);
 
                 if (!pass.IsRelatedToRaytracing())
                 {
                     pass.keywords.Add(CoreKeywordDescriptors.ShadowsShadowmask);
                     pass.keywords.Add(CoreKeywordDescriptors.Decals);
                     pass.keywords.Add(CoreKeywordDescriptors.DecalSurfaceGradient);
-                    pass.keywords.Add(CoreKeywordDescriptors.UseLegacyLightmaps);
                 }
-            }
-
-            if(pass.IsPathTracing() || pass.IsRayTracing())
-            {
-                pass.keywords.Add(CoreKeywordDescriptors.DecalsRayTracing);
-                pass.keywords.Add(CoreKeywordDescriptors.DecalSurfaceGradientRayTracing);
             }
 
             if (pass.IsForward())
             {
-                pass.keywords.Add(CoreKeywordDescriptors.PunctualShadow);
-                pass.keywords.Add(CoreKeywordDescriptors.DirectionalShadow);
+                pass.keywords.Add(CoreKeywordDescriptors.Shadow);
                 pass.keywords.Add(CoreKeywordDescriptors.AreaShadow);
                 pass.keywords.Add(CoreKeywordDescriptors.ScreenSpaceShadow);
 

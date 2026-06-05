@@ -1,5 +1,3 @@
-using Unity.Mathematics;
-
 namespace UnityEngine.Rendering.HighDefinition
 {
     internal class WaterConsts
@@ -96,307 +94,197 @@ namespace UnityEngine.Rendering.HighDefinition
             0f, 0f, 3.466048E-16f, 0.0002757984f, 0.07301058f, 0.5810083f, 1.590872f, 2.889345f, 4.348913f, 5.903265f, 7.540101f, 9.294528f, 11.19862f, 13.30132f, 15.57237f, 17.95442f, 20.38092f, 22.79476f, 25.19281f, 27.56402f, 29.95196f, 32.41065f, 35.00351f, 37.80022f, 40.75069f, 43.83775f, 47.04081f, 50.30617f, 53.56975f, 56.76492f, 59.88307f, 62.8869f,
             0f, 0f, 3.565781E-17f, 0.0001705384f, 0.06073458f, 0.5260445f, 1.512204f, 2.818909f, 4.289411f, 5.855178f, 7.519925f, 9.289353f, 11.18376f, 13.24182f, 15.48364f, 17.85008f, 20.33566f, 22.85831f, 25.345f, 27.78366f, 30.21792f, 32.66293f, 35.18232f, 37.86638f, 40.71719f, 43.73797f, 46.93105f, 50.21576f, 53.50548f, 56.77405f, 59.9977f, 63.11657f,
             0f, 0f, 3.398541E-18f, 0.0001041713f, 0.05119007f, 0.4937522f, 1.472545f, 2.773492f, 4.258455f, 5.857123f, 7.523153f, 9.283202f, 11.19288f, 13.24743f, 15.47529f, 17.87516f, 20.36746f, 22.87952f, 25.36941f, 27.85065f, 30.33868f, 32.83906f, 35.45756f, 38.22281f, 41.11535f, 44.21394f, 47.44939f, 50.79641f, 54.21289f, 57.59188f, 60.92396f, 64.16597f};
-
-        // Sector definitions
-        internal const int k_NumSectors = 8;
-        internal const float k_SectorSize = ((2.0f * math.PI) / k_NumSectors);
-        internal const int k_SectorDataSamplingOffset = 0;
-        internal const int k_SectorDataOtherOffset = k_NumSectors;
-        static readonly float k_ISq2 = 0.70710678118f;
-
-        // Quadrant 8 Directions
-        // (1, 0, 0, 1)
-        // (k_ISq2, k_ISq2, -k_ISq2, k_ISq2)
-        // (0, 1, -1, 0)
-        // (-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2)
-        // (-1, 0, 0, -1)
-        // (-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2)
-        // (0, -1, 1, 0)
-        // (k_ISq2, -k_ISq2, k_ISq2, k_ISq2)
-
-        // Quadrant 8 Basis
-        // (1, 0, 0, 1), (k_ISq2, k_ISq2, -k_ISq2, k_ISq2),
-        // (0, 1, -1, 0), (k_ISq2, k_ISq2, -k_ISq2, k_ISq2),
-
-        // (0, 1, -1, 0), (-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2),
-        // (-1, 0, 0, -1), (-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2),
-
-        // (-1, 0, 0, -1), (-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2),
-        // (0, -1, 1, 0), (-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2),
-
-        // (0, -1, 1, 0), (k_ISq2, -k_ISq2, k_ISq2, k_ISq2),
-        // (1, 0, 0, 1), (k_ISq2, -k_ISq2, k_ISq2, k_ISq2),
-
-        internal static readonly float4[] k_SectorSwizzle = new float4[] {
-            // Eight Quadrants Sampling
-            new float4(1, 0, 0, 1),
-            new float4(k_ISq2, k_ISq2, -k_ISq2, k_ISq2),
-
-            new float4(0, 1, -1, 0),
-            new float4(k_ISq2, k_ISq2, -k_ISq2, k_ISq2),
-
-            new float4(0, 1, -1, 0),
-            new float4(-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2),
-
-            new float4(-1, 0, 0, -1),
-            new float4(-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2),
-
-            new float4(-1, 0, 0, -1),
-            new float4(-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2),
-
-            new float4(0, -1, 1, 0),
-            new float4(-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2),
-
-            new float4(0, -1, 1, 0),
-            new float4(k_ISq2, -k_ISq2, k_ISq2, k_ISq2),
-
-            new float4(1, 0, 0, 1),
-            new float4(k_ISq2, -k_ISq2, k_ISq2, k_ISq2),
-
-            // Eight Quadrants Sampling
-            new float4(1, 0, 0, 1),
-            new float4(k_ISq2, -k_ISq2, k_ISq2, k_ISq2), // Mirrored: k_ISq2, k_ISq2, -k_ISq2, k_ISq2,
-
-            new float4(0, -1, 1, 0), // Mirrored: 0, 1, -1, 0,
-            new float4(k_ISq2, -k_ISq2, k_ISq2, k_ISq2), // Mirrored: k_ISq2, k_ISq2, -k_ISq2, k_ISq2,
-
-            new float4(0, -1, 1, 0), // Mirrored: 0, 1, -1, 0,
-            new float4(-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2), // Mirrored: -k_ISq2, k_ISq2, -k_ISq2, -k_ISq2
-
-            new float4(-1, 0, 0, -1),
-            new float4(-k_ISq2, -k_ISq2, k_ISq2, -k_ISq2), // Mirrored: -k_ISq2, k_ISq2, -k_ISq2, -k_ISq2
-
-            new float4(-1, 0, 0, -1),
-            new float4(-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2), // Mirrored: -k_ISq2, -k_ISq2, k_ISq2, -k_ISq2
-
-            new float4(0, 1, -1, 0), // Mirrored: 0, -1, 1, 0,
-            new float4(-k_ISq2, k_ISq2, -k_ISq2, -k_ISq2), // Mirrored: -k_ISq2, -k_ISq2, k_ISq2, -k_ISq2
-
-            new float4(0, 1, -1, 0), // Mirrored: 0, -1, 1, 0,
-            new float4(k_ISq2, k_ISq2, -k_ISq2, k_ISq2), // Mirrored: k_ISq2, -k_ISq2, k_ISq2, k_ISq2
-
-            new float4(1, 0, 0, 1),
-            new float4(k_ISq2, k_ISq2, -k_ISq2, k_ISq2) // Mirrored: k_ISq2, -k_ISq2, k_ISq2, k_ISq2
-        };
-
-        internal static readonly float4[] k_SectorSwizzlePacked = new float4[] {
-            // Eight Quadrants Sampling
-            new float4(1, 0, k_ISq2, k_ISq2),
-            new float4(0, 1, k_ISq2, k_ISq2),
-            new float4(0, 1, -k_ISq2, k_ISq2),
-            new float4(-1, 0, -k_ISq2, k_ISq2),
-            new float4(-1, 0, -k_ISq2, -k_ISq2),
-            new float4(0, -1, -k_ISq2, -k_ISq2),
-            new float4(0, -1, k_ISq2, -k_ISq2),
-            new float4(1, 0, k_ISq2, -k_ISq2),
-
-            // Eight Quadrants Sampling
-            new float4(1, 0, k_ISq2, -k_ISq2), // Mirrored: k_ISq2, k_ISq2, -k_ISq2, k_ISq2,
-            new float4(0, -1, k_ISq2, -k_ISq2), // Mirrored: k_ISq2, k_ISq2, -k_ISq2, k_ISq2,
-            new float4(0, -1, -k_ISq2, -k_ISq2), // Mirrored: -k_ISq2, k_ISq2, -k_ISq2, -k_ISq2
-            new float4(-1, 0, -k_ISq2, -k_ISq2), // Mirrored: -k_ISq2, k_ISq2, -k_ISq2, -k_ISq2
-            new float4(-1, 0, -k_ISq2, k_ISq2), // Mirrored: -k_ISq2, -k_ISq2, k_ISq2, -k_ISq2
-            new float4(0, 1, -k_ISq2, k_ISq2), // Mirrored: -k_ISq2, -k_ISq2, k_ISq2, -k_ISq2
-            new float4(0, 1, k_ISq2, k_ISq2), // Mirrored: k_ISq2, -k_ISq2, k_ISq2, k_ISq2
-            new float4(1, 0, k_ISq2, k_ISq2) // Mirrored: k_ISq2, -k_ISq2, k_ISq2, k_ISq2
-        };
-
-        // Water tile classification
-        public const int k_NumWaterVariants = 5;
-    }
-
-    /// <summary>
-    /// Controls how a water surface is rendered.
-    /// </summary>
-    [GenerateHLSL(PackingRules.Exact)]
-    public enum WaterDebugMode
-    {
-        /// <summary>
-        /// The water surface is rendered as a lit water body.
-        /// </summary>
-        None = 0,
-
-        /// <summary>
-        /// The water surface is rendered in debug mode, displaying the water mask.
-        /// </summary>
-        WaterMask = 1,
-
-        /// <summary>
-        /// The water surface is rendered in debug mode, displaying the foam mask.
-        /// </summary>
-        SimulationFoamMask = 2,
-
-        /// <summary>
-        /// The water surface is rendered in debug mode, displaying the current texture.
-        /// </summary>
-        Current = 3,
-
-        /// <summary>
-        /// The water surface is rendered in debug mode, displaying the deformation area.
-        /// </summary>
-        Deformation = 4,
-
-        /// <summary>
-        /// The water surface is rendered in debug mode, displaying the foam area.
-        /// </summary>
-        Foam = 5
-    }
-
-    /// <summary>
-    /// Controls which channel of the water mask is displayed.
-    /// </summary>
-    [GenerateHLSL(PackingRules.Exact)]
-    public enum WaterMaskDebugMode
-    {
-        /// <summary>
-        /// The red channel of the water mask is displayed in gray scale.
-        /// </summary>
-        RedChannel = 0,
-
-        /// <summary>
-        /// The green channel of the water mask is displayed in gray scale.
-        /// </summary>
-        GreenChannel = 1,
-
-        /// <summary>
-        /// The blue channel of the water mask is displayed in gray scale.
-        /// </summary>
-        BlueChannel = 2,
-    }
-
-    /// <summary>
-    /// Controls which part of the simulation is used for the current debug mode.
-    /// </summary>
-    [GenerateHLSL(PackingRules.Exact)]
-    public enum WaterCurrentDebugMode
-    {
-        /// <summary>
-        /// The debug mode will display the current of the large water simulation.
-        /// </summary>
-        [InspectorName("Swell or Agitation")]
-        Large = 0,
-
-        /// <summary>
-        /// The debug mode will display the current of the ripples simulation.
-        /// </summary>
-        Ripples = 1,
-    }
-
-    /// <summary>
-    /// Controls which foam is displayed in the debug mode.
-    /// </summary>
-    [GenerateHLSL(PackingRules.Exact)]
-    public enum WaterFoamDebugMode
-    {
-        /// <summary>
-        /// The surface foam is displayed in gray scale.
-        /// </summary>
-        SurfaceFoam = 0,
-
-        /// <summary>
-        /// The deep foam is displayed in gray scale.
-        /// </summary>
-        DeepFoam = 1,
-    }
-
-    /// <summary>
-    /// Defines the possible resolution for the water required atlas size.
-    /// </summary>
-    [GenerateHLSL(PackingRules.Exact)]
-    public enum WaterAtlasSize
-    {
-        /// <summary>
-        /// The deformation atlas size will be 64x64
-        /// </summary>
-        AtlasSize64 = 64,
-
-        /// <summary>
-        /// The deformation atlas size will be 128x128
-        /// </summary>
-        AtlasSize128 = 128,
-
-        /// <summary>
-        /// The deformation atlas size will be 256x256
-        /// </summary>
-        AtlasSize256 = 256,
-
-        /// <summary>
-        /// The deformation atlas size will be 512x512
-        /// </summary>
-        AtlasSize512 = 512,
-
-        /// <summary>
-        /// The deformation atlas size will be 1024x1024
-        /// </summary>
-        AtlasSize1024 = 1024,
-
-        /// <summary>
-        /// The deformation atlas size will be 2048x2048
-        /// </summary>
-        AtlasSize2048 = 2048,
     }
 
     // This structure holds all the information that can be requested during the deferred water lighting
     [GenerateHLSL(PackingRules.Exact, false)]
     struct WaterSurfaceProfile
     {
+        public Vector3 waterAmbientProbe;
+        public float tipScatteringHeight;
+
         public float bodyScatteringHeight;
         public float maxRefractionDistance;
-        public uint renderingLayers;
+        public uint lightLayers;
         public int cameraUnderWater;
 
-        // Extinction coefficient
-        public Vector3 extinction;
-        // Extinction coefficient multiplier for underwater
-        public float extinctionMultiplier;
+        // Refraction data Data
+        public Vector3 transparencyColor;
+        public float outScatteringCoefficient;
 
-        // Albedo
-        public Vector3 albedo;
+        // Scattering color
+        public Vector3 scatteringColor;
         // Roughness used for environment lighting
         public float envPerceptualRoughness;
 
-        public Vector3 foamColor;
-        public float padding1;
-
-        public Vector3 underwaterColor;
-        public float padding2;
-
-        // Vertical direction of the water surface (used for SSR, Env Lighting, etc)
-        public Vector3 upDirection;
-        public float roughnessEndValue;
-
+        // Smoothness fade transition values
         public float smoothnessFadeStart;
         public float smoothnessFadeDistance;
-        public int disableIOR;
-        public float tipScatteringHeight;
+        public float roughnessEndValue;
+        public float padding;
     }
 
-    [GenerateHLSL(PackingRules.Exact, false)]
-    struct WaterDecalData
+    [GenerateHLSL(needAccessors = false, generateCBuffer = true)]
+    unsafe struct ShaderVariablesWater
     {
-        public Vector2 positionXZ;
-        public Vector2 forwardXZ;
+        // Resolution at which the simulation is evaluated
+        public uint _BandResolution;
+        // Maximal wave height of the current setup
+        public float _MaxWaveHeight;
+        // Current simulation time
+        public float _SimulationTime;
+        // Maximal wave height (used for tip scattering)
+        public float _ScatteringWaveHeight;
 
-        public float2 regionSize;
-        public float surfaceFoamDimmer;
-        public float deepFoamDimmer;
+        // Individual sizes of the wave bands
+        public Vector4 _PatchSize;
 
-        public float amplitude;
-        public float padding0;
-        public float padding1;
-        public float padding2;
+        // Amplitude per band
+        public Vector4 _PatchAmplitudeMultiplier;
 
-        public Vector4 deformScaleOffset;
-        public Vector4 foamScaleOffset;
-        public Vector4 maskScaleOffset;
-        public Vector4 largeCurrentScaleOffset;
-        public Vector4 ripplesCurrentScaleOffset;
+        // Controls how much the wind affect the current of the waves
+        public Vector4 _PatchDirectionDampener;
+
+        // Wind speed per band
+        public Vector4 _PatchWindSpeed;
+
+        // Horizontal wind direction
+        public Vector4 _PatchWindOrientation;
+
+        // Current speed for each band
+        public Vector4 _PatchCurrentSpeed;
+
+        // Current orientation for each band
+        public Vector4 _PatchCurrentOrientation;
+
+        // Fade start distance
+        public Vector4 _PatchFadeStart;
+        // Fade range
+        public Vector4 _PatchFadeDistance;
+        // Fade value
+        public Vector4 _PatchFadeValue;
+
+        // Smoothness of the simulation foam
+        public float _SimulationFoamSmoothness;
+        // Controls the amount of drag of the simulation foam
+        public float _JacobianDrag;
+        // Amount of surface foam
+        public float _SimulationFoamAmount;
+        // TODO WRITE
+        public float _SSSMaskCoefficient;
+
+        // Amount of choppiness
+        public float _Choppiness;
+        // Delta-time since the last simulation step
+        public float _DeltaTime;
+        // Maximal horizontal displacement
+        public float _MaxWaveDisplacement;
+        // Maximum refraction distance
+        public float _MaxRefractionDistance;
+
+        // Horizontal offsets of the foam texture
+        public Vector2 _FoamOffsets;
+        // Tiling parameter of the foam texture
+        public float _FoamTilling;
+        // Attenuation of the foam due to the wind
+        public float _WindFoamAttenuation;
+
+        // Color applied to the surfaces that are through the refraction
+        public Vector4 _TransparencyColor;
+
+        public Vector4 _ScatteringColorTips;
+
+        public float _DisplacementScattering;
+        public int _WaterInitialFrame;
+        public int _SurfaceIndex;
+        public float _CausticsRegionSize;
+
+        public Vector4 _ScatteringLambertLighting;
+
+        public Vector4 _DeepFoamColor;
+
+        public float _OutScatteringCoefficient;
+        public float _FoamSmoothness;
+        public float _HeightBasedScattering;
+        public float _WaterSmoothness;
+
+        public Vector4 _FoamJacobianLambda;
+
+        // Offsets used to guarantee the coherence between the different simulation resolutions
+        public int _WaterRefSimRes;
+        public float _WaterSpectrumOffset;
+        public int _WaterSampleOffset;
+        public int _WaterBandCount;
+
+        public Vector2 _PaddingW0;
+        public float _AmbientScattering;
+        public int _CausticsBandIndex;
     }
 
-    [GenerateHLSL(PackingRules.Exact, false)]
-    struct WaterSectorData
+    [GenerateHLSL(needAccessors = false, generateCBuffer = true)]
+    unsafe struct ShaderVariablesWaterRendering
     {
-        public float4 dir0;
-        public float4 dir1;
+        // Horizontal size of the grid in the horizontal plane
+        public Vector2 _GridSize;
+        // Rotation of the water geometry
+        public Vector2 _WaterRotation;
+
+        // Offset of the current patch w/r to the origin
+        public Vector4 _PatchOffset;
+
+        // Number of LODs used to render infinite water surfaces
+        public uint _WaterLODCount;
+        // Number of water patches that need to be rendered
+        public uint _NumWaterPatches;
+        // Intensity of the foam
+        public float _FoamIntensity;
+        // Intensity of the water caustics
+        public float _CausticsIntensity;
+
+        // Scale of the current water mask
+        public Vector2 _WaterMaskScale;
+        // Offset of the current water mask
+        public Vector2 _WaterMaskOffset;
+
+        // Scale of the current foam mask
+        public Vector2 _FoamMaskScale;
+        // Offset of the current foam mask
+        public Vector2 _FoamMaskOffset;
+
+        // Blend distance
+        public float _CausticsPlaneBlendDistance;
+        // Type of caustics that are rendered
+        public int _WaterCausticsEnabled;
+        // Which decal layers should affect this surface
+        public uint _WaterDecalLayer;
+        // Is this surface infinite or finite
+        public int _InfiniteSurface;
+
+        // Max tessellation factor
+        public float _WaterMaxTessellationFactor;
+        // Distance at which the fade of the tessellation starts
+        public float _WaterTessellationFadeStart;
+        // Size of the range of the tessellation
+        public float _WaterTessellationFadeRange;
+        // Flag that defines if the camera is in the underwater volume of this surface
+        public int _CameraInUnderwaterRegion;
+    }
+
+    [GenerateHLSL(needAccessors = false, generateCBuffer = true)]
+    unsafe struct ShaderVariablesUnderWater
+    {
+        // Refraction color of the water surface
+        public Vector4 _WaterRefractionColor;
+        // Scattering color of the water surface
+        public Vector4 _WaterScatteringColor;
+
+        // Multiplier of the view distance when under water
+        public float _MaxViewDistanceMultiplier;
+        // Scattering coefficent for the absorption
+        public float _OutScatteringCoeff;
+        // Vertical transition size of the water
+        public float _WaterTransitionSize;
+        // Padding
+        public float _PaddingUW;
     }
 }

@@ -14,12 +14,6 @@ namespace UnityEditor.Rendering.HighDefinition
         SerializedDataParameter m_SkyType;
         SerializedDataParameter m_CloudType;
         SerializedDataParameter m_SkyAmbientMode;
-
-        SerializedDataParameter m_PlanetRadius;
-        SerializedDataParameter m_RenderingSpace;
-        SerializedDataParameter m_CenterMode;
-        SerializedDataParameter m_PlanetCenter;
-
         SerializedDataParameter m_WindOrientation;
         SerializedDataParameter m_WindSpeed;
 
@@ -74,11 +68,6 @@ namespace UnityEditor.Rendering.HighDefinition
             m_CloudType = Unpack(o.Find(x => x.cloudType));
             m_SkyAmbientMode = Unpack(o.Find(x => x.skyAmbientMode));
 
-            m_PlanetRadius = Unpack(o.Find(x => x.planetRadius));
-            m_RenderingSpace = Unpack(o.Find(x => x.renderingSpace));
-            m_CenterMode = Unpack(o.Find(x => x.centerMode));
-            m_PlanetCenter = Unpack(o.Find(x => x.planetCenter));
-
             m_WindOrientation = Unpack(o.Find(x => x.windOrientation));
             m_WindSpeed = Unpack(o.Find(x => x.windSpeed));
         }
@@ -98,7 +87,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
                 foreach (KeyValuePair<int, Type> kvp in skyTypesDict)
                 {
-                    string name = ObjectNames.NicifyVariableName(kvp.Value.Name);
+                    string name = ObjectNames.NicifyVariableName(kvp.Value.Name.ToString());
                     name = name.Replace("Settings", ""); // remove Settings if it was in the class name
                     m_SkyClassNames.Add(new GUIContent(name));
                     m_SkyUniqueIDs.Add(kvp.Key);
@@ -117,7 +106,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
                 foreach (KeyValuePair<int, Type> kvp in typesDict)
                 {
-                    string name = ObjectNames.NicifyVariableName(kvp.Value.Name);
+                    string name = ObjectNames.NicifyVariableName(kvp.Value.Name.ToString());
                     name = name.Replace("Settings", ""); // remove Settings if it was in the class name
                     m_CloudClassNames.Add(new GUIContent(name));
                     m_CloudUniqueIDs.Add(kvp.Key);
@@ -127,16 +116,15 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-            // Sky
             UpdateSkyAndFogIntPopupData();
 
-            using (var scope = new OverridablePropertyScope(m_SkyType, EditorGUIUtility.TrTextContent("Sky Type", "Specifies the type of sky this Volume uses."), this))
+            using (var scope = new OverridablePropertyScope(m_SkyType, EditorGUIUtility.TrTextContent("Sky type", "Specifies the type of sky this Volume uses."), this))
             {
                 if (scope.displayed)
                     EditorGUILayout.IntPopup(m_SkyType.value, m_SkyClassNames.ToArray(), m_SkyUniqueIDs.ToArray(), scope.label);
             }
 
-            using (var scope = new OverridablePropertyScope(m_CloudType, EditorGUIUtility.TrTextContent("Background Clouds", "Specifies the type of background cloud this Volume uses."), this))
+            using (var scope = new OverridablePropertyScope(m_CloudType, EditorGUIUtility.TrTextContent("Background clouds", "Specifies the type of background cloud this Volume uses."), this))
             {
                 if (scope.displayed)
                     EditorGUILayout.IntPopup(m_CloudType.value, m_CloudClassNames.ToArray(), m_CloudUniqueIDs.ToArray(), scope.label);
@@ -151,34 +139,18 @@ namespace UnityEditor.Rendering.HighDefinition
                     EditorGUILayout.HelpBox("No Static Lighting Sky is assigned in the Environment settings.", MessageType.Info);
                 else
                 {
-                    var skyType = staticLightingSky.staticLightingSkyUniqueID == 0 ? "no Sky" : SkyManager.skyTypesDict[staticLightingSky.staticLightingSkyUniqueID].Name;
-                    var cloudType = staticLightingSky.staticLightingCloudsUniqueID == 0 ? "no Clouds" : SkyManager.cloudTypesDict[staticLightingSky.staticLightingCloudsUniqueID].Name;
-                    var staticLightingSkyProfileName = staticLightingSky.profile != null ? staticLightingSky.profile.name : "None";
-                    EditorGUILayout.HelpBox($"Current Static Lighting Sky uses {skyType} and {cloudType} of profile {staticLightingSkyProfileName}.", MessageType.Info);
+                    var skyType = staticLightingSky.staticLightingSkyUniqueID == 0 ? "no Sky" : SkyManager.skyTypesDict[staticLightingSky.staticLightingSkyUniqueID].Name.ToString();
+                    var cloudType = staticLightingSky.staticLightingCloudsUniqueID == 0 ? "no Clouds" : SkyManager.cloudTypesDict[staticLightingSky.staticLightingCloudsUniqueID].Name.ToString();
+                    EditorGUILayout.HelpBox($"Current Static Lighting Sky uses {skyType} and {cloudType} of profile {staticLightingSky.profile?.name ?? "None"}.", MessageType.Info);
                 }
             }
 
-            // Planet
-            PropertyField(m_PlanetRadius, EditorGUIUtility.TrTextContent("Radius", "Sets the radius of the planet in kilometers. This is distance from the center of the planet to the sea level."));
-            PropertyField(m_RenderingSpace);
-
-            if (m_RenderingSpace.value.intValue == (int)RenderingSpace.World && BeginAdditionalPropertiesScope())
-            {
-                PropertyField(m_CenterMode, EditorGUIUtility.TrTextContent("Center", "The center is used when defining where the planets surface is. In automatic mode, the surface is at the world's origin and the center is derived from the planet radius."));
-                if (m_CenterMode.value.intValue == (int)VisualEnvironment.PlanetMode.Manual)
-                {
-                    using (new IndentLevelScope())
-                        PropertyField(m_PlanetCenter, EditorGUIUtility.TrTextContent("Position", "Sets the world-space position of the planet's center in kilometers."));
-                }
-                EndAdditionalPropertiesScope();
-            }
-
-            // Wind
             PropertyField(m_WindOrientation, EditorGUIUtility.TrTextContent("Global Orientation", "Controls the orientation of the wind relative to the X world vector."));
             PropertyField(m_WindSpeed, EditorGUIUtility.TrTextContent("Global Speed", "Controls the global wind speed in kilometers per hour."));
 
             if (m_WindSpeed.overrideState.boolValue && m_WindSpeed.value.floatValue != 0.0f && SceneView.lastActiveSceneView && !SceneView.lastActiveSceneView.sceneViewState.alwaysRefreshEnabled)
                 EditorGUILayout.HelpBox("Wind animations in the scene view are only supported when \"Always Refresh\" is enabled.", MessageType.Info);
+
         }
     }
 
@@ -192,7 +164,6 @@ namespace UnityEditor.Rendering.HighDefinition
         {
             rect = EditorGUILayout.GetControlRect();
             rect.xMax -= popupWidth + 2;
-            EditorGUI.BeginProperty(rect, title, parameter.value);
 
             var popupRect = rect;
             popupRect.x = rect.xMax + 2;
@@ -223,7 +194,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public static void EndGUI(SerializedProperty mode)
         {
-            EditorGUI.EndProperty();
             if (mode.intValue == (int)WindParameter.WindOverrideMode.Global)
             {
                 EditorGUI.showMixedValue = false;

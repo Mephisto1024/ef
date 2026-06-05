@@ -2,13 +2,10 @@ using UnityEngine.Rendering;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
-    // HDRP Profile Id
-    // - You can use [HideInDebugUI] attribute to hide a given id from the Detailed Stats section of Rendering Debugger.
     internal enum HDProfileId
     {
         CopyDepthBuffer,
         CopyDepthInTargetTexture,
-        DuplicateDepthBuffer,
         BuildCoarseStencilAndResolveIfNeeded,
         AmbientOcclusion,
         HorizonSSAO,
@@ -22,7 +19,6 @@ namespace UnityEngine.Rendering.HighDefinition
         ApplyDistortion,
         ForwardDepthPrepass,
         DeferredDepthPrepass,
-        PreRefractionDepthPrepass,
         TransparentDepthPrepass,
         GBuffer,
         DBufferRender,
@@ -98,43 +94,21 @@ namespace UnityEngine.Rendering.HighDefinition
 
         // Volumetric clouds
         VolumetricClouds,
+        VolumetricCloudsDepthDownscale,
         VolumetricCloudsTrace,
         VolumetricCloudsReproject,
         VolumetricCloudsPreUpscale,
-        VolumetricCloudsUpscale,
-        VolumetricCloudsCombine,
+        VolumetricCloudsUpscaleAndCombine,
         VolumetricCloudsShadow,
         VolumetricCloudMapGeneration,
         VolumetricCloudsAmbientProbe,
 
-        // Water Decals
-        WaterDecalDeformation,
-        WaterDecalFoam,
-        WaterDecalMask,
-        WaterDecalCurrent,
-
         // Water surface
-        WaterSurfaceUpdate,
         WaterSurfaceSimulation,
-        WaterSurfaceCaustics,
-        WaterExclusion,
-        WaterGBuffer,
-        WaterMaskDebug,
-        WaterPrepareLighting,
-        WaterDeferredLighting,
-        WaterLineRendering,
-
-        // High Quality Lines
-        LinesGeometrySetup,
-        LinesVertexSetup,
-        LinesSegmentSetup,
-        LinesShadingPrepare,
-        LinesShading,
-        LinesRasterizationSetup,
-        LinesBuildClusters,
-        LinesBinningStage,
-        LinesWorkQueue,
-        LinesFineRaster,
+        WaterSurfaceRenderingGBuffer,
+        WaterSurfaceRenderingSSR,
+        WaterSurfaceRenderingDeferred,
+        WaterSurfaceRenderingUnderWater,
 
         // RT Cluster
         RaytracingBuildCluster,
@@ -149,18 +123,6 @@ namespace UnityEngine.Rendering.HighDefinition
         RaytracingReflectionAdjustWeight,
         RaytracingReflectionFilter,
         RaytracingReflectionUpscale,
-
-        // ReBlur Denoiser
-        ReBlurPreBlur,
-        ReBlurTemporalAccumulation,
-        ReBlurMipGeneration,
-        ReBlurMipHistoryFix,
-        ReBlurBlur,
-        ReBlurCopyHistory,
-        ReBlurTemporalStabilization,
-        ReBlurCopyHistoryStab,
-        ReBlurPostBlur,
-
         // RTAO
         RaytracingAmbientOcclusion,
         RaytracingFilterAmbientOcclusion,
@@ -209,11 +171,6 @@ namespace UnityEngine.Rendering.HighDefinition
         SortVisibleLights,
         BuildVisibleLightEntities,
         ProcessShadows,
-        ComputeShadowCullingSplits,
-        CalculateLightDataTextureInfo,
-        CalculateShadowIndices,
-        UpdateDirectionalShadowData,
-        EditorOnlyDebugSelectedLightShadow,
 
         // Profile sampler for shadow
         RenderShadowMaps,
@@ -230,12 +187,14 @@ namespace UnityEngine.Rendering.HighDefinition
         DisplayShadows,
 
         RenderDeferredLightingCompute,
+        RenderDeferredLightingComputeAsPixel,
+        RenderDeferredLightingSinglePass,
+        RenderDeferredLightingSinglePassMRT,
 
         // Misc
         VolumeUpdate,
         CustomPassVolumeUpdate,
         OffscreenUIRendering,
-        ComputeThickness,
 
         // XR
         XRMirrorView,
@@ -245,17 +204,7 @@ namespace UnityEngine.Rendering.HighDefinition
         // Low res transparency
         DownsampleDepth,
         LowResTransparent,
-        CombineAndUpsampleTransparent,
         UpsampleLowResTransparent,
-        CombineTransparents,
-
-        // Line Rendering
-        LineRenderingSetup,
-        LineRenderingComposite,
-
-        // Decal
-        UpdateShaderGraphDecalTexture,
-        UpdateDecalAtlasMipmaps,
 
         // Post-processing
         AlphaCopy,
@@ -264,8 +213,7 @@ namespace UnityEngine.Rendering.HighDefinition
         DynamicExposure,
         ApplyExposure,
         TemporalAntialiasing,
-        UpscalerColorMask,
-        FSR2,
+        DeepLearningSuperSamplingColorMask,
         DeepLearningSuperSampling,
         DepthOfField,
         DepthOfFieldKernel,
@@ -278,9 +226,6 @@ namespace UnityEngine.Rendering.HighDefinition
         DepthOfFieldGatherNear,
         DepthOfFieldPreCombine,
         DepthOfFieldCombine,
-        DepthOfFieldComputeSlowTiles,
-        DepthOfFieldApertureShape,
-        LensFlareScreenSpace,
         LensFlareDataDriven,
         LensFlareComputeOcclusionDataDriven,
         LensFlareMergeOcclusionDataDriven,
@@ -306,13 +251,11 @@ namespace UnityEngine.Rendering.HighDefinition
         CustomPostProcessAfterPPBlurs,
         CustomPostProcessAfterPP,
         CustomPostProcessAfterOpaqueAndSky,
-        Sharpening,
         ContrastAdaptiveSharpen,
         EdgeAdaptiveSpatialUpsampling,
+        PrepareProbeVolumeList,
+        ProbeVolumeDebug,
         CustomPassBufferClearDebug,
-
-        // Temp
-        APVSamplingDebug,
 
         AOVExecute,
         AOVOutput,

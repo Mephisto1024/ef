@@ -5,10 +5,10 @@
 
 void VFXGetHDRPLitData(out SurfaceData surfaceData, out BuiltinData builtinData, out BSDFData bsdfData, out PreLightData preLightData, VFX_VARYING_PS_INPUTS i, float3 normalWS, PositionInputs posInput,  const VFXUVData uvData, bool frontFace, uint2 tileIndex)
 {
-    #if HDRP_MATERIAL_TYPE_TRANSLUCENT
-	    ${VFXLoadParameter:{diffusionProfileHash}} // Loads diffusion profile
+	#if HDRP_MATERIAL_TYPE_TRANSLUCENT
+	${VFXLoadParameter:{diffusionProfileHash}} // Loads diffusion profile
 	#else
-	    const uint diffusionProfileHash = 0;
+	const uint diffusionProfileHash = 0;
 	#endif
 	    float alpha;
 	    surfaceData = VFXGetSurfaceData(i,normalWS,uvData,diffusionProfileHash,frontFace,alpha);
@@ -44,7 +44,6 @@ void VFXGetHDRPLitData(out SurfaceData surfaceData, out BuiltinData builtinData,
 	PreLightData preLightData = (PreLightData)0;
 	VFXGetHDRPLitData(surfaceData,builtinData,bsdfData,preLightData,i,normalWS,uvData, true, uint2(0,0));
 }
-
 
 #endif
 

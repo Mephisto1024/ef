@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -18,8 +18,8 @@ namespace UnityEngine.Rendering.HighDefinition
             if (m_Asset.currentPlatformRenderPipelineSettings.supportSSGI)
             {
                 // Grab the sets of shaders that we'll be using
-                ComputeShader ssGICS = runtimeShaders.screenSpaceGlobalIlluminationCS;
-                ComputeShader bilateralUpsampleCS =runtimeShaders.bilateralUpsampleCS;
+                ComputeShader ssGICS = m_Asset.renderPipelineResources.shaders.screenSpaceGlobalIlluminationCS;
+                ComputeShader bilateralUpsampleCS = m_Asset.renderPipelineResources.shaders.bilateralUpsampleCS;
 
                 // Grab the set of kernels that we shall be using
                 m_TraceGlobalIlluminationKernel = ssGICS.FindKernel("TraceGlobalIllumination");
@@ -133,7 +133,6 @@ namespace UnityEngine.Rendering.HighDefinition
             public int raySteps;
             public int frameIndex;
             public int rayMiss;
-            public UnityEngine.RenderingLayerMask apvLayerMask;
             public float lowResPercentage;
 
             // Compute Shader
@@ -147,7 +146,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public ComputeBuffer offsetBuffer;
 
             // Prepass buffers
-            public BufferHandle lightList;
+            public ComputeBufferHandle lightList;
             public TextureHandle depthTexture;
             public TextureHandle stencilBuffer;
             public TextureHandle normalBuffer;
@@ -169,10 +168,12 @@ namespace UnityEngine.Rendering.HighDefinition
             return new Vector2(hdCamera.lowResScaleForScreenSpaceLighting, hdCamera.historyLowResScaleForScreenSpaceLighting);
         }
 
-        TextureHandle TraceSSGI(RenderGraph renderGraph, HDCamera hdCamera, GlobalIllumination giSettings, TextureHandle depthPyramid, TextureHandle normalBuffer, TextureHandle stencilBuffer, TextureHandle motionVectorsBuffer, BufferHandle lightList)
+        TextureHandle TraceSSGI(RenderGraph renderGraph, HDCamera hdCamera, GlobalIllumination giSettings, TextureHandle depthPyramid, TextureHandle normalBuffer, TextureHandle stencilBuffer, TextureHandle motionVectorsBuffer, ComputeBufferHandle lightList)
         {
-            using (var builder = renderGraph.AddUnsafePass<TraceSSGIPassData>("Trace SSGI", out var passData, ProfilingSampler.Get(HDProfileId.SSGITrace)))
+            using (var builder = renderGraph.AddRenderPass<TraceSSGIPassData>("Trace SSGI", out var passData, ProfilingSampler.Get(HDProfileId.SSGITrace)))
             {
+                builder.EnableAsyncCompute(false);
+
                 if (giSettings.fullResolutionSS.value)
                 {
                     passData.lowResPercentage = 1.0f;
@@ -196,10 +197,9 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.raySteps = giSettings.maxRaySteps;
                 passData.frameIndex = RayTracingFrameIndex(hdCamera, 16);
                 passData.rayMiss = (int)giSettings.rayMiss.value;
-                passData.apvLayerMask = giSettings.adaptiveProbeVolumesLayerMask.value;
 
                 // Grab the right kernel
-                passData.ssGICS = runtimeShaders.screenSpaceGlobalIlluminationCS;
+                passData.ssGICS = asset.renderPipelineResources.shaders.screenSpaceGlobalIlluminationCS;
                 passData.traceKernel = giSettings.fullResolutionSS.value ? m_TraceGlobalIlluminationKernel : m_TraceGlobalIlluminationHalfKernel;
                 passData.projectKernel = giSettings.fullResolutionSS.value ? m_ReprojectGlobalIlluminationKernel : m_ReprojectGlobalIlluminationHalfKernel;
 
@@ -208,49 +208,37 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.shaderVariablesRayTracingCB = m_ShaderVariablesRayTracingCB;
                 passData.offsetBuffer = hdCamera.depthBufferMipChainInfo.GetOffsetBufferData(m_DepthPyramidMipLevelOffsetsBuffer);
 
-                passData.lightList = lightList;
-                builder.UseBuffer(passData.lightList, AccessFlags.Read);
-                passData.depthTexture = depthPyramid;
-                builder.UseTexture(passData.depthTexture, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.stencilBuffer = stencilBuffer;
-                builder.UseTexture(passData.stencilBuffer, AccessFlags.Read);
+                passData.lightList = builder.ReadComputeBuffer(lightList);
+                passData.depthTexture = builder.ReadTexture(depthPyramid);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.stencilBuffer = builder.ReadTexture(stencilBuffer);
 
                 if (!hdCamera.frameSettings.IsEnabled(FrameSettingsField.ObjectMotionVectors))
-                    passData.motionVectorsBuffer = renderGraph.defaultResources.blackTextureXR;
+                {
+                    passData.motionVectorsBuffer = builder.ReadTexture(renderGraph.defaultResources.blackTextureXR);
+                }
                 else
-                    passData.motionVectorsBuffer = motionVectorsBuffer;
-                builder.UseTexture(passData.motionVectorsBuffer, AccessFlags.Read);
+                {
+                    passData.motionVectorsBuffer = builder.ReadTexture(motionVectorsBuffer);
+                }
 
                 // History buffers
                 var colorPyramid = hdCamera.GetPreviousFrameRT((int)HDCameraFrameHistoryType.ColorBufferMipChain);
-                if (colorPyramid != null)
-                    passData.colorPyramid = renderGraph.ImportTexture(colorPyramid);
-                else
-                    passData.colorPyramid = renderGraph.defaultResources.blackTextureXR;
-                builder.UseTexture(passData.colorPyramid, AccessFlags.Read);
-
+                passData.colorPyramid = colorPyramid != null ? builder.ReadTexture(renderGraph.ImportTexture(colorPyramid)) : renderGraph.defaultResources.blackTextureXR;
                 var historyDepth = hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.Depth);
-                if (historyDepth != null)
-                    passData.historyDepth = renderGraph.ImportTexture(historyDepth);
-                else
-                    passData.historyDepth = renderGraph.defaultResources.blackTextureXR;
-                builder.UseTexture(passData.historyDepth, AccessFlags.Read);
+                passData.historyDepth = historyDepth != null ? builder.ReadTexture(renderGraph.ImportTexture(historyDepth)) : renderGraph.defaultResources.blackTextureXR;
 
                 // Temporary textures
                 passData.hitPointBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16_SFloat, enableRandomWrite = true, name = "SSGI Hit Point" });
+                { colorFormat = GraphicsFormat.R16G16_SFloat, enableRandomWrite = true, name = "SSGI Hit Point" });
 
                 // Output textures
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.B10G11R11_UFloatPack32, enableRandomWrite = true, name = "SSGI Color" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.B10G11R11_UFloatPack32, enableRandomWrite = true, name = "SSGI Color" }));
 
                 builder.SetRenderFunc(
-                    (TraceSSGIPassData data, UnsafeGraphContext ctx) =>
+                    (TraceSSGIPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         int ssgiTileSize = 8;
                         int numTilesXHR = (data.texWidth + (ssgiTileSize - 1)) / ssgiTileSize;
                         int numTilesYHR = (data.texHeight + (ssgiTileSize - 1)) / ssgiTileSize;
@@ -260,52 +248,51 @@ namespace UnityEngine.Rendering.HighDefinition
                         float f = data.farClipPlane;
                         float thicknessScale = 1.0f / (1.0f + data.thickness);
                         float thicknessBias = -n / (f - n) * (data.thickness * thicknessScale);
-                        natCmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingThicknessScale, thicknessScale);
-                        natCmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingThicknessBias, thicknessBias);
-                        natCmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._RayMarchingSteps, data.raySteps);
-                        natCmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._RayMarchingReflectSky, 1);
-                        natCmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._IndirectDiffuseFrameIndex, data.frameIndex);
+                        ctx.cmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingThicknessScale, thicknessScale);
+                        ctx.cmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingThicknessBias, thicknessBias);
+                        ctx.cmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._RayMarchingSteps, data.raySteps);
+                        ctx.cmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._RayMarchingReflectSky, 1);
+                        ctx.cmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._IndirectDiffuseFrameIndex, data.frameIndex);
 
                         // Inject the ray-tracing sampling data
-                        BlueNoise.BindDitheredTextureSet(natCmd, data.ditheredTextureSet);
+                        BlueNoise.BindDitheredTextureSet(ctx.cmd, data.ditheredTextureSet);
 
                         // Inject all the input textures/buffers
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.traceKernel, HDShaderIDs._DepthTexture, data.depthTexture);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.traceKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.traceKernel, HDShaderIDs._IndirectDiffuseHitPointTextureRW, data.hitPointBuffer);
-                        natCmd.SetComputeBufferParam(data.ssGICS, data.traceKernel, HDShaderIDs._DepthPyramidMipLevelOffsets, data.offsetBuffer);
-                        natCmd.SetComputeBufferParam(data.ssGICS, data.traceKernel, HDShaderIDs.g_vLightListTile, data.lightList);
-                        natCmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingLowResPercentageInv, 1.0f / data.lowResPercentage);
-                        natCmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._SSGILayerMask, (uint)data.apvLayerMask);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.traceKernel, HDShaderIDs._DepthTexture, data.depthTexture);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.traceKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.traceKernel, HDShaderIDs._IndirectDiffuseHitPointTextureRW, data.hitPointBuffer);
+                        ctx.cmd.SetComputeBufferParam(data.ssGICS, data.traceKernel, HDShaderIDs._DepthPyramidMipLevelOffsets, data.offsetBuffer);
+                        ctx.cmd.SetComputeBufferParam(data.ssGICS, data.traceKernel, HDShaderIDs.g_vLightListTile, data.lightList);
+                        ctx.cmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingLowResPercentageInv, 1.0f / data.lowResPercentage);
 
                         // Do the ray marching
-                        natCmd.DispatchCompute(data.ssGICS, data.traceKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                        ctx.cmd.DispatchCompute(data.ssGICS, data.traceKernel, numTilesXHR, numTilesYHR, data.viewCount);
 
                         // Update global constant buffer.
                         // This should probably be a shader specific uniform instead of reusing the global constant buffer one since it's the only one updated here.
-                        ConstantBuffer.PushGlobal(natCmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
+                        ConstantBuffer.PushGlobal(ctx.cmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
 
                         // Inject all the input scalars
-                        natCmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._ObjectMotionStencilBit, (int)StencilUsage.ObjectMotionVector);
-                        natCmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._RayMarchingFallbackHierarchy, data.rayMiss);
-                        natCmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingLowResPercentageInv, 1.0f / data.lowResPercentage);
+                        ctx.cmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._ObjectMotionStencilBit, (int)StencilUsage.ObjectMotionVector);
+                        ctx.cmd.SetComputeIntParam(data.ssGICS, HDShaderIDs._RayMarchingFallbackHierarchy, data.rayMiss);
+                        ctx.cmd.SetComputeFloatParam(data.ssGICS, HDShaderIDs._RayMarchingLowResPercentageInv, 1.0f / data.lowResPercentage);
 
                         // Bind all the input buffers
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._DepthTexture, data.depthTexture);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._StencilTexture, data.stencilBuffer, 0, RenderTextureSubElement.Stencil);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._CameraMotionVectorsTexture, data.motionVectorsBuffer);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._IndirectDiffuseHitPointTexture, data.hitPointBuffer);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._ColorPyramidTexture, data.colorPyramid);
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._HistoryDepthTexture, data.historyDepth);
-                        natCmd.SetComputeBufferParam(data.ssGICS, data.projectKernel, HDShaderIDs._DepthPyramidMipLevelOffsets, data.offsetBuffer);
-                        natCmd.SetComputeBufferParam(data.ssGICS, data.projectKernel, HDShaderIDs.g_vLightListTile, data.lightList);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._DepthTexture, data.depthTexture);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._StencilTexture, data.stencilBuffer, 0, RenderTextureSubElement.Stencil);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._CameraMotionVectorsTexture, data.motionVectorsBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._IndirectDiffuseHitPointTexture, data.hitPointBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._ColorPyramidTexture, data.colorPyramid);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._HistoryDepthTexture, data.historyDepth);
+                        ctx.cmd.SetComputeBufferParam(data.ssGICS, data.projectKernel, HDShaderIDs._DepthPyramidMipLevelOffsets, data.offsetBuffer);
+                        ctx.cmd.SetComputeBufferParam(data.ssGICS, data.projectKernel, HDShaderIDs.g_vLightListTile, data.lightList);
 
                         // Bind the output texture
-                        natCmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._IndirectDiffuseTextureRW, data.outputBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.ssGICS, data.projectKernel, HDShaderIDs._IndirectDiffuseTextureRW, data.outputBuffer);
 
                         // Do the re-projection
-                        natCmd.DispatchCompute(data.ssGICS, data.projectKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                        ctx.cmd.DispatchCompute(data.ssGICS, data.projectKernel, numTilesXHR, numTilesYHR, data.viewCount);
                     });
 
                 return passData.outputBuffer;
@@ -333,8 +320,10 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle UpscaleSSGI(RenderGraph renderGraph, HDCamera hdCamera, GlobalIllumination giSettings, HDUtils.PackedMipChainInfo info, TextureHandle depthPyramid, TextureHandle inputBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<UpscaleSSGIPassData>("Upscale SSGI", out var passData, ProfilingSampler.Get(HDProfileId.SSGIUpscale)))
+            using (var builder = renderGraph.AddRenderPass<UpscaleSSGIPassData>("Upscale SSGI", out var passData, ProfilingSampler.Get(HDProfileId.SSGIUpscale)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Set the camera parameters
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -358,21 +347,17 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.halfScreenSize.Set(lowResWidth, lowResHeight, 1.0f / lowResWidth, 1.0f / lowResHeight);
 
                 // Grab the right kernel
-                passData.bilateralUpsampleCS =  runtimeShaders.bilateralUpsampleCS;
+                passData.bilateralUpsampleCS = m_Asset.renderPipelineResources.shaders.bilateralUpsampleCS;
                 passData.upscaleKernel = passData.lowResPercentage == 0.5f ? m_BilateralUpSampleColorKernelHalf : m_BilateralUpSampleColorKernel;
 
-                passData.depthTexture = depthPyramid;
-                builder.UseTexture(passData.depthTexture, AccessFlags.Read);
-                passData.inputBuffer = inputBuffer;
-                builder.UseTexture(passData.inputBuffer, AccessFlags.Read);
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.B10G11R11_UFloatPack32, enableRandomWrite = true, name = "SSGI Final" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                passData.depthTexture = builder.ReadTexture(depthPyramid);
+                passData.inputBuffer = builder.ReadTexture(inputBuffer);
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.B10G11R11_UFloatPack32, enableRandomWrite = true, name = "SSGI Final" }));
 
                 builder.SetRenderFunc(
-                    (UpscaleSSGIPassData data, UnsafeGraphContext ctx) =>
+                    (UpscaleSSGIPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Re-evaluate the dispatch parameters (we are evaluating the upsample in full resolution)
                         int ssgiTileSize = 8;
                         int numTilesXHR = (data.texWidth + (ssgiTileSize - 1)) / ssgiTileSize;
@@ -380,18 +365,18 @@ namespace UnityEngine.Rendering.HighDefinition
 
                         ConstantBuffer.PushGlobal(ctx.cmd, data.shaderVariablesBilateralUpsampleCB, HDShaderIDs._ShaderVariablesBilateralUpsample);
 
-                        natCmd.SetComputeFloatParam(data.bilateralUpsampleCS, HDShaderIDs._RayMarchingLowResPercentage, data.lowResPercentage);
+                        ctx.cmd.SetComputeFloatParam(data.bilateralUpsampleCS, HDShaderIDs._RayMarchingLowResPercentage, data.lowResPercentage);
 
                         // Inject all the input buffers
-                        natCmd.SetComputeTextureParam(data.bilateralUpsampleCS, data.upscaleKernel, HDShaderIDs._DepthTexture, data.depthTexture);
-                        natCmd.SetComputeTextureParam(data.bilateralUpsampleCS, data.upscaleKernel, HDShaderIDs._LowResolutionTexture, data.inputBuffer);
-                        natCmd.SetComputeVectorParam(data.bilateralUpsampleCS, HDShaderIDs._HalfScreenSize, data.halfScreenSize);
+                        ctx.cmd.SetComputeTextureParam(data.bilateralUpsampleCS, data.upscaleKernel, HDShaderIDs._DepthTexture, data.depthTexture);
+                        ctx.cmd.SetComputeTextureParam(data.bilateralUpsampleCS, data.upscaleKernel, HDShaderIDs._LowResolutionTexture, data.inputBuffer);
+                        ctx.cmd.SetComputeVectorParam(data.bilateralUpsampleCS, HDShaderIDs._HalfScreenSize, data.halfScreenSize);
 
                         // Inject the output textures
-                        natCmd.SetComputeTextureParam(data.bilateralUpsampleCS, data.upscaleKernel, HDShaderIDs._OutputUpscaledTexture, data.outputBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.bilateralUpsampleCS, data.upscaleKernel, HDShaderIDs._OutputUpscaledTexture, data.outputBuffer);
 
                         // Upscale the buffer to full resolution
-                        natCmd.DispatchCompute(data.bilateralUpsampleCS, data.upscaleKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                        ctx.cmd.DispatchCompute(data.bilateralUpsampleCS, data.upscaleKernel, numTilesXHR, numTilesYHR, data.viewCount);
                     });
                 return passData.outputBuffer;
             }
@@ -469,7 +454,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle RenderSSGI(RenderGraph renderGraph, HDCamera hdCamera,
             TextureHandle depthPyramid, TextureHandle depthStencilBuffer, TextureHandle normalBuffer, TextureHandle motionVectorsBuffer, TextureHandle historyValidationTexture,
-            ShaderVariablesRaytracing shaderVariablesRayTracingCB, HDUtils.PackedMipChainInfo info, BufferHandle lightList)
+            ShaderVariablesRaytracing shaderVariablesRayTracingCB, HDUtils.PackedMipChainInfo info, ComputeBufferHandle lightList)
         {
             // Grab the global illumination volume component
             GlobalIllumination giSettings = hdCamera.volumeStack.GetComponent<GlobalIllumination>();
@@ -491,7 +476,7 @@ namespace UnityEngine.Rendering.HighDefinition
             }
         }
 
-        TextureHandle RenderScreenSpaceIndirectDiffuse(HDCamera hdCamera, in PrepassOutput prepassOutput, TextureHandle rayCountTexture, TextureHandle historyValidationTexture, BufferHandle lightList)
+        TextureHandle RenderScreenSpaceIndirectDiffuse(HDCamera hdCamera, in PrepassOutput prepassOutput, TextureHandle rayCountTexture, TextureHandle historyValidationTexture, ComputeBufferHandle lightList)
         {
             TextureHandle result;
             switch (GetIndirectDiffuseMode(hdCamera))

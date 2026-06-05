@@ -4,7 +4,7 @@ Shader "Hidden/HDRP/Blit"
 
         #pragma target 4.5
         #pragma editor_sync_compilation
-        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
         #pragma multi_compile _ DISABLE_TEXTURE2D_X_ARRAY
         #pragma multi_compile _ BLIT_SINGLE_SLICE
         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -14,14 +14,12 @@ Shader "Hidden/HDRP/Blit"
 
     SubShader
     {
-        // Note: Keep shader pass names in sync with the ShaderPassNames enum in Blitter.cs
         Tags{ "RenderPipeline" = "HDRenderPipeline" }
 
         // 0: Nearest
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "Nearest"
 
             HLSLPROGRAM
                 #pragma vertex Vert
@@ -33,7 +31,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "Bilinear"
 
             HLSLPROGRAM
                 #pragma vertex Vert
@@ -45,7 +42,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "NearestQuad"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -57,7 +53,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuad"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -69,7 +64,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "NearestQuadPadding"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -81,7 +75,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuadPadding"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -89,11 +82,10 @@ Shader "Hidden/HDRP/Blit"
             ENDHLSL
         }
 
-        // 6: Nearest quad with padding and repeat
+        // 6: Nearest quad with padding
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "NearestQuadPaddingRepeat"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -101,11 +93,10 @@ Shader "Hidden/HDRP/Blit"
             ENDHLSL
         }
 
-        // 7: Bilinear quad with padding and repeat
+        // 7: Bilinear quad with padding
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuadPaddingRepeat"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -117,7 +108,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuadPaddingOctahedral"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -130,7 +120,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend DstColor Zero Cull Off
-            Name "NearestQuadPaddingAlphaBlend"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -143,7 +132,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend DstColor Zero Cull Off
-            Name "BilinearQuadPaddingAlphaBlend"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -152,11 +140,10 @@ Shader "Hidden/HDRP/Blit"
             ENDHLSL
         }
 
-        // 11: Nearest quad with padding alpha blend repeat (6 with alpha blend)
+        // 11: Nearest quad with padding alpha blend (6 with alpha blend)
         Pass
         {
             ZWrite Off ZTest Always Blend DstColor Zero Cull Off
-            Name "NearestQuadPaddingAlphaBlendRepeat"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -165,11 +152,10 @@ Shader "Hidden/HDRP/Blit"
             ENDHLSL
         }
 
-        // 12: Bilinear quad with padding alpha blend repeat (7 with alpha blend)
+        // 12: Bilinear quad with padding alpha blend (7 with alpha blend)
         Pass
         {
             ZWrite Off ZTest Always Blend DstColor Zero Cull Off
-            Name "BilinearQuadPaddingAlphaBlendRepeat"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -182,7 +168,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend DstColor Zero Cull Off
-            Name "BilinearQuadPaddingAlphaBlendOctahedral"
 
             HLSLPROGRAM
                 #pragma vertex VertQuadPadding
@@ -195,7 +180,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "CubeToOctahedral"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -207,7 +191,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "CubeToOctahedralLuminance"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -219,7 +202,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "CubeToOctahedralAlpha"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -231,7 +213,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "CubeToOctahedralRed"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -243,7 +224,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuadLuminance"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -255,7 +235,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuadAlpha"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -267,7 +246,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearQuadRed"
 
             HLSLPROGRAM
                 #pragma vertex VertQuad
@@ -279,7 +257,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "NearestCubeToOctahedralPadding"
 
             HLSLPROGRAM
                 #pragma multi_compile_local _ BLIT_DECODE_HDR
@@ -292,7 +269,6 @@ Shader "Hidden/HDRP/Blit"
         Pass
         {
             ZWrite Off ZTest Always Blend Off Cull Off
-            Name "BilinearCubeToOctahedralPadding"
 
             HLSLPROGRAM
                 #pragma multi_compile_local _ BLIT_DECODE_HDR

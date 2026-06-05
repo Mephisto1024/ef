@@ -14,7 +14,7 @@ namespace UnityEngine.Rendering.HighDefinition
     public partial class HDRenderPipelineAsset : IVersionable<HDRenderPipelineAsset.Version>, IMigratableAsset
     {
         // /!\ For each new version, you must now upgrade asset in HDRP_Runtime, HDRP_Performance and SRP_SmokeTest test project.
-        internal enum Version
+        enum Version
         {
             None,
             First,
@@ -37,11 +37,7 @@ namespace UnityEngine.Rendering.HighDefinition
             AddedHDRenderPipelineGlobalSettings,
             DecalSurfaceGradient,
             RemovalOfUpscaleFilter,
-            CombinedPlanarAndCubemapReflectionAtlases,
-            APVByDefault,
-            MergeDitheringAndLODQualitySetting,
-            UpdatedUpscalers,
-            AddNamesToUpscalers,
+            CombinedPlanarAndCubemapReflectionAtlases
             // If you add more steps here, do not clear settings that are used for the migration to the HDRP Global Settings asset
         }
 
@@ -110,8 +106,7 @@ namespace UnityEngine.Rendering.HighDefinition
             MigrationStep.New(Version.ShadowFilteringVeryHighQualityRemoval, (HDRenderPipelineAsset data) =>
             {
                 ref var shadowInit = ref data.m_RenderPipelineSettings.hdShadowInitParams;
-                shadowInit.punctualShadowFilteringQuality = shadowInit.punctualShadowFilteringQuality > HDShadowFilteringQuality.High ? HDShadowFilteringQuality.High : shadowInit.punctualShadowFilteringQuality;
-                shadowInit.directionalShadowFilteringQuality = shadowInit.directionalShadowFilteringQuality > HDShadowFilteringQuality.High ? HDShadowFilteringQuality.High : shadowInit.directionalShadowFilteringQuality;
+                shadowInit.shadowFilteringQuality = shadowInit.shadowFilteringQuality > HDShadowFilteringQuality.High ? HDShadowFilteringQuality.High : shadowInit.shadowFilteringQuality;
             }),
             MigrationStep.New(Version.SeparateColorGradingAndTonemappingFrameSettings, (HDRenderPipelineAsset data) =>
             {
@@ -184,6 +179,9 @@ namespace UnityEngine.Rendering.HighDefinition
 #pragma warning disable 618 // Type or member is obsolete
                 data.m_ObsoleteDefaultVolumeProfile = null;
                 data.m_ObsoleteDefaultLookDevProfile = null;
+
+                data.m_ObsoleteRenderPipelineResources = null;
+                data.m_ObsoleteRenderPipelineRayTracingResources = null;
 
                 data.m_ObsoleteBeforeTransparentCustomPostProcesses = null;
                 data.m_ObsoleteBeforePostProcessCustomPostProcesses = null;
@@ -265,116 +263,74 @@ namespace UnityEngine.Rendering.HighDefinition
                 }
 
                 lightLoopSettings.maxCubeReflectionOnScreen = Mathf.Clamp(lightLoopSettings.maxEnvLightsOnScreen - lightLoopSettings.maxPlanarReflectionOnScreen, HDRenderPipeline.k_MaxCubeReflectionsOnScreen / 2, HDRenderPipeline.k_MaxCubeReflectionsOnScreen);
-            }),
 #pragma warning restore 618
-            MigrationStep.New(Version.APVByDefault, (HDRenderPipelineAsset data) =>
-            {
-#pragma warning disable 618 // Type or member is obsolete
-                if (!data.m_RenderPipelineSettings.oldSupportProbeVolume)
-                {
-                    data.m_RenderPipelineSettings.lightProbeSystem = RenderPipelineSettings.LightProbeSystem.LegacyLightProbes;
-                }
-
-                if (data.m_RenderPipelineSettings.oldSupportProbeVolume || data.m_RenderPipelineSettings.oldLightProbeSystem == RenderPipelineSettings.LightProbeSystem.AdaptiveProbeVolumes)
-                {
-                    data.m_RenderPipelineSettings.lightProbeSystem = RenderPipelineSettings.LightProbeSystem.AdaptiveProbeVolumes;
-                }
-            }),
-#pragma warning restore 618
-            MigrationStep.New(Version.MergeDitheringAndLODQualitySetting, (HDRenderPipelineAsset data) =>
-            {
-#pragma warning disable 618 // Type or member is obsolete
-                if (!data.m_RenderPipelineSettings.supportDitheringCrossFade)
-                    return;
-
-                QualitySettings.ForEach(() =>
-                {
-                    if (QualitySettings.renderPipeline == data)
-                    {
-                        QualitySettings.enableLODCrossFade = true;
-                    }
-                });
-            }),
-#pragma warning restore 618
-            MigrationStep.New(Version.UpdatedUpscalers, (HDRenderPipelineAsset data) =>
-            {
-#pragma warning disable 618 // Type or member is obsolete
-                data.m_RenderPipelineSettings.dynamicResolutionSettings.advancedUpscalersByPriority.Clear();
-                if(!data.m_RenderPipelineSettings.dynamicResolutionSettings.enableDLSS)
-                    return;
-
-                data.m_RenderPipelineSettings.dynamicResolutionSettings.enableDLSS = false;
-                data.m_RenderPipelineSettings.dynamicResolutionSettings.advancedUpscalersByPriority.Add(AdvancedUpscalers.DLSS);
-#pragma warning restore 618
-            }),
-            MigrationStep.New(Version.AddNamesToUpscalers, (HDRenderPipelineAsset data) =>
-            {
-                data.m_RenderPipelineSettings.dynamicResolutionSettings.advancedUpscalerNames = new List<string>();
-#pragma warning disable 618 // Type or member is obsolete
-                foreach (var u in data.m_RenderPipelineSettings.dynamicResolutionSettings.advancedUpscalersByPriority)
-#pragma warning restore 618
-                {
-                    data.m_RenderPipelineSettings.dynamicResolutionSettings.advancedUpscalerNames.Add(u.ToString());
-                }
             })
-        );
+            );
         #endregion
 
         [SerializeField]
-        internal Version m_Version = MigrationDescription.LastVersion<Version>();
+        Version m_Version = MigrationDescription.LastVersion<Version>();
         Version IVersionable<Version>.version { get => m_Version; set => m_Version = value; }
 
 #pragma warning disable 618 // Type or member is obsolete
         #region FrameSettings Moved
         [SerializeField]
-        [FormerlySerializedAs("serializedFrameSettings"), FormerlySerializedAs("m_FrameSettings"), Obsolete("For data migration. #rom(2021.1)")]
+        [FormerlySerializedAs("serializedFrameSettings"), FormerlySerializedAs("m_FrameSettings"), Obsolete("For data migration")]
         ObsoleteFrameSettings m_ObsoleteFrameSettings;
         [SerializeField]
-        [FormerlySerializedAs("m_BakedOrCustomReflectionFrameSettings"), Obsolete("For data migration. #rom(2021.1)")]
+        [FormerlySerializedAs("m_BakedOrCustomReflectionFrameSettings"), Obsolete("For data migration")]
         ObsoleteFrameSettings m_ObsoleteBakedOrCustomReflectionFrameSettings;
         [SerializeField]
-        [FormerlySerializedAs("m_RealtimeReflectionFrameSettings"), Obsolete("For data migration. #rom(2021.1)")]
+        [FormerlySerializedAs("m_RealtimeReflectionFrameSettings"), Obsolete("For data migration")]
         ObsoleteFrameSettings m_ObsoleteRealtimeReflectionFrameSettings;
         #endregion
 
         #region Settings Moved from the HDRP Asset to HDRenderPipelineGlobalSettings
         [SerializeField]
-        [FormerlySerializedAs("m_DefaultVolumeProfile"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_DefaultVolumeProfile"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal VolumeProfile m_ObsoleteDefaultVolumeProfile;
         [SerializeField]
-        [FormerlySerializedAs("m_DefaultLookDevProfile"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_DefaultLookDevProfile"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal VolumeProfile m_ObsoleteDefaultLookDevProfile;
 
         [SerializeField]
-        [FormerlySerializedAs("m_RenderingPathDefaultCameraFrameSettings"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_RenderingPathDefaultCameraFrameSettings"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal FrameSettings m_ObsoleteFrameSettingsMovedToDefaultSettings;
         [SerializeField]
-        [FormerlySerializedAs("m_RenderingPathDefaultBakedOrCustomReflectionFrameSettings"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_RenderingPathDefaultBakedOrCustomReflectionFrameSettings"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal FrameSettings m_ObsoleteBakedOrCustomReflectionFrameSettingsMovedToDefaultSettings;
         [SerializeField]
-        [FormerlySerializedAs("m_RenderingPathDefaultRealtimeReflectionFrameSettings"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_RenderingPathDefaultRealtimeReflectionFrameSettings"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal FrameSettings m_ObsoleteRealtimeReflectionFrameSettingsMovedToDefaultSettings;
+
         [SerializeField]
-        [FormerlySerializedAs("beforeTransparentCustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_RenderPipelineResources"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
+        internal HDRenderPipelineRuntimeResources m_ObsoleteRenderPipelineResources;
+        [SerializeField]
+        [FormerlySerializedAs("m_RenderPipelineRayTracingResources"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
+        internal HDRenderPipelineRayTracingResources m_ObsoleteRenderPipelineRayTracingResources;
+
+        [SerializeField]
+        [FormerlySerializedAs("beforeTransparentCustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal List<string> m_ObsoleteBeforeTransparentCustomPostProcesses;
         [SerializeField]
-        [FormerlySerializedAs("beforePostProcessCustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("beforePostProcessCustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal List<string> m_ObsoleteBeforePostProcessCustomPostProcesses;
         [SerializeField]
-        [FormerlySerializedAs("afterPostProcessCustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("afterPostProcessCustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal List<string> m_ObsoleteAfterPostProcessCustomPostProcesses;
         [SerializeField]
-        [FormerlySerializedAs("beforeTAACustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("beforeTAACustomPostProcesses"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal List<string> m_ObsoleteBeforeTAACustomPostProcesses;
 
         [SerializeField]
-        [FormerlySerializedAs("shaderVariantLogLevel"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("shaderVariantLogLevel"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal int m_ObsoleteShaderVariantLogLevel;
         [SerializeField]
-        [FormerlySerializedAs("m_LensAttenuation"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("m_LensAttenuation"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal LensAttenuationMode m_ObsoleteLensAttenuation;
         [SerializeField]
-        [FormerlySerializedAs("diffusionProfileSettingsList"), Obsolete("Moved from HDRPAsset to HDGlobal Settings. #from(2021.2)")]
+        [FormerlySerializedAs("diffusionProfileSettingsList"), Obsolete("Moved from HDRPAsset to HDGlobal Settings")]
         internal DiffusionProfileSettings[] m_ObsoleteDiffusionProfileSettingsList;
         #endregion
 #pragma warning restore 618
@@ -424,7 +380,7 @@ namespace UnityEngine.Rendering.HighDefinition
             => Migrate();
 
         bool IMigratableAsset.IsAtLastVersion()
-            => m_Version >= MigrationDescription.LastVersion<Version>();
+            => m_Version == MigrationDescription.LastVersion<Version>();
 
         internal bool IsVersionBelowAddedHDRenderPipelineGlobalSettings()
             => m_Version < Version.AddedHDRenderPipelineGlobalSettings;

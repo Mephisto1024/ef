@@ -8,16 +8,18 @@ The Bloom effect also has a **Lens Dirt** feature, which you can use to apply a 
 
 ## Using Bloom
 
-**Bloom** uses the [Volume](understand-volumes.md) framework, so to enable and modify **Bloom** properties, you must add a **Bloom** override to a [Volume](understand-volumes.md) in your Scene. To add **Bloom** to a Volume:
+**Bloom** uses the [Volume](Volumes.md) framework, so to enable and modify **Bloom** properties, you must add a **Bloom** override to a [Volume](Volumes.md) in your Scene. To add **Bloom** to a Volume:
 
 1. In the Scene or Hierarchy view, select a GameObject that contains a Volume component to view it in the Inspector.
 2. In the Inspector, go to **Add Override** > **Post-processing** and select **Bloom**. HDRP now applies **Bloom** to any Camera this Volume affects.
 
-Bloom includes [advanced properties](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@latest?subfolder=/manual/advanced-properties.html) that you must manually expose.
+Bloom includes [additional properties](More-Options.md) that you must manually expose.
 
 [!include[](snippets/volume-override-api.md)]
 
 ## Properties
+
+![](Images/Post-processingBloom1.png)
 
 ### Bloom
 
@@ -39,16 +41,16 @@ Bloom includes [advanced properties](https://docs.unity3d.com/Packages/com.unity
 
 | **Property**               | **Description**                                              |
 | -------------------------- | ------------------------------------------------------------ |
-| **Resolution**             | Use the drop-down to set the resolution at which HDRP processes the Bloom effect. If you target consoles that use a very high resolution (for example, 4k), select **Quarter,** because it's less resource-intensive.<br />&#8226; **Quarter**: Uses quarter the screen resolution.<br />&#8226; **Half**: Uses half the screen resolution.<br/>This property only appears when you enable [advanced properties](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@latest?subfolder=/manual/advanced-properties.html). |
-| **High Quality Prefiltering** | Enable the checkbox to make HDRP use 13 samples instead of 4 during the prefiltering pass. This increases the resource intensity of the Bloom effect, but results in less flickering by small and bright objects like the sun.<br />This property only appears when you enable [additional properties](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@17.2/manual/advanced-properties.html). |
-| **High Quality Filtering** | Enable the checkbox to make HDRP use bicubic filtering instead of bilinear filtering. This increases the resource intensity of the Bloom effect, but results in smoother visuals.<br />This property only appears when you enable [advanced properties](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@latest?subfolder=/manual/advanced-properties.html). |
-| **Anamorphic**             | Enable the checkbox to make the bloom effect take the **Anamorphism** property of the Camera into account. This stretches the bloom horizontally or vertically like it would on anamorphic sensors.<br />This property only appears when you enable [advanced properties](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@latest?subfolder=/manual/advanced-properties.html). |
+| **Resolution**             | Use the drop-down to set the resolution at which HDRP processes the Bloom effect. If you target consoles that use a very high resolution (for example, 4k), select **Quarter,** because it's less resource-intensive.<br />&#8226; **Quarter**: Uses quarter the screen resolution.<br />&#8226; **Half**: Uses half the screen resolution.<br/>This property only appears when you enable [additional properties](More-Options.md). |
+| **High Quality Prefiltering** | Enable the checkbox to make HDRP use 13 samples instead of 4 during the prefiltering pass. This increases the resource intensity of the Bloom effect, but results in less flickering by small and bright objects like the sun.<br />This property only appears when you enable [additional properties](More-Options.md). |
+| **High Quality Filtering** | Enable the checkbox to make HDRP use bicubic filtering instead of bilinear filtering. This increases the resource intensity of the Bloom effect, but results in smoother visuals.<br />This property only appears when you enable [additional properties](More-Options.md). |
+| **Anamorphic**             | Enable the checkbox to make the bloom effect take the **Anamorphism** property of the Camera into account. This stretches the bloom horizontally or vertically like it would on anamorphic sensors.<br />This property only appears when you enable [additional properties](More-Options.md). |
 
 ## Details
 
-From 2019.3, HDRP provides [lookup textures](Authoring-LUTs.md) that you can use to customize this effect. These lookup textures are for the **Texture** property in the **Lens Dirt** section. To add these Textures to your Unity Project, you must use the Package Manager:
+From 2019.3, HDRP provides lookup Textures that you can use to customize this effect. These lookup Textures are for the **Texture** property in the **Lens Dirt** section. To add these Textures to your Unity Project, you must use the Package Manager:
 
-1. Go to **Window** > **Package Management** > **Package Manager**.
+1. Go to **Window** > **Package Manager**.
 2. In the **Packages** window, select **High Definition RP**.
 3. In the **High Definition RP** section, go to **Additional Post-processing Data** and select **Import into Project**.
 4. The Textures that are relevant to Bloom are in the **Lens Dirt** folder, so if you only want the lookup Textures for Bloom, only import the contents of the **Lens Dirt** folder.

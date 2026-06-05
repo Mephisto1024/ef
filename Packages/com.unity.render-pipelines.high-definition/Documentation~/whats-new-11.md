@@ -36,21 +36,21 @@ From HDRP 11.0, [Planar Reflection Probes](Planar-Reflection-Probe.md) now consi
 
 From HDRP 11.0, the AxF Material supports ray tracing. It also supports rasterized area light shadows.
 
-![AxF raytracing sample.](Images/AxFRaytracing.png)
+![](Images/AxFRaytracing.png)
 
 ### Decal widget
 
 From HDRP 11.0, the decal widget includes more functionality to help you create decals in a Scene. It now includes pivot point manipulation (both in the Inspector and Scene view), UV manipulation (in the Scene view only), and color and intensity customization.
 
-![Decal widget sample.](Images/DecalWidget-1.gif)
+![](Images/DecalWidget-1.gif)
 
-![Decal widget sample.](Images/DecalWidget-2.gif)
+![](Images/DecalWidget-2.gif)
 
 ### Cubemap fields in Volume components
 
 Cubemap fields now accept both [RenderTextures](https://docs.unity3d.com/Manual/class-RenderTexture.html) and [CustomRenderTextures](https://docs.unity3d.com/Manual/class-CustomRenderTexture.html) if they use the cubemap mode / dimension. This change affects the `HDRI Sky` and `Physically Based Sky` components and allows you to animate both skies.
 
-For more information, see the [HDRI Sky](create-an-hdri-sky.md) and [Physically Based Sky](create-a-physically-based-sky.md) sections of the documentation.
+For more information, see the [HDRI Sky](Override-HDRI-Sky.md) and [Physically Based Sky](Override-Physically-Based-Sky) sections of the documentation.
 
 ### Volume System API
 

@@ -4,8 +4,6 @@
 // Otherwise those parameters are not bound correctly at runtime.
 // ===========================================================================
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
-
 TEXTURE2D(_HairStrandMap);
 SAMPLER(sampler_HairStrandMap);
 
@@ -127,6 +125,7 @@ float _RayTracing;
 float4 _BaseColor;
 float4 _BaseColorMap_ST;
 float4 _BaseColorMap_TexelSize;
+float4 _BaseColorMap_MipInfo;
 
 float _Metallic;
 float _MetallicRemapMin;
@@ -180,19 +179,6 @@ float _ObjectSpaceUVMapping;
 
 #endif // LAYERED_LIT_SHADER
 
-// Tessellation specific
-
-#ifdef TESSELLATION_ON
-float _TessellationFactor;
-float _TessellationFactorMinDistance;
-float _TessellationFactorMaxDistance;
-float _TessellationFactorTriangleSize;
-float _TessellationShapeFactor;
-float _TessellationBackFaceCullEpsilon;
-#endif
-
-// Mipmap Streaming Debug
-UNITY_TEXTURE_STREAMING_DEBUG_VARS;
 
 CBUFFER_END
 
@@ -201,9 +187,3 @@ CBUFFER_END
 int _ObjectId;
 int _PassValue;
 float4 _SelectionID;
-
-#if defined(UNITY_DOTS_INSTANCING_ENABLED)
-#if defined(LAYERED_LIT_SHADER)
-
-#endif
-#endif

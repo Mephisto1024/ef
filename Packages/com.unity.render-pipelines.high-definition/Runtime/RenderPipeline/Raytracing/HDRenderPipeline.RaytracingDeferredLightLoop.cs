@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using System.Collections.Generic;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -123,24 +123,20 @@ namespace UnityEngine.Rendering.HighDefinition
 
             // Input textures
             public TextureHandle directionBuffer;
-            public TextureHandle renderingLayersTexture;
 
             // Intermediate textures
             public TextureHandle gbuffer0;
             public TextureHandle gbuffer1;
             public TextureHandle gbuffer2;
             public TextureHandle gbuffer3;
-            public TextureHandle tmpDistanceBuffer;
+            public TextureHandle distanceBuffer;
 
             // Output textures
             public TextureHandle litBuffer;
-            public TextureHandle distanceBuffer;
             public TextureHandle rayCountTexture;
 
             // Data textures
             public Texture skyTexture;
-
-            public bool enableDecals;
         }
 
         static void BinRays(CommandBuffer cmd, in DeferredLightingRTParameters config, RTHandle directionBuffer, int texWidth, int texHeight)
@@ -216,49 +212,35 @@ namespace UnityEngine.Rendering.HighDefinition
             cmd.SetComputeTextureParam(data.parameters.rayMarchingCS, marchingKernel, HDShaderIDs._GBufferTextureRW[1], data.gbuffer1);
             cmd.SetComputeTextureParam(data.parameters.rayMarchingCS, marchingKernel, HDShaderIDs._GBufferTextureRW[2], data.gbuffer2);
             cmd.SetComputeTextureParam(data.parameters.rayMarchingCS, marchingKernel, HDShaderIDs._GBufferTextureRW[3], data.gbuffer3);
-            cmd.SetComputeTextureParam(data.parameters.rayMarchingCS, marchingKernel, HDShaderIDs._RaytracingDistanceBuffer, data.tmpDistanceBuffer);
+            cmd.SetComputeTextureParam(data.parameters.rayMarchingCS, marchingKernel, HDShaderIDs._RaytracingDistanceBuffer, data.distanceBuffer);
 
             // Run the ray marching
             cmd.DispatchCompute(data.parameters.rayMarchingCS, marchingKernel, numTilesRayBinX, numTilesRayBinY, data.parameters.viewCount);
         }
 
-        struct RayTracingDefferedLightLoopOutput
-        {
-            public TextureHandle lightingBuffer;
-            public TextureHandle distanceBuffer;
-        }
-
-        RayTracingDefferedLightLoopOutput DeferredLightingRT(RenderGraph renderGraph,
-            HDCamera hdCamera,
-            in DeferredLightingRTParameters parameters,
+        TextureHandle DeferredLightingRT(RenderGraph renderGraph, in DeferredLightingRTParameters parameters,
             TextureHandle directionBuffer,
             in PrepassOutput prepassOutput,
             Texture skyTexture,
             TextureHandle rayCountTexture)
         {
-            RayTracingDefferedLightLoopOutput output = new RayTracingDefferedLightLoopOutput();
-            using (var builder = renderGraph.AddUnsafePass<DeferredLightingRTRPassData>("Deferred Lighting Ray Tracing", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingDeferredLighting)))
+            using (var builder = renderGraph.AddRenderPass<DeferredLightingRTRPassData>("Deferred Lighting Ray Tracing", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingDeferredLighting)))
             {
-                passData.parameters = parameters;
+                builder.EnableAsyncCompute(false);
 
+                passData.parameters = parameters;
                 // Input Buffers
-                passData.directionBuffer = directionBuffer;
-                builder.UseTexture(passData.directionBuffer, AccessFlags.Read);
-                passData.depthStencilBuffer = prepassOutput.depthBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.depthPyramid = prepassOutput.depthPyramidTexture;
-                builder.UseTexture(passData.depthPyramid, AccessFlags.Read);
-                passData.normalBuffer = prepassOutput.normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.renderingLayersTexture = renderGraph.defaultResources.whiteTextureXR;
-                builder.UseTexture(passData.renderingLayersTexture, AccessFlags.Read);
+                passData.directionBuffer = builder.ReadTexture(directionBuffer);
+                passData.depthStencilBuffer = builder.ReadTexture(prepassOutput.depthBuffer);
+                passData.depthPyramid = builder.ReadTexture(prepassOutput.depthPyramidTexture);
+                passData.normalBuffer = builder.ReadTexture(prepassOutput.normalBuffer);
 
                 if (passData.parameters.mixedTracing)
                 {
-                    passData.ssgbuffer0 = prepassOutput.gbuffer.mrt[0];
-                    passData.ssgbuffer1 = prepassOutput.gbuffer.mrt[1];
-                    passData.ssgbuffer2 = prepassOutput.gbuffer.mrt[2];
-                    passData.ssgbuffer3 = prepassOutput.gbuffer.mrt[3];
+                    passData.ssgbuffer0 = builder.ReadTexture(prepassOutput.gbuffer.mrt[0]);
+                    passData.ssgbuffer1 = builder.ReadTexture(prepassOutput.gbuffer.mrt[1]);
+                    passData.ssgbuffer2 = builder.ReadTexture(prepassOutput.gbuffer.mrt[2]);
+                    passData.ssgbuffer3 = builder.ReadTexture(prepassOutput.gbuffer.mrt[3]);
                 }
                 else
                 {
@@ -267,41 +249,29 @@ namespace UnityEngine.Rendering.HighDefinition
                     passData.ssgbuffer2 = renderGraph.defaultResources.blackTextureXR;
                     passData.ssgbuffer3 = renderGraph.defaultResources.blackTextureXR;
                 }
-                builder.UseTexture(passData.ssgbuffer0, AccessFlags.Read);
-                builder.UseTexture(passData.ssgbuffer1, AccessFlags.Read);
-                builder.UseTexture(passData.ssgbuffer2, AccessFlags.Read);
-                builder.UseTexture(passData.ssgbuffer3, AccessFlags.Read);
 
                 passData.skyTexture = skyTexture;
 
                 // Temporary buffers
                 passData.gbuffer0 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R8G8B8A8_SRGB, enableRandomWrite = true, name = "GBuffer0" });
+                { colorFormat = GraphicsFormat.R8G8B8A8_SRGB, enableRandomWrite = true, name = "GBuffer0" });
                 passData.gbuffer1 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R8G8B8A8_UNorm, enableRandomWrite = true, name = "GBuffer1" });
+                { colorFormat = GraphicsFormat.R8G8B8A8_UNorm, enableRandomWrite = true, name = "GBuffer1" });
                 passData.gbuffer2 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R8G8B8A8_UNorm, enableRandomWrite = true, name = "GBuffer2" });
+                { colorFormat = GraphicsFormat.R8G8B8A8_UNorm, enableRandomWrite = true, name = "GBuffer2" });
                 passData.gbuffer3 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = Builtin.GetLightingBufferFormat(), enableRandomWrite = true, name = "GBuffer3" });
-                passData.tmpDistanceBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "TMP Distance Buffer" });
+                { colorFormat = Builtin.GetLightingBufferFormat(), enableRandomWrite = true, name = "GBuffer3" });
+                passData.distanceBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "Distance Buffer" });
 
                 // Output buffers
-                passData.rayCountTexture = rayCountTexture;
-                builder.UseTexture(passData.rayCountTexture, AccessFlags.ReadWrite);
-                passData.litBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Deferred Lighting Result" });
-                builder.UseTexture(passData.litBuffer, AccessFlags.Write);
-                passData.distanceBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "Distance Buffer" });
-                builder.UseTexture(passData.distanceBuffer, AccessFlags.Write);
-
-                passData.enableDecals = hdCamera.frameSettings.IsEnabled(FrameSettingsField.Decals);
+                passData.rayCountTexture = builder.ReadWriteTexture(rayCountTexture);
+                passData.litBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Deferred Lighting Result" }));
 
                 builder.SetRenderFunc(
-                    (DeferredLightingRTRPassData data, UnsafeGraphContext ctx) =>
+                    (DeferredLightingRTRPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Compute the input texture dimension
                         int texWidth = data.parameters.width;
                         int texHeight = data.parameters.height;
@@ -314,71 +284,65 @@ namespace UnityEngine.Rendering.HighDefinition
                         }
 
                         // Inject the global parameters
-                        ConstantBuffer.PushGlobal(natCmd, data.parameters.raytracingCB, HDShaderIDs._ShaderVariablesRaytracing);
+                        ConstantBuffer.PushGlobal(ctx.cmd, data.parameters.raytracingCB, HDShaderIDs._ShaderVariablesRaytracing);
 
                         // If mixed ray tracing was enabled for this pass, we need to try to resolve as many pixels as possible
                         // using the depth buffer ray marching
                         if (data.parameters.mixedTracing)
                         {
-                            RayMarchGBuffer(natCmd, data, texWidth, texHeight);
+                            RayMarchGBuffer(ctx.cmd, data, texWidth, texHeight);
                         }
 
                         if (data.parameters.rayBinning)
                         {
-                            BinRays(natCmd, data.parameters, data.directionBuffer, texWidth, texHeight);
+                            BinRays(ctx.cmd, data.parameters, data.directionBuffer, texWidth, texHeight);
                         }
 
                         // Inject the global parameters
                         data.parameters.raytracingCB._RayTracingLodBias = data.parameters.lodBias;
-                        ConstantBuffer.PushGlobal(natCmd, data.parameters.raytracingCB, HDShaderIDs._ShaderVariablesRaytracing);
+                        ConstantBuffer.PushGlobal(ctx.cmd, data.parameters.raytracingCB, HDShaderIDs._ShaderVariablesRaytracing);
 
                         // Define the shader pass to use for the reflection pass
-                        natCmd.SetRayTracingShaderPass(data.parameters.gBufferRaytracingRT, "GBufferDXR");
+                        ctx.cmd.SetRayTracingShaderPass(data.parameters.gBufferRaytracingRT, "GBufferDXR");
 
                         if (data.parameters.rayBinning)
                         {
                             int numTilesRayBinX = (texWidth + (binningTileSize - 1)) / binningTileSize;
-                            natCmd.SetGlobalBuffer(HDShaderIDs._RayBinResult, data.parameters.rayBinResult);
-                            natCmd.SetGlobalBuffer(HDShaderIDs._RayBinSizeResult, data.parameters.rayBinSizeResult);
-                            natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayBinTileCountX, numTilesRayBinX);
+                            ctx.cmd.SetGlobalBuffer(HDShaderIDs._RayBinResult, data.parameters.rayBinResult);
+                            ctx.cmd.SetGlobalBuffer(HDShaderIDs._RayBinSizeResult, data.parameters.rayBinSizeResult);
+                            ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayBinTileCountX, numTilesRayBinX);
                         }
 
                         // Set the acceleration structure for the pass
-                        natCmd.SetRayTracingAccelerationStructure(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingAccelerationStructureName, data.parameters.accelerationStructure);
+                        ctx.cmd.SetRayTracingAccelerationStructure(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingAccelerationStructureName, data.parameters.accelerationStructure);
 
                         // Set ray count texture
-                        natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayCountType, data.parameters.rayCountType);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayCountTexture, data.rayCountTexture);
+                        ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayCountType, data.parameters.rayCountType);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayCountTexture, data.rayCountTexture);
 
                         // Bind all input parameter
-                        natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayTracingLayerMask, data.parameters.layerMask);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingDirectionBuffer, data.directionBuffer);
-                        natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingHalfResolution, data.parameters.halfResolution ? 1 : 0);
+                        ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayTracingLayerMask, data.parameters.layerMask);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingDirectionBuffer, data.directionBuffer);
+                        ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingHalfResolution, data.parameters.halfResolution ? 1 : 0);
 
                         // Bind the output textures
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[0], data.gbuffer0);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[1], data.gbuffer1);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[2], data.gbuffer2);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[3], data.gbuffer3);
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingDistanceBuffer, data.tmpDistanceBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[0], data.gbuffer0);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[1], data.gbuffer1);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[2], data.gbuffer2);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._GBufferTextureRW[3], data.gbuffer3);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RaytracingDistanceBuffer, data.distanceBuffer);
 
                         // Compute the actual resolution that is needed base on the resolution
                         uint widthResolution = (uint)data.parameters.width;
                         uint heightResolution = (uint)data.parameters.height;
 
                         // Include the sky if required
-                        natCmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._SkyTexture, data.skyTexture);
+                        ctx.cmd.SetRayTracingTextureParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._SkyTexture, data.skyTexture);
 
                         // Only compute diffuse lighting if required
-                        CoreUtils.SetKeyword(natCmd, "MINIMAL_GBUFFER", data.parameters.diffuseLightingOnly);
-
-                        if (data.enableDecals)
-                        {
-                            DecalSystem.instance.SetAtlas(natCmd);
-                            data.parameters.lightCluster.BindLightClusterData(natCmd);
-                        }
+                        CoreUtils.SetKeyword(ctx.cmd, "MINIMAL_GBUFFER", data.parameters.diffuseLightingOnly);
 
                         if (data.parameters.rayBinning)
                         {
@@ -387,44 +351,42 @@ namespace UnityEngine.Rendering.HighDefinition
                             int numTilesRayBinY = (texHeight + (binningTileSize - 1)) / binningTileSize;
                             int bufferSizeX = numTilesRayBinX * binningTileSize;
                             int bufferSizeY = numTilesRayBinY * binningTileSize;
-                            natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._BufferSizeX, bufferSizeX);
+                            ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._BufferSizeX, bufferSizeX);
 
                             // Inject the data for the additional views
-                            natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayBinViewOffset, bufferSizeX * bufferSizeY);
-                            natCmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayBinTileViewOffset, numTilesRayBinX * numTilesRayBinY);
+                            ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayBinViewOffset, bufferSizeX * bufferSizeY);
+                            ctx.cmd.SetRayTracingIntParam(data.parameters.gBufferRaytracingRT, HDShaderIDs._RayBinTileViewOffset, numTilesRayBinX * numTilesRayBinY);
 
                             // A really nice tip is to dispatch the rays as a 1D array instead of 2D, the performance difference has been measured.
                             uint dispatchSize = (uint)(bufferSizeX * bufferSizeY);
-
-                            natCmd.DispatchRays(data.parameters.gBufferRaytracingRT, m_RayGenGBufferBinned, dispatchSize, 1, (uint)data.parameters.viewCount, null);
+                            ctx.cmd.DispatchRays(data.parameters.gBufferRaytracingRT, m_RayGenGBufferBinned, dispatchSize, 1, (uint)data.parameters.viewCount);
                         }
                         else
                         {
-                            natCmd.DispatchRays(data.parameters.gBufferRaytracingRT, m_RayGenGBuffer, widthResolution, heightResolution, (uint)data.parameters.viewCount, null);
+                            ctx.cmd.DispatchRays(data.parameters.gBufferRaytracingRT, m_RayGenGBuffer, widthResolution, heightResolution, (uint)data.parameters.viewCount);
                         }
 
-                        CoreUtils.SetKeyword(natCmd, "MINIMAL_GBUFFER", false);
+                        CoreUtils.SetKeyword(ctx.cmd, "MINIMAL_GBUFFER", false);
 
                         // Now let's do the deferred shading pass on the samples
                         int currentKernel = data.parameters.deferredRaytracingCS.FindKernel(data.parameters.halfResolution ? "RaytracingDeferredHalf" : "RaytracingDeferred");
 
                         // Bind the lightLoop data
-                        data.parameters.lightCluster.BindLightClusterData(natCmd);
+                        data.parameters.lightCluster.BindLightClusterData(ctx.cmd);
 
                         // Bind the input textures
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingDirectionBuffer, data.directionBuffer);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingDistanceBuffer, data.tmpDistanceBuffer);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[0], data.gbuffer0);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[1], data.gbuffer1);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[2], data.gbuffer2);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[3], data.gbuffer3);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RenderingLayersTexture, data.renderingLayersTexture);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingDirectionBuffer, data.directionBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingDistanceBuffer, data.distanceBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[0], data.gbuffer0);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[1], data.gbuffer1);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[2], data.gbuffer2);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._GBufferTexture[3], data.gbuffer3);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._LightLayersTexture, TextureXR.GetWhiteTexture());
 
                         // Bind the output texture
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingLitBufferRW, data.litBuffer);
-                        natCmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingDistanceBufferRW, data.distanceBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.parameters.deferredRaytracingCS, currentKernel, HDShaderIDs._RaytracingLitBufferRW, data.litBuffer);
 
                         // Evaluate the dispatch parameters
                         int areaTileSize = 8;
@@ -432,13 +394,10 @@ namespace UnityEngine.Rendering.HighDefinition
                         int numTilesYHR = (texHeight + (areaTileSize - 1)) / areaTileSize;
 
                         // Compute the texture
-                        natCmd.DispatchCompute(data.parameters.deferredRaytracingCS, currentKernel, numTilesXHR, numTilesYHR, data.parameters.viewCount);
+                        ctx.cmd.DispatchCompute(data.parameters.deferredRaytracingCS, currentKernel, numTilesXHR, numTilesYHR, data.parameters.viewCount);
                     });
 
-                // Output the two buffers we need
-                output.lightingBuffer = passData.litBuffer;
-                output.distanceBuffer = passData.distanceBuffer;
-                return output;
+                return passData.litBuffer;
             }
         }
     }

@@ -5,17 +5,6 @@
 #ifndef MIPMAPDEBUG_CS_HLSL
 #define MIPMAPDEBUG_CS_HLSL
 //
-// UnityEngine.Rendering.HighDefinition.DebugMipMapMode:  static fields
-//
-#define DEBUGMIPMAPMODE_NONE (0)
-#define DEBUGMIPMAPMODE_MIP_STREAMING_PERFORMANCE (1)
-#define DEBUGMIPMAPMODE_MIP_STREAMING_STATUS (2)
-#define DEBUGMIPMAPMODE_MIP_STREAMING_ACTIVITY (3)
-#define DEBUGMIPMAPMODE_MIP_STREAMING_PRIORITY (4)
-#define DEBUGMIPMAPMODE_MIP_COUNT (5)
-#define DEBUGMIPMAPMODE_MIP_RATIO (6)
-
-//
 // UnityEngine.Rendering.HighDefinition.DebugMipMapModeTerrainTexture:  static fields
 //
 #define DEBUGMIPMAPMODETERRAINTEXTURE_CONTROL (0)
@@ -29,10 +18,14 @@
 #define DEBUGMIPMAPMODETERRAINTEXTURE_LAYER7 (8)
 
 //
-// UnityEngine.Rendering.HighDefinition.DebugMipMapStatusMode:  static fields
+// UnityEngine.Rendering.HighDefinition.DebugMipMapMode:  static fields
 //
-#define DEBUGMIPMAPSTATUSMODE_MATERIAL (0)
-#define DEBUGMIPMAPSTATUSMODE_TEXTURE (1)
+#define DEBUGMIPMAPMODE_NONE (0)
+#define DEBUGMIPMAPMODE_MIP_RATIO (1)
+#define DEBUGMIPMAPMODE_MIP_COUNT (2)
+#define DEBUGMIPMAPMODE_MIP_COUNT_REDUCTION (3)
+#define DEBUGMIPMAPMODE_STREAMING_MIP_BUDGET (4)
+#define DEBUGMIPMAPMODE_STREAMING_MIP (5)
 
 
 #endif

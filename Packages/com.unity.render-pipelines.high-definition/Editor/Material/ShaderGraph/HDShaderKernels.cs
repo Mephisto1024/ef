@@ -8,7 +8,16 @@ using UnityEditor.ShaderGraph.Internal;
 
 namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
 {
-    static partial class HDShaderKernels
+    static class HDShaderKernels
     {
+        static public KernelDescriptor GenerateVertexSetup()
+        {
+            return new KernelDescriptor
+            {
+                name = "VertexSetup",
+                templatePath = $"{HDUtils.GetHDRenderPipelinePath()}Editor/Material/ShaderGraph/Templates/Kernels/VertexSetup.template",
+                passDescriptorReference = HDShaderPasses.GenerateShadowCaster(false, false, false)
+            };
+        }
     }
 }

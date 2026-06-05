@@ -1,20 +1,8 @@
-# Use shadowmasks
+# Shadowmask lighting mode
 
-Shadowmasks use the Shadowmask mixed lighting mode combine baked and real-time shadows at runtime and render shadows in the far distance. 
+The High Definition Render Pipelines (HDRP) supports the Shadowmask Lighting Mode which makes the lightmapper precompute shadows for static GameObjects, but still process real-time lighting for non-static GameObjects. HDRP also supports the [Baked Indirect](https://docs.unity3d.com/Manual/LightMode-Mixed-BakedIndirect.html) mixed Lighting Mode. For more information on mixed lighting and shadowmasks, see [Mixed lighting modes](https://docs.unity3d.com/Manual/LightMode-Mixed.html) and [Shadowmask](https://docs.unity3d.com/Manual/LightMode-Mixed-ShadowmaskMode.html).
 
-HDRP supports the following [Mixed Lighting Modes](https://docs.unity3d.com/Manual/LightMode-Mixed.html):
-
-- [Baked indirect](https://docs.unity3d.com/Manual/LightMode-Mixed-BakedIndirect.html)
-- [Shadowmask](https://docs.unity3d.com/Manual/LightMode-Mixed-ShadowmaskMode.html).
-
-# Enable shadowmasks
-
-To use shadowmasks in HDRP, you must enable shadowmask support in your Unity Project’s HDRP Asset and then make your Cameras use shadowmasks in their [Frame Settings](Frame-Settings.md) :
-
-1. Under **Render Pipeline Supported Features**, enable the **Shadowmask** checkbox. This enables support for shadowmasks in your Unity Project.
-2. Next, you must make your Cameras use shadowmasks. In your HDRP Asset, navigate to **Default Frame Settings > Lighting** and enable the **Shadowmask** checkbox to make Cameras use shadowmasks by default.
-
-# Set up shadowmasks
+## Using shadowmasks
 
 To use shadowmasks in HDRP, you must set up your Project to support them. To do this:
 
@@ -31,17 +19,12 @@ To use shadowmasks in HDRP, you must set up your Project to support them. To do 
    1. Open the Lighting window (menu: **Window** > **Rendering** > **Lighting**).
    2. In the **Mixed Lighting** section, enable **Baked Global Illumination** and set the **Lighting Mode** to **Shadowmask**.
 4. Make your Cameras use shadowmasks when they render the Scene. To set this as the default behaviour for Cameras:
-   1. Go to **Edit** > **Project Settings** > **Graphics** > **Pipeline Specific Settings** > **HDRP**.
+   1. Open the Project Settings window (menu: **Edit** > **Project Settings**) and select the **HDRP Global Settings** tab.
    2. Go to **Frame Settings (Default Values)** > **Camera** > **Lighting** and enable **Shadowmask**.
 5. Optionally, you can make your [Reflection Probes](Reflection-Probes-Intro.md) use shadowmask for baked or real-time reflections. To do this:
    1. Go to **Frame Settings (Default Values)** > **Realtime Reflection** or **Baked or Custom Reflection** > **Lighting** and enable **Shadowmask**.
 
-On a [Light](Light-Component.md), when you select the **Mixed** mode. The lightmapper precomputes Shadowmasks for static GameObject that the Light affects.
-
-
-## Change the shadowmask lighting mode
-
-The High Definition Render Pipelines (HDRP) supports the Shadowmask Lighting Mode which makes the lightmapper precompute shadows for static GameObjects, but still process real-time lighting for non-static GameObjects. HDRP also supports the [Baked Indirect](https://docs.unity3d.com/Manual/LightMode-Mixed-BakedIndirect.html) mixed Lighting Mode. For more information on mixed lighting and shadowmasks, see [Mixed lighting modes](https://docs.unity3d.com/Manual/LightMode-Mixed.html) and [Shadowmask](https://docs.unity3d.com/Manual/LightMode-Mixed-ShadowmaskMode.html).
+Now, on a [Light](Light-Component.md), when you select the **Mixed** mode. The lightmapper precomputes Shadowmasks for static GameObject that the Light affects.
 
 ## Shadowmask mode
 
@@ -55,14 +38,10 @@ For information on the behavior of each Shadowmask Mode, see the following table
 
 | Shadowmask Mode     | Description                                                  |
 | ------------------- | ------------------------------------------------------------ |
-| **Distance Shadowmask** | Makes the Light cast real-time shadows for all GameObjects when the distance between the Camera and the Light is less than the Fade Distance. If you can not see this property, enable [advanced properties](https://docs.unity3d.com/Packages/com.unity.render-pipelines.core@latest?subfolder=/manual/advanced-properties.html) for the Shadows section. When the distance between the Light and the Camera is greater than the Fade Distance, HDRP stops calculating real-time shadows for the Light. Instead, it uses shadowmasks for static GameObjects, and non-static GameObjects don't cast shadows. Directional Lights don't use Fade Distance, instead they use the current [Max Shadow Distance](Override-Shadows.md). |
+| **Distance Shadowmask** | Makes the Light cast real-time shadows for all GameObjects when the distance between the Camera and the Light is less than the Fade Distance. If you can not see this property, enable [additional properties](More-Options.md) for the Shadows section. When the distance between the Light and the Camera is greater than the Fade Distance, HDRP stops calculating real-time shadows for the Light. Instead, it uses shadowmasks for static GameObjects, and non-static GameObjects don't cast shadows. Directional Lights don't use Fade Distance, instead they use the current [Max Shadow Distance](Override-Shadows.md). |
 | **Shadowmask**          | Makes the Light cast real-time shadows for non-static GameObjects only. It then combines these shadows with shadowmasks for static GameObjects when the distance between the Camera and the Light is less than the Fade Distance. When the distance between the Light and the Camera is greater than the Fade Distance, HDRP stops calculating real-time shadows for the Light. It uses shadowmasks for static GameObjects and non-static GameObjects don't cast shadows. |
 
-<a name="DirectionalLightEquivalentProperty"></a>
-
-Directional Lights don't use **Fade Distance**. Instead they use the **Max Distance** property located in the [HD Shadow Settings](Override-Shadows.md) of your Scene’s Volumes.
-
-## Performance
+### Performance
 
 **Distance Shadowmask** is more GPU intensive, but looks more realistic because real-time lighting that's closer to the Light is more accurate than shadowmask Textures with a low resolution meant to represent areas further away.
 

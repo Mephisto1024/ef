@@ -43,8 +43,6 @@ namespace UnityEditor.Rendering.HighDefinition
             public static GUIContent overrideShaderPass = new GUIContent("Pass Name", "The pass for the override material to use.");
             public static GUIContent overrideMode = new GUIContent("Override Mode", "Choose the material override mode. Material: override the material and all properties. Shader: override the shader and maintain current properties.");
             public static GUIContent sortingCriteria = new GUIContent("Sorting", "Sorting settings used to render objects in a certain order.");
-            public static GUIContent variableRateShading = new GUIContent("Variable Rate Shading", "Enable variable rate shading. Requires a generated shading-rate-image texture.");
-
             public static GUIContent shaderPass = new GUIContent("Shader Pass", "Sets which pass will be used to render the materials. If the pass does not exist, the material will not be rendered.");
 
             //Depth Settings
@@ -130,9 +128,6 @@ namespace UnityEditor.Rendering.HighDefinition
         SerializedProperty m_SortingCriteria;
         SerializedProperty m_ShaderPass;
 
-        // VRS
-        SerializedProperty m_VariableRateShading;
-
         // Override depth state
         SerializedProperty m_OverrideDepthState;
         SerializedProperty m_DepthCompareFunction;
@@ -178,9 +173,6 @@ namespace UnityEditor.Rendering.HighDefinition
             m_OverrideShaderPassName = customPass.FindPropertyRelative("overrideShaderPassName");
             m_OverrideMode = customPass.FindPropertyRelative("overrideMode");
             m_SortingCriteria = customPass.FindPropertyRelative("sortingCriteria");
-
-            // Variable Rate Shading options
-            m_VariableRateShading = customPass.FindPropertyRelative("variableRateShading");
 
             // Depth options
             m_OverrideDepthState = customPass.FindPropertyRelative("overrideDepthState");
@@ -248,9 +240,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
                 EditorGUI.indentLevel--;
             }
-
-            EditorGUI.PropertyField(rect, m_VariableRateShading, Styles.variableRateShading);
-            rect.y += Styles.defaultLineSpace;
         }
 
         // Tell if we need to show a warning for rendering opaque object and we're in deferred.
@@ -276,7 +265,10 @@ namespace UnityEditor.Rendering.HighDefinition
         // Tell if we need to show the MSAA message info
         bool ShowMsaaObjectInfo()
         {
-            return m_Volume.injectionPoint == CustomPassInjectionPoint.AfterPostProcess || m_Volume.injectionPoint == CustomPassInjectionPoint.BeforePostProcess;
+            if (m_Volume.injectionPoint != CustomPassInjectionPoint.AfterPostProcess && m_Volume.injectionPoint != CustomPassInjectionPoint.BeforePostProcess)
+                return false;
+
+            return true;
         }
 
         void DoFilters(ref Rect rect)
@@ -555,7 +547,6 @@ namespace UnityEditor.Rendering.HighDefinition
 #endif
 
                 height += Styles.defaultLineSpace; // sorting criteria;
-                height += Styles.defaultLineSpace; // vrs
             }
 
             return height;

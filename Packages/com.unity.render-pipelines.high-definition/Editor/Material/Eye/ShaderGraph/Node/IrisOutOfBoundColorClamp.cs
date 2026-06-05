@@ -5,12 +5,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.ShaderGraph
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Eye", "IrisOutOfBoundColorClamp")]
+    [Title("Utility", "High Definition Render Pipeline", "Eye", "IrisOutOfBoundColorClamp (Preview)")]
     class IrisOutOfBoundColorClamp : CodeFunctionNode
     {
         public IrisOutOfBoundColorClamp()
         {
-            name = "Iris Out Of Bound Color Clamp";
+            name = "Iris Out Of Bound Color Clamp (Preview)";
         }
 
         public override bool hasPreview

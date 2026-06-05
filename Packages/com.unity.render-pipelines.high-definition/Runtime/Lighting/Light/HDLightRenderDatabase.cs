@@ -1,12 +1,10 @@
 using System;
 using UnityEngine.Jobs;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using Unity.Burst;
 using UnityEngine.Assertions;
 using Unity.Collections;
+using Unity.Mathematics;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -22,13 +20,15 @@ namespace UnityEngine.Rendering.HighDefinition
     //TODO: as a next round of optimizations, this should be reorganized to be cache friendly, and possibly split into SoAs for that matter.
     internal struct HDLightRenderData
     {
-        public uint renderingLayerMask;
+        public HDAdditionalLightData.PointLightHDType pointLightType;
+        public SpotLightShape spotLightShape;
+        public AreaLightShape areaLightShape;
+        public LightLayerEnum lightLayer;
         public float fadeDistance;
         public float distance;
         public float angularDiameter;
         public float volumetricFadeDistance;
         public bool includeForRayTracing;
-        public bool includeForPathTracing;
         public bool useScreenSpaceShadows;
         public bool useRayTracedShadows;
         public bool colorShadow;
@@ -37,134 +37,27 @@ namespace UnityEngine.Rendering.HighDefinition
         public float shadowDimmer;
         public float shadowFadeDistance;
         public float volumetricShadowDimmer;
+        public float shapeWidth;
+        public float shapeHeight;
+        public float aspectRatio;
+        public float innerSpotPercent;
         public float spotIESCutoffPercent;
         public float shapeRadius;
         public float barnDoorLength;
         public float barnDoorAngle;
+        public float flareSize;
+        public float flareFalloff;
         public bool affectVolumetric;
         public bool affectDiffuse;
         public bool affectSpecular;
         public bool applyRangeAttenuation;
         public bool penumbraTint;
         public bool interactsWithSky;
+        public Color surfaceTint;
         public Color shadowTint;
+        public Color flareTint;
     }
 
-    internal struct HDAdditionalLightDataUpdateInfo
-    {
-        const int ShadowUpdateModeTypeDataIndex = 0;
-
-        const int UseCustomSpotLightShadowConeFlagsIndex = 0;
-        const int AlwaysDrawDynamicShadowsFlagsIndex = 1;
-        const int UpdateUponLightMovementFlagsIndex = 2;
-
-        public float shadowNearPlane;
-        public float normalBias;
-        public float areaLightShadowCone;
-        public float softnessScale;
-        public float angularDiameter;
-        public float shapeRadius;
-        public float slopeBias;
-        public float minFilterSize;
-        public float lightAngle;
-        public float maxDepthBias;
-        public float evsmExponent;
-        public float evsmLightLeakBias;
-        public float evsmVarianceBias;
-        public float customSpotLightShadowCone;
-        public float cachedShadowTranslationUpdateThreshold;
-        public float cachedShadowAngleUpdateThreshold;
-        public float dirLightPCSSMaxPenumbraSize;
-        public float dirLightPCSSMaxSamplingDistance;
-        public float dirLightPCSSMinFilterSizeTexels;
-        public float dirLightPCSSMinFilterMaxAngularDiameter;
-        public float dirLightPCSSBlockerSearchAngularDiameter;
-        public float dirLightPCSSBlockerSamplingClumpExponent;
-        public int lightIdxForCachedShadows;
-        public byte dirLightPCSSBlockerSampleCount;
-        public byte dirLightPCSSFilterSampleCount;
-        public byte filterSampleCount;
-        public byte blockerSampleCount;
-        public byte kernelSize;
-        public byte evsmBlurPasses;
-        public BitArray8 flags;
-        public byte typeData;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetTypeData(byte typeIndex, byte value)
-        {
-            typeData = (byte)((typeData & ~(0b11 << (typeIndex * 2))) | (value << (typeIndex * 2)));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte GetTypeData(byte typeIndex)
-        {
-            return (byte)((typeData >> (typeIndex * 2)) & 0b11);
-        }
-
-        public ShadowUpdateMode shadowUpdateMode
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)] get => (ShadowUpdateMode)GetTypeData(ShadowUpdateModeTypeDataIndex);
-            [MethodImpl(MethodImplOptions.AggressiveInlining)] set => SetTypeData(ShadowUpdateModeTypeDataIndex, (byte)value);
-        }
-
-        public bool useCustomSpotLightShadowCone
-        {
-            get => flags[UseCustomSpotLightShadowConeFlagsIndex];
-            set => flags[UseCustomSpotLightShadowConeFlagsIndex] = value;
-        }
-
-        public bool alwaysDrawDynamicShadows
-        {
-            get => flags[AlwaysDrawDynamicShadowsFlagsIndex];
-            set => flags[AlwaysDrawDynamicShadowsFlagsIndex] = value;
-        }
-
-        public bool updateUponLightMovement
-        {
-            get => flags[UpdateUponLightMovementFlagsIndex];
-            set => flags[UpdateUponLightMovementFlagsIndex] = value;
-        }
-
-        public bool hasCachedComponent => shadowUpdateMode != ShadowUpdateMode.EveryFrame;
-
-        public void Set(HDAdditionalLightData additionalLightData)
-        {
-            shadowNearPlane = additionalLightData.shadowNearPlane;
-            normalBias = additionalLightData.normalBias;
-            areaLightShadowCone = additionalLightData.areaLightShadowCone;
-            softnessScale = additionalLightData.softnessScale;
-            angularDiameter = additionalLightData.angularDiameter;
-            shapeRadius = additionalLightData.shapeRadius;
-            slopeBias = additionalLightData.slopeBias;
-            minFilterSize = additionalLightData.minFilterSize;
-            lightAngle = additionalLightData.lightAngle;
-            maxDepthBias = additionalLightData.maxDepthBias;
-            evsmExponent = additionalLightData.evsmExponent;
-            evsmLightLeakBias = additionalLightData.evsmLightLeakBias;
-            evsmVarianceBias = additionalLightData.evsmVarianceBias;
-            customSpotLightShadowCone = additionalLightData.customSpotLightShadowCone;
-            cachedShadowTranslationUpdateThreshold = additionalLightData.cachedShadowTranslationUpdateThreshold;
-            cachedShadowAngleUpdateThreshold = additionalLightData.cachedShadowAngleUpdateThreshold;
-            dirLightPCSSMaxPenumbraSize = additionalLightData.dirLightPCSSMaxPenumbraSize;
-            dirLightPCSSMaxSamplingDistance = additionalLightData.dirLightPCSSMaxSamplingDistance;
-            dirLightPCSSMinFilterSizeTexels = additionalLightData.dirLightPCSSMinFilterSizeTexels;
-            dirLightPCSSMinFilterMaxAngularDiameter = additionalLightData.dirLightPCSSMinFilterMaxAngularDiameter;
-            dirLightPCSSBlockerSearchAngularDiameter = additionalLightData.dirLightPCSSBlockerSearchAngularDiameter;
-            dirLightPCSSBlockerSamplingClumpExponent = additionalLightData.dirLightPCSSBlockerSamplingClumpExponent;
-            dirLightPCSSBlockerSampleCount = (byte)additionalLightData.dirLightPCSSBlockerSampleCount;
-            dirLightPCSSFilterSampleCount = (byte)additionalLightData.dirLightPCSSFilterSampleCount;
-            blockerSampleCount = (byte)additionalLightData.blockerSampleCount;
-            filterSampleCount = (byte)additionalLightData.filterSampleCount;
-            kernelSize = (byte)additionalLightData.kernelSize;
-            evsmBlurPasses = (byte)additionalLightData.evsmBlurPasses;
-            lightIdxForCachedShadows = additionalLightData.lightIdxForCachedShadows;
-            shadowUpdateMode = additionalLightData.shadowUpdateMode;
-            useCustomSpotLightShadowCone = additionalLightData.useCustomSpotLightShadowCone;
-            alwaysDrawDynamicShadows = additionalLightData.alwaysDrawDynamicShadows;
-            updateUponLightMovement = additionalLightData.updateUponLightMovement;
-        }
-    }
     //Class representing a rendering side database of lights in the world
     internal partial class HDLightRenderDatabase
     {
@@ -184,20 +77,6 @@ namespace UnityEngine.Rendering.HighDefinition
         //Attachments in case the rendering pipeline uses game objects
         public DynamicArray<HDAdditionalLightData> hdAdditionalLightData => m_HDAdditionalLightData;
         public DynamicArray<GameObject> aovGameObjects => m_AOVGameObjects;
-
-        public NativeList<HDShadowRequestSetHandle> packedShadowRequestSetHandles => m_ShadowRequestSetPackedHandles;
-
-        public NativeArray<HDAdditionalLightDataUpdateInfo> additionalLightDataUpdateInfos => m_AdditionalLightDataUpdateInfos;
-
-        public int validCustomViewCallbackEvents => m_ValidCustomViewCallbackEvents;
-
-        public DynamicArray<SpotLightCallbackData> customViewCallbackEvents => m_CustomViewCallbackEvents;
-
-        public HDShadowRequestDatabase shadowRequests => HDShadowRequestDatabase.instance;
-
-        // This array tracks directional lights for the PBR sky
-        // We need this as VisibleLight result from culling ignores lights with intensity == 0
-        public List<HDAdditionalLightData> directionalLights = new();
 
         //Access of main instance
         static public HDLightRenderDatabase instance
@@ -232,103 +111,32 @@ namespace UnityEngine.Rendering.HighDefinition
             }
         }
 
-        public ref HDAdditionalLightDataUpdateInfo EditAdditionalLightUpdateDataAsRef(in HDLightRenderEntity entity)
-        {
-            int dataIndex = m_LightEntities[entity.entityIndex].dataIndex;
-            if ( dataIndex >= m_LightCount)
-                throw new Exception("Entity passed in is out of bounds. Index requested " + dataIndex + " and maximum length is " + m_LightCount);
-
-            unsafe
-            {
-                HDAdditionalLightDataUpdateInfo* data = (HDAdditionalLightDataUpdateInfo*)m_AdditionalLightDataUpdateInfos.GetUnsafePtr<HDAdditionalLightDataUpdateInfo>() + dataIndex;
-                return ref UnsafeUtility.AsRef<HDAdditionalLightDataUpdateInfo>(data);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetShapeRadius(in HDLightRenderEntity entity, float shapeRadius)
-        {
-            if (!entity.valid)
-                return;
-
-            EditLightDataAsRef(entity).shapeRadius = shapeRadius;
-            EditAdditionalLightUpdateDataAsRef(entity).shapeRadius = shapeRadius;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetAngularDiameter(in HDLightRenderEntity entity, float angularDiameter)
-        {
-            if (!entity.valid)
-                return;
-
-            EditLightDataAsRef(entity).angularDiameter = angularDiameter;
-            EditAdditionalLightUpdateDataAsRef(entity).angularDiameter = angularDiameter;
-        }
-
-        public void SetCustomCallback(in HDLightRenderEntity entity, HDAdditionalLightData.CustomViewCallback callback)
-        {
-            int dataIndex = m_LightEntities[entity.entityIndex].dataIndex;
-            if ( dataIndex >= m_LightCount)
-                throw new Exception("Entity passed in is out of bounds. Index requested " + dataIndex + " and maximum length is " + m_LightCount);
-            ref var currentCallback = ref m_CustomViewCallbackEvents[dataIndex];
-            bool wasSet = currentCallback.isAnythingRegistered;
-            bool isSet = callback != null;
-
-            currentCallback.callback = callback;
-            currentCallback.isAnythingRegistered = isSet;
-
-            if (wasSet != isSet)
-            {
-                m_ValidCustomViewCallbackEvents += isSet ? 1 : -1;
-            }
-        }
-
         // Creates a light render entity.
         public HDLightRenderEntity CreateEntity(bool autoDestroy)
         {
-            if (!m_LightEntities.IsCreated)
-            {
-                m_LightEntities = new NativeList<LightEntityInfo>(Allocator.Persistent);
-            }
-
             LightEntityInfo newData = AllocateEntityData();
 
             HDLightRenderEntity newLightEntity = HDLightRenderEntity.Invalid;
             if (m_FreeIndices.Count == 0)
             {
-                newLightEntity.entityIndex = m_LightEntities.Length;
+                newLightEntity.entityIndex = m_LightEntities.Count;
                 m_LightEntities.Add(newData);
-
-                EnsureNativeListsAreCreated();
-
-                m_ShadowRequestSetHandles.Add(new HDShadowRequestSetHandle{ relativeDataOffset =  HDShadowRequestSetHandle.InvalidIndex });
-                m_ShadowRequestSetPackedHandles.Add(new HDShadowRequestSetHandle{ relativeDataOffset =  HDShadowRequestSetHandle.InvalidIndex });
             }
             else
             {
                 newLightEntity.entityIndex = m_FreeIndices.Dequeue();
                 m_LightEntities[newLightEntity.entityIndex] = newData;
-                m_ShadowRequestSetHandles[newLightEntity.entityIndex] = new HDShadowRequestSetHandle {relativeDataOffset = HDShadowRequestSetHandle.InvalidIndex};
             }
 
             m_OwnerEntity[newData.dataIndex] = newLightEntity;
             m_AutoDestroy[newData.dataIndex] = autoDestroy;
-            m_ShadowRequestSetPackedHandles[newData.dataIndex] = new HDShadowRequestSetHandle {relativeDataOffset = HDShadowRequestSetHandle.InvalidIndex};
             return newLightEntity;
-        }
-
-        private void EnsureNativeListsAreCreated()
-        {
-            if (!m_ShadowRequestSetHandles.IsCreated)
-                m_ShadowRequestSetHandles = new NativeList<HDShadowRequestSetHandle>(Allocator.Persistent);
-            if (!m_ShadowRequestSetPackedHandles.IsCreated)
-                m_ShadowRequestSetPackedHandles = new NativeList<HDShadowRequestSetHandle>(Allocator.Persistent);
         }
 
         //Must be called by game object so we can gather all the information needed,
         //This will prep this system when dots lights come in.
         //Dots lights wont have to use this and instead will have to set this data on their own.
-        public unsafe void AttachGameObjectData(
+        public void AttachGameObjectData(
             HDLightRenderEntity entity,
             int instanceID,
             HDAdditionalLightData additionalLightData,
@@ -348,49 +156,26 @@ namespace UnityEngine.Rendering.HighDefinition
             m_LightsToEntityItem.Add(entityInfo.lightInstanceID, entityInfo);
             m_HDAdditionalLightData[dataIndex] = additionalLightData;
             m_AOVGameObjects[dataIndex] = aovGameObject;
-            HDAdditionalLightDataUpdateInfo updateInfo = default;
-            updateInfo.Set(additionalLightData);
-            m_AdditionalLightDataUpdateInfos[dataIndex] = updateInfo;
-            m_CustomViewCallbackEvents[dataIndex] = new SpotLightCallbackData() { callback = additionalLightData.CustomViewCallbackEvent, isAnythingRegistered = additionalLightData.CustomViewCallbackEvent != null};
-            if (additionalLightData.CustomViewCallbackEvent != null)
-                ++m_ValidCustomViewCallbackEvents;
             ++m_AttachedGameObjects;
-
-            if (additionalLightData.legacyLight.type == LightType.Directional
-#if UNITY_EDITOR
-                 && !UnityEditor.SceneManagement.EditorSceneManager.IsPreviewScene(additionalLightData.gameObject.scene)
-#endif
-                )
-                directionalLights.Add(additionalLightData);
         }
 
         // Destroys a light render entity.
-        public unsafe void DestroyEntity(HDLightRenderEntity lightEntity)
+        public void DestroyEntity(HDLightRenderEntity lightEntity)
         {
-            if (!lightEntity.valid)
-                return;
+            Assert.IsTrue(IsValid(lightEntity));
 
             m_FreeIndices.Enqueue(lightEntity.entityIndex);
             LightEntityInfo entityData = m_LightEntities[lightEntity.entityIndex];
             m_LightsToEntityItem.Remove(entityData.lightInstanceID);
 
-            var lightData = m_HDAdditionalLightData[entityData.dataIndex];
-            if (lightData != null)
-            {
-                int idx = directionalLights.FindIndex((x) => ReferenceEquals(x, lightData));
-                if (idx != -1) directionalLights.RemoveAt(idx);
-
+            if (m_HDAdditionalLightData[entityData.dataIndex] != null)
                 --m_AttachedGameObjects;
-            }
-
-            FreeHDShadowRequests(lightEntity);
 
             RemoveAtSwapBackArrays(entityData.dataIndex);
 
             if (m_LightCount == 0)
             {
                 DeleteArrays();
-                HDShadowRequestDatabase.instance.DeleteArrays();
             }
             else
             {
@@ -401,94 +186,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 if (dataToUpdate.lightInstanceID != entityData.lightInstanceID)
                     m_LightsToEntityItem[dataToUpdate.lightInstanceID] = dataToUpdate;
             }
-        }
-
-        public void AllocateHDShadowRequests(HDLightRenderEntity entity)
-        {
-            if (!entity.valid)
-                return;
-
-            HDShadowRequestSetHandle shadowSethandle = m_ShadowRequestSetHandles[entity.entityIndex];
-            if (!shadowSethandle.valid)
-            {
-                shadowSethandle = HDShadowRequestDatabase.instance.AllocateHDShadowRequests();
-                m_ShadowRequestSetHandles[entity.entityIndex] = shadowSethandle;
-                m_ShadowRequestSetPackedHandles[GetEntityData(entity).dataIndex] = shadowSethandle;
-            }
-        }
-
-        public void FreeHDShadowRequests(HDLightRenderEntity lightEntity)
-        {
-            if (!lightEntity.valid)
-                return;
-
-            HDShadowRequestSetHandle shadowRequestSetHandle = m_ShadowRequestSetHandles[lightEntity.entityIndex];
-            HDShadowRequestDatabase.instance.FreeHDShadowRequests(ref shadowRequestSetHandle);
-            m_ShadowRequestSetHandles[lightEntity.entityIndex] = shadowRequestSetHandle;
-            m_ShadowRequestSetPackedHandles[GetEntityData(lightEntity).dataIndex] = shadowRequestSetHandle;
-        }
-
-        public HDShadowRequestSetHandle GetShadowRequestSetHandle(HDLightRenderEntity entity)
-        {
-            return m_ShadowRequestSetHandles[entity.entityIndex];
-        }
-
-        [BurstCompile]
-        private struct GetDataIndicesFromHDLightRenderEntitiesArrayJob : IJob
-        {
-            [ReadOnly] public NativeArray<HDLightRenderEntity> lightEntityLookups;
-            [ReadOnly] public NativeArray<LightEntityInfo> lightEntityStorage;
-            [WriteOnly] public NativeList<int> dataIndices;
-
-            public void Execute()
-            {
-                for (int i = 0; i < lightEntityLookups.Length; i++)
-                {
-                    LightEntityInfo entityInfo = lightEntityStorage[lightEntityLookups[i].entityIndex];
-                    dataIndices.Add(entityInfo.dataIndex);
-                }
-            }
-        }
-
-        [BurstCompile]
-        private struct GetDataIndicesFromHDLightRenderEntitiesHashmapJob : IJob
-        {
-            [ReadOnly] public NativeParallelHashMap<int, HDLightRenderEntity> lightEntityLookups;
-            [ReadOnly] public NativeArray<LightEntityInfo> lightEntityStorage;
-            [WriteOnly] public NativeList<int> dataIndices;
-
-            public void Execute()
-            {
-                foreach (var kvp in lightEntityLookups)
-                {
-                    LightEntityInfo entityInfo = lightEntityStorage[kvp.Value.entityIndex];
-                    dataIndices.Add(entityInfo.dataIndex);
-                }
-            }
-        }
-
-        public void GetDataIndicesFromEntities(NativeArray<HDLightRenderEntity> inLightEntities, NativeList<int> outDataIndices)
-        {
-            GetDataIndicesFromHDLightRenderEntitiesArrayJob getDataIndicesJob = new GetDataIndicesFromHDLightRenderEntitiesArrayJob()
-            {
-                lightEntityLookups = inLightEntities,
-                lightEntityStorage = m_LightEntities.AsArray(),
-                dataIndices = outDataIndices
-            };
-
-            getDataIndicesJob.Run();
-        }
-
-        public void GetDataIndicesFromEntities(NativeParallelHashMap<int, HDLightRenderEntity> inLightEntities, NativeList<int> outDataIndices)
-        {
-            GetDataIndicesFromHDLightRenderEntitiesHashmapJob getDataIndicesJob = new GetDataIndicesFromHDLightRenderEntitiesHashmapJob()
-            {
-                lightEntityLookups = inLightEntities,
-                lightEntityStorage = m_LightEntities.AsArray(),
-                dataIndices = outDataIndices
-            };
-
-            getDataIndicesJob.Run();
         }
 
         //Must be called at the destruction of the rendering pipeline to delete all the internal buffers.
@@ -523,7 +220,7 @@ namespace UnityEngine.Rendering.HighDefinition
         // Returns true / false wether the entity has been destroyed or not.
         public bool IsValid(HDLightRenderEntity entity)
         {
-            return entity.valid && m_LightEntities.IsCreated && entity.entityIndex < m_LightEntities.Length;
+            return entity.valid && entity.entityIndex < m_LightEntities.Count;
         }
 
         // Returns the index in data of an entity. Use this index to access lightData.
@@ -544,8 +241,6 @@ namespace UnityEngine.Rendering.HighDefinition
             return -1;
         }
 
-
-
         #endregion
 
         #region private definitions
@@ -559,12 +254,6 @@ namespace UnityEngine.Rendering.HighDefinition
             public bool valid { get { return dataIndex != -1 && lightInstanceID != -1; } }
         }
 
-        internal struct SpotLightCallbackData
-        {
-            public HDAdditionalLightData.CustomViewCallback callback;
-            public bool isAnythingRegistered;
-        }
-
         private const int ArrayCapacity = 100;
         private static HDLightRenderDatabase s_Instance = null;
 
@@ -573,21 +262,13 @@ namespace UnityEngine.Rendering.HighDefinition
         private int m_AttachedGameObjects = 0;
         private HDLightRenderEntity m_DefaultLightEntity = HDLightRenderEntity.Invalid;
 
-        private NativeList<LightEntityInfo> m_LightEntities;
-
-        // Technically only used for spot lights. Not good for perf, would like to deprecate this whenever possible.
-        private DynamicArray<SpotLightCallbackData> m_CustomViewCallbackEvents = new DynamicArray<SpotLightCallbackData>();
-        private int m_ValidCustomViewCallbackEvents;
-        private NativeList<HDShadowRequestSetHandle> m_ShadowRequestSetHandles;
-        private NativeList<HDShadowRequestSetHandle> m_ShadowRequestSetPackedHandles;
-
+        private List<LightEntityInfo> m_LightEntities = new List<LightEntityInfo>();
         private Queue<int> m_FreeIndices = new Queue<int>();
         private Dictionary<int, LightEntityInfo> m_LightsToEntityItem = new Dictionary<int, LightEntityInfo>();
 
         private NativeArray<HDLightRenderData> m_LightData;
         private NativeArray<HDLightRenderEntity> m_OwnerEntity;
         private NativeArray<bool> m_AutoDestroy;
-        private NativeArray<HDAdditionalLightDataUpdateInfo> m_AdditionalLightDataUpdateInfos;
 
         //TODO: Hack array just used for shadow allocation. Need to refactor this so we dont depend on hdAdditionalData
         private DynamicArray<GameObject> m_AOVGameObjects = new DynamicArray<GameObject>();
@@ -597,12 +278,10 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             m_HDAdditionalLightData.Resize(m_Capacity, true);
             m_AOVGameObjects.Resize(m_Capacity, true);
-            m_CustomViewCallbackEvents.Resize(m_Capacity, true);
 
             m_LightData.ResizeArray(m_Capacity);
             m_OwnerEntity.ResizeArray(m_Capacity);
             m_AutoDestroy.ResizeArray(m_Capacity);
-            m_AdditionalLightDataUpdateInfos.ResizeArray(m_Capacity);
         }
 
         private void RemoveAtSwapBackArrays(int removeIndexAt)
@@ -617,11 +296,6 @@ namespace UnityEngine.Rendering.HighDefinition
             m_LightData[removeIndexAt] = m_LightData[lastIndex];
             m_OwnerEntity[removeIndexAt] = m_OwnerEntity[lastIndex];
             m_AutoDestroy[removeIndexAt] = m_AutoDestroy[lastIndex];
-            m_AdditionalLightDataUpdateInfos[removeIndexAt] = m_AdditionalLightDataUpdateInfos[lastIndex];
-            m_ShadowRequestSetPackedHandles[removeIndexAt] = m_ShadowRequestSetPackedHandles[lastIndex];
-            m_ShadowRequestSetPackedHandles[lastIndex] = new HDShadowRequestSetHandle {relativeDataOffset = HDShadowRequestSetHandle.InvalidIndex};
-            m_CustomViewCallbackEvents[removeIndexAt] = m_CustomViewCallbackEvents[lastIndex];
-            m_CustomViewCallbackEvents[lastIndex] = default;
 
             --m_LightCount;
         }
@@ -636,17 +310,10 @@ namespace UnityEngine.Rendering.HighDefinition
             m_LightData.Dispose();
             m_OwnerEntity.Dispose();
             m_AutoDestroy.Dispose();
-            m_AdditionalLightDataUpdateInfos.Dispose();
 
             m_FreeIndices.Clear();
-            m_LightEntities.Dispose();
-            m_LightEntities = default;
-            m_ShadowRequestSetHandles.Dispose();
-            m_ShadowRequestSetHandles = default;
-            m_ShadowRequestSetPackedHandles.Dispose();
-            m_ShadowRequestSetPackedHandles = default;
+            m_LightEntities.Clear();
 
-            m_ValidCustomViewCallbackEvents = 0;
             m_Capacity = 0;
         }
 

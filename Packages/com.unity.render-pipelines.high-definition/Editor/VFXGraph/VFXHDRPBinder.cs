@@ -9,6 +9,8 @@ using UnityEditor.VFX;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
+using BlendMode = UnityEditor.Rendering.HighDefinition.BlendMode;
+
 using static UnityEngine.Rendering.HighDefinition.HDMaterial;
 
 namespace UnityEditor.VFX.HDRP
@@ -49,41 +51,37 @@ namespace UnityEditor.VFX.HDRP
 
         public override bool TryGetQueueOffset(ShaderGraphVfxAsset shaderGraph, VFXMaterialSerializedSettings materialSettings, out int queueOffset)
         {
-            var path = AssetDatabase.GetAssetPath(shaderGraph);
-            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
-
             queueOffset = 0;
-            if (!materialSettings.TryGetFloat(HDMaterialProperties.kTransparentSortPriority, material, out var queueOffsetFloat))
-                return false;
-
-            queueOffset = (int)queueOffsetFloat;
-            return true;
+            if (materialSettings.HasProperty(HDMaterialProperties.kTransparentSortPriority))
+            {
+                queueOffset = (int)materialSettings.GetFloat(HDMaterialProperties.kTransparentSortPriority);
+                return true;
+            }
+            return false;
         }
 
-        public override VFXAbstractRenderedOutput.BlendMode GetBlendModeFromMaterial(ShaderGraphVfxAsset shaderGraph, VFXMaterialSerializedSettings materialSettings)
+        public override VFXAbstractRenderedOutput.BlendMode GetBlendModeFromMaterial(ShaderGraphVfxAsset shader, VFXMaterialSerializedSettings materialSettings)
         {
             var blendMode = VFXAbstractRenderedOutput.BlendMode.Opaque;
 
-            var path = AssetDatabase.GetAssetPath(shaderGraph);
-            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
-
-            if (!materialSettings.TryGetFloat(HDMaterialProperties.kSurfaceType, material, out var surfaceType)
-                || !materialSettings.TryGetFloat(HDMaterialProperties.kBlendMode, material, out var blendModeFloat))
+            if (!materialSettings.HasProperty(HDMaterialProperties.kSurfaceType) ||
+                !materialSettings.HasProperty(HDMaterialProperties.kBlendMode))
             {
                 return blendMode;
             }
 
+            var surfaceType = materialSettings.GetFloat(HDMaterialProperties.kSurfaceType);
             if (surfaceType == (int)SurfaceType.Transparent)
             {
-                switch (blendModeFloat)
+                switch (materialSettings.GetFloat(HDMaterialProperties.kBlendMode))
                 {
-                    case (int)BlendingMode.Alpha:
-                        blendMode = VFXAbstractRenderedOutput.BlendMode.Alpha;
-                        break;
-                    case (int)BlendingMode.Additive:
+                    case (int)BlendMode.Additive:
                         blendMode = VFXAbstractRenderedOutput.BlendMode.Additive;
                         break;
-                    case (int)BlendingMode.Premultiply:
+                    case (int)BlendMode.Alpha:
+                        blendMode = VFXAbstractRenderedOutput.BlendMode.Alpha;
+                        break;
+                    case (int)BlendMode.Premultiply:
                         blendMode = VFXAbstractRenderedOutput.BlendMode.AlphaPremultiplied;
                         break;
                 }
@@ -120,13 +118,6 @@ namespace UnityEditor.VFX.HDRP
             return false;
         }
 
-        public override bool GetSupportsRayTracing()
-        {
-            return HDRenderPipeline.currentAsset.currentPlatformRenderPipelineSettings.supportRayTracing &&
-                   HDRenderPipeline.currentAsset.currentPlatformRenderPipelineSettings.supportVFXRayTracing;
-        }
-
-
         public override string GetShaderName(ShaderGraphVfxAsset shaderGraph)
         {
             // Recover the HDRP Shader ids from the VFX Shader Graph.
@@ -135,12 +126,12 @@ namespace UnityEditor.VFX.HDRP
         }
 
         // List of shader properties that currently are not supported for exposure in VFX shaders (for HDRP).
-        private static readonly (Type, string)[] s_UnsupportedHDRPShaderPropertyTypes = new[]
+        private static readonly Dictionary<Type, string> s_UnsupportedHDRPShaderPropertyTypes = new Dictionary<Type, string>()
         {
-            (typeof(DiffusionProfileShaderProperty), "Diffusion Profile" ),
+            { typeof(DiffusionProfileShaderProperty), "Diffusion Profile" },
         };
 
-        public override IEnumerable<(Type, string)> GetUnsupportedShaderPropertyType()
+        public override IEnumerable<KeyValuePair<Type, string>> GetUnsupportedShaderPropertyType()
         {
             return base.GetUnsupportedShaderPropertyType().Concat(s_UnsupportedHDRPShaderPropertyTypes);
         }
@@ -158,10 +149,6 @@ namespace UnityEditor.VFX.HDRP
                 HDStructFields.AttributesMesh.uv1,
                 HDStructFields.AttributesMesh.uv2,
                 HDStructFields.AttributesMesh.uv3,
-                HDStructFields.AttributesMesh.uv4,
-                HDStructFields.AttributesMesh.uv5,
-                HDStructFields.AttributesMesh.uv6,
-                HDStructFields.AttributesMesh.uv7,
                 HDStructFields.AttributesMesh.color,
 
                 // InstanceID without the Preprocessor.
@@ -174,6 +161,28 @@ namespace UnityEditor.VFX.HDRP
                 new FieldDescriptor(HDStructFields.AttributesMesh.name, "vertexID", "ATTRIBUTES_NEED_VERTEXID", ShaderValueType.Uint, "VERTEXID_SEMANTIC")
             }
         };
+
+        // A key difference between Material Shader and VFX Shader generation is how surface properties are provided. Material Shaders
+        // simply provide properties via UnityPerMaterial cbuffer. VFX expects these same properties to be computed in the vertex
+        // stage (because we must evaluate them with the VFX blocks), and packed with the interpolators for the fragment stage.
+        static StructDescriptor AppendVFXInterpolator(StructDescriptor interpolator, VFXContext context, VFXContextCompiledData contextData)
+        {
+            var fields = interpolator.fields.ToList();
+
+            fields.AddRange(VFXSubTarget.GetVFXInterpolators(HDStructFields.VaryingsMeshToPS.name, context, contextData));
+
+            // VFX Object Space Interpolators
+            fields.Add(HDStructFields.VaryingsMeshToPS.worldToElement0);
+            fields.Add(HDStructFields.VaryingsMeshToPS.worldToElement1);
+            fields.Add(HDStructFields.VaryingsMeshToPS.worldToElement2);
+
+            fields.Add(HDStructFields.VaryingsMeshToPS.elementToWorld0);
+            fields.Add(HDStructFields.VaryingsMeshToPS.elementToWorld1);
+            fields.Add(HDStructFields.VaryingsMeshToPS.elementToWorld2);
+
+            interpolator.fields = fields.ToArray();
+            return interpolator;
+        }
 
         static readonly DependencyCollection ElementSpaceDependencies = new DependencyCollection
         {
@@ -202,28 +211,19 @@ namespace UnityEditor.VFX.HDRP
             new FieldDependency(BlockFields.SurfaceDescription.NormalOS, HDStructFields.FragInputs.worldToElement),
         };
 
-        static readonly FieldDescriptor[] VaryingsAdditionalFields = {
-            HDStructFields.VaryingsMeshToPS.worldToElement0,
-            HDStructFields.VaryingsMeshToPS.worldToElement1,
-            HDStructFields.VaryingsMeshToPS.worldToElement2,
 
-            HDStructFields.VaryingsMeshToPS.elementToWorld0,
-            HDStructFields.VaryingsMeshToPS.elementToWorld1,
-            HDStructFields.VaryingsMeshToPS.elementToWorld2,
-        };
-
-        public override ShaderGraphBinder GetShaderGraphDescriptor(VFXContext context, VFXTaskCompiledData data)
+        public override ShaderGraphBinder GetShaderGraphDescriptor(VFXContext context, VFXContextCompiledData data)
         {
             return new ShaderGraphBinder
             {
-                baseStructs = new StructCollection
+                structs = new StructCollection
                 {
                     AttributesMeshVFX, // TODO: Could probably re-use the original HD Attributes Mesh and just ensure Instancing enabled.
                     Structs.VertexDescriptionInputs,
                     Structs.SurfaceDescriptionInputs,
+                    AppendVFXInterpolator(HDStructs.VaryingsMeshToPS, context, data),
                 },
-
-                varyingsAdditionalFields = VaryingsAdditionalFields,
+                
                 fieldDependencies = ElementSpaceDependencies,
                 useFragInputs = true
             };

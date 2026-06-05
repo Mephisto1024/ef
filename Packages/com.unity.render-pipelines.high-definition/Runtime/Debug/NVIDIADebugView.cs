@@ -31,12 +31,18 @@ namespace UnityEngine.NVIDIA
 
         private GraphicsDeviceDebugView m_DebugView = null;
 
+        private class Container<T> where T : struct
+        {
+            public T data = new T();
+        }
+
         private class Data
         {
             public DeviceState deviceState = DeviceState.Unknown;
             public bool dlssSupported = false;
-            public DLSSDebugFeatureInfos[] dlssFeatureInfos = null;
+            public Container<DLSSDebugFeatureInfos>[] dlssFeatureInfos = null;
         }
+
         private Data m_Data = new Data();
 
         private void InternalReset()
@@ -86,20 +92,39 @@ namespace UnityEngine.NVIDIA
                 bool isPluginLoaded = NVUnityPlugin.IsLoaded();
                 m_Data.deviceState = isPluginLoaded ?  DeviceState.DeviceCreationFailed : DeviceState.MissingPluginDLL;
                 m_Data.dlssSupported = false;
+                ClearFeatureStateContainer(m_Data.dlssFeatureInfos);
             }
 
             UpdateDebugUITable();
         }
 
-        private static void TranslateDlssFeatureArray(DLSSDebugFeatureInfos[] featureArray, in GraphicsDeviceDebugView debugView)
+        private static void ClearFeatureStateContainer(Container<DLSSDebugFeatureInfos>[] containerArray)
         {
-            new Span<DLSSDebugFeatureInfos>(featureArray).Clear(); // Clear the local array first.
-            debugView.dlssFeatureInfosSpan.CopyTo(featureArray); // Directly copy the data from the source span to the destination array.
+            for (int i = 0; i < containerArray.Length; ++i)
+            {
+                containerArray[i].data = new DLSSDebugFeatureInfos();
+            }
         }
 
-        #endregion
+        private static void TranslateDlssFeatureArray(Container<DLSSDebugFeatureInfos>[] containerArray, in GraphicsDeviceDebugView debugView)
+        {
+            ClearFeatureStateContainer(containerArray);
+            if (!debugView.dlssFeatureInfos.Any())
+                return;
 
-        #region Debug User Interface
+            //copy data over
+            int i = 0;
+            foreach (var featureInfo in debugView.dlssFeatureInfos)
+            {
+                if (i == containerArray.Length)
+                    break;
+                containerArray[i++].data = featureInfo;
+            }
+        }
+
+#endregion
+
+#region Debug User Interface
 
         private const int MaxDebugRows = 4;
         private DebugUI.Container m_DebugWidget = null;
@@ -127,23 +152,20 @@ namespace UnityEngine.NVIDIA
                     },
                     new DebugUI.Container() {
                         displayName = "Quality",
-                    },
-                    new DebugUI.Container() {
-                        displayName = "Render Preset",
                     }
                 }
             };
 
             m_DlssViewStateTable = new DebugUI.Table()
             {
-                displayName = "Feature Slot ID",
+                displayName = "DLSS Slot ID",
                 isReadOnly = true
             };
 
             m_DlssViewStateTable.children.Add(m_DlssViewStateTableHeader);
 
-            m_DebugWidget = new DebugUI.Foldout() {
-                displayName = "NVIDIA Device settings",
+            m_DebugWidget = new DebugUI.Container() {
+                displayName = "NVIDIA device debug view",
                 children =
                 {
                     new DebugUI.Value()
@@ -153,8 +175,8 @@ namespace UnityEngine.NVIDIA
                     },
                     new DebugUI.Value()
                     {
-                        displayName = "DLSS Version", // Must match NVUnityPlugin preprocessor definition NV_MAKE_BIT_VERSION
-                        getter = () => m_DebugView == null ? "-" : String.Format("{0}.{1}.{2}", (m_DebugView.ngxVersion >> 18) & 0x3FF, (m_DebugView.ngxVersion >> 7) & 0x7F, m_DebugView.ngxVersion & 0x7F),
+                        displayName = "NGX API Version",
+                        getter = () => m_DebugView == null ? "-" : m_DebugView.ngxVersion.ToString("X2"),
                     },
                     new DebugUI.Value()
                     {
@@ -174,7 +196,7 @@ namespace UnityEngine.NVIDIA
                 }
             };
 
-            m_Data.dlssFeatureInfos = new DLSSDebugFeatureInfos[MaxDebugRows];
+            m_Data.dlssFeatureInfos = new Container<DLSSDebugFeatureInfos>[MaxDebugRows];
             m_DlssViewStateTableRows = new DebugUI.Table.Row[m_Data.dlssFeatureInfos.Length];
 
             String resToString(uint a, uint b)
@@ -184,102 +206,48 @@ namespace UnityEngine.NVIDIA
 
             for (int r = 0; r < m_Data.dlssFeatureInfos.Length; ++r)
             {
-                int currentIndex = r;
-                string GetPresetLabel(DLSSQuality quality, int index)
+                var c = new Container<DLSSDebugFeatureInfos>()
                 {
-                    DLSSPreset presetValue = DLSSPreset.Preset_Default;
-                    switch (quality)
-                    {
-                        case DLSSQuality.DLAA: presetValue = m_Data.dlssFeatureInfos[index].initData.presetDlaaMode; break;
-                        case DLSSQuality.Balanced: presetValue = m_Data.dlssFeatureInfos[index].initData.presetBalancedMode; break;
-                        case DLSSQuality.MaximumQuality: presetValue = m_Data.dlssFeatureInfos[index].initData.presetQualityMode; break;
-                        case DLSSQuality.UltraPerformance: presetValue = m_Data.dlssFeatureInfos[index].initData.presetUltraPerformanceMode; break;
-                        case DLSSQuality.MaximumPerformance: presetValue = m_Data.dlssFeatureInfos[index].initData.presetPerformanceMode; break;
-                    }
-                    string presetLabel = presetValue.ToString();
-                    int delimiterIndex = presetLabel.IndexOf(" - "); // trim explanation from explanation separator token
-                    if (delimiterIndex != -1)
-                        presetLabel = presetLabel.Substring(0, delimiterIndex);
-                    return presetLabel;
-                }
-                
+                    data = new DLSSDebugFeatureInfos()
+                };
+                m_Data.dlssFeatureInfos[r] = c;
                 var dlssStateRow = new DebugUI.Table.Row()
                 {
                     children =
                         {
                             new DebugUI.Value()
                             {
-                                getter = () => m_Data.dlssFeatureInfos[currentIndex].validFeature ? "Valid" : "-"
+                                getter = () => c.data.validFeature ? "Valid" : ""
                             },
                             new DebugUI.Value()
                             {
-                                getter = () => m_Data.dlssFeatureInfos[currentIndex].validFeature ? resToString(m_Data.dlssFeatureInfos[currentIndex].execData.subrectWidth, m_Data.dlssFeatureInfos[currentIndex].execData.subrectHeight) : "-"
+                                getter = () => c.data.validFeature ? resToString(c.data.execData.subrectWidth, c.data.execData.subrectHeight) : ""
                             },
                             new DebugUI.Value()
                             {
-                                getter = () => m_Data.dlssFeatureInfos[currentIndex].validFeature ? resToString(m_Data.dlssFeatureInfos[currentIndex].initData.outputRTWidth, m_Data.dlssFeatureInfos[currentIndex].initData.outputRTHeight) : "-"
+                                getter = () => c.data.validFeature ? resToString(c.data.initData.outputRTWidth, c.data.initData.outputRTHeight) : ""
                             },
                             new DebugUI.Value()
                             {
-                                getter = () => m_Data.dlssFeatureInfos[currentIndex].validFeature ? m_Data.dlssFeatureInfos[currentIndex].initData.quality.ToString() : "-"
-                            },
-                            new DebugUI.Value()
-                            {
-                                getter = () => m_Data.dlssFeatureInfos[currentIndex].validFeature ? GetPresetLabel(m_Data.dlssFeatureInfos[currentIndex].initData.quality, currentIndex) : "-"
+                                getter = () => c.data.validFeature ? c.data.initData.quality.ToString() : ""
                             }
                         }
                 };
-                dlssStateRow.isHiddenCallback = () => !m_Data.dlssFeatureInfos[currentIndex].validFeature;
-                m_DlssViewStateTableRows[currentIndex] = dlssStateRow;
+                dlssStateRow.isHiddenCallback = () => !c.data.validFeature;
+                m_DlssViewStateTableRows[r] = dlssStateRow;
             }
             m_DlssViewStateTable.children.Add(m_DlssViewStateTableRows);
-            m_DlssViewStateTable.isHiddenCallback = () =>
-            {
-                foreach (var row in m_DlssViewStateTableRows)
-                {
-                    if (!row.isHidden)
-                        return false;
-                }
 
-                return true;
-            };
 
             return m_DebugWidget;
         }
 
         private void UpdateDebugUITable()
         {
-            if (m_DlssViewStateTableRows == null)
-                return;
-
             for (int r = 0; r < m_DlssViewStateTableRows.Length; ++r)
             {
-                var d = m_Data.dlssFeatureInfos[r];
-                m_DlssViewStateTableRows[r].displayName = "";
-                if(d.validFeature)
-                {
-                    // we know we dont support more than 16 features at one time on the plugin side.
-                    // here's an allocation-free way to setup display name string values.
-                    switch (d.featureSlot)
-                    {
-                        case  0: m_DlssViewStateTableRows[r].displayName = "0"; break;
-                        case  1: m_DlssViewStateTableRows[r].displayName = "1"; break;
-                        case  2: m_DlssViewStateTableRows[r].displayName = "2"; break;
-                        case  3: m_DlssViewStateTableRows[r].displayName = "3"; break;
-                        case  4: m_DlssViewStateTableRows[r].displayName = "4"; break;
-                        case  5: m_DlssViewStateTableRows[r].displayName = "5"; break;
-                        case  6: m_DlssViewStateTableRows[r].displayName = "6"; break;
-                        case  7: m_DlssViewStateTableRows[r].displayName = "7"; break;
-                        case  8: m_DlssViewStateTableRows[r].displayName = "8"; break;
-                        case  9: m_DlssViewStateTableRows[r].displayName = "9"; break;
-                        case 10: m_DlssViewStateTableRows[r].displayName = "10"; break;
-                        case 11: m_DlssViewStateTableRows[r].displayName = "11"; break;
-                        case 12: m_DlssViewStateTableRows[r].displayName = "12"; break;
-                        case 13: m_DlssViewStateTableRows[r].displayName = "13"; break;
-                        case 14: m_DlssViewStateTableRows[r].displayName = "14"; break;
-                        case 15: m_DlssViewStateTableRows[r].displayName = "15"; break;
-                    }
-                }
+                var d = m_Data.dlssFeatureInfos[r].data;
+                m_DlssViewStateTableRows[r].displayName = d.validFeature ? Convert.ToString(d.featureSlot) : "";
             }
         }
 

@@ -46,8 +46,6 @@ namespace UnityEngine.Rendering.HighDefinition
             [ReadOnly]
             public bool enableRayTracing;
             [ReadOnly]
-            public bool enablePathTracing;
-            [ReadOnly]
             public bool showDirectionalLight;
             [ReadOnly]
             public bool showPunctualLight;
@@ -87,16 +85,13 @@ namespace UnityEngine.Rendering.HighDefinition
                 if (dataIndex < 0)
                     return true;
 
-                // If the light was forced visible it will be outside of the view and have no pixels on screen.
-                // The light will still generate a cached shadow map, but removed before going in to the
-                // main light loop.
-                if (light.forcedVisible)
-                    return false;
-
                 // We can skip the processing of lights that are so small to not affect at least a pixel on screen.
                 // TODO: The minimum pixel size on screen should really be exposed as parameter, to allow small lights to be culled to user's taste.
                 const int minimumPixelAreaOnScreen = 1;
-                return (light.screenRect.height * light.screenRect.width * pixelCount) < minimumPixelAreaOnScreen;
+                if ((light.screenRect.height * light.screenRect.width * pixelCount) < minimumPixelAreaOnScreen)
+                    return true;
+
+                return false;
             }
 
             private int IncrementCounter(HDProcessedVisibleLightsBuilder.ProcessLightsCountSlots counterSlot)
@@ -163,8 +158,9 @@ namespace UnityEngine.Rendering.HighDefinition
 
             private HDProcessedVisibleLightsBuilder.ShadowMapFlags EvaluateShadowState(
                 LightShadows shadows,
-                LightType lightType,
+                HDLightType lightType,
                 GPULightType gpuLightType,
+                AreaLightShape areaLightShape,
                 bool useScreenSpaceShadowsVal,
                 bool useRayTracingShadowsVal,
                 float shadowDimmerVal,
@@ -182,11 +178,11 @@ namespace UnityEngine.Rendering.HighDefinition
                     return flags;
 
                 // If the shadow is too far away, we don't render it
-                bool isShadowInRange = lightType == LightType.Directional || distanceToCamera < shadowFadeDistanceVal;
+                bool isShadowInRange = lightType == HDLightType.Directional || distanceToCamera < shadowFadeDistanceVal;
                 if (!isShadowInRange)
                     return flags;
 
-                if (lightType == LightType.Tube || lightType == LightType.Disc)
+                if (lightType == HDLightType.Area && areaLightShape != AreaLightShape.Rectangle)
                     return flags;
 
                 // First we reset the ray tracing and screen space shadow data
@@ -202,9 +198,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     bool validShadow = false;
                     if (gpuLightType == GPULightType.Point
                         || gpuLightType == GPULightType.Rectangle
-                        || gpuLightType == GPULightType.Spot
-                        || gpuLightType == GPULightType.ProjectorPyramid
-                        || gpuLightType == GPULightType.ProjectorBox)
+                        || (gpuLightType == GPULightType.Spot && lightVolumeType == LightVolumeType.Cone))
                         validShadow = true;
 
                     if (validShadow)
@@ -253,29 +247,29 @@ namespace UnityEngine.Rendering.HighDefinition
 
                 ref HDLightRenderData lightRenderData = ref GetLightData(dataIndex);
 
-                if (enableRayTracing && !enablePathTracing && !lightRenderData.includeForRayTracing)
-                    return;
-
-                if (enableRayTracing && enablePathTracing && !lightRenderData.includeForPathTracing)
+                if (enableRayTracing && !lightRenderData.includeForRayTracing)
                     return;
 
                 float3 lightPosition = visibleLight.GetPosition();
                 float distanceToCamera = math.distance(cameraPosition, lightPosition);
-                var lightType = visibleLight.lightType;
+                var lightType = HDAdditionalLightData.TranslateLightType(visibleLight.lightType, lightRenderData.pointLightType);
                 var lightCategory = LightCategory.Count;
                 var gpuLightType = GPULightType.Point;
+                var areaLightShape = lightRenderData.areaLightShape;
 
-                if (!enableAreaLights && (lightType == LightType.Rectangle || lightType == LightType.Tube))
+                if (!enableAreaLights && (lightType == HDLightType.Area && (areaLightShape == AreaLightShape.Rectangle || areaLightShape == AreaLightShape.Tube)))
                     return;
 
+                var spotLightShape = lightRenderData.spotLightShape;
                 var lightVolumeType = LightVolumeType.Count;
                 var isBakedShadowMaskLight =
                     bakingOutput.lightmapBakeType == LightmapBakeType.Mixed &&
                     bakingOutput.mixedLightingMode == MixedLightingMode.Shadowmask &&
                     bakingOutput.occlusionMaskChannel != -1;    // We need to have an occlusion mask channel assign, else we have no shadow mask
-                HDRenderPipeline.EvaluateGPULightType(lightType, ref lightCategory, ref gpuLightType, ref lightVolumeType);
+                HDRenderPipeline.EvaluateGPULightType(lightType, spotLightShape, areaLightShape,
+                    ref lightCategory, ref gpuLightType, ref lightVolumeType);
 
-                if (debugFilterMode != DebugLightFilterMode.None && debugFilterMode.IsEnabledFor(gpuLightType))
+                if (debugFilterMode != DebugLightFilterMode.None && debugFilterMode.IsEnabledFor(gpuLightType, spotLightShape))
                     return;
 
                 float lightDistanceFade = gpuLightType == GPULightType.Directional ? 1.0f : HDUtils.ComputeLinearDistanceFade(distanceToCamera, lightRenderData.fadeDistance);
@@ -285,9 +279,9 @@ namespace UnityEngine.Rendering.HighDefinition
                 contributesToLighting = contributesToLighting && (lightDistanceFade > 0);
 
                 var shadowMapFlags = EvaluateShadowState(
-                    shadows, lightType, gpuLightType, lightRenderData.useScreenSpaceShadows,
-                    lightRenderData.useRayTracedShadows, lightRenderData.shadowDimmer,
-                    lightRenderData.shadowFadeDistance, distanceToCamera, lightVolumeType);
+                    shadows, lightType, gpuLightType, areaLightShape,
+                    lightRenderData.useScreenSpaceShadows, lightRenderData.useRayTracedShadows,
+                    lightRenderData.shadowDimmer, lightRenderData.shadowFadeDistance, distanceToCamera, lightVolumeType);
 
                 if (!contributesToLighting)
                     return;
@@ -300,7 +294,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 if (outputIndex < 0 || outputIndex >= visibleLights.Length)
                     throw new Exception("Trying to access an output index out of bounds. Output index is " + outputIndex + "and max length is " + visibleLights.Length);
 #endif
-                sortKeys[outputIndex] = HDGpuLightsBuilder.PackLightSortKey(lightCategory, gpuLightType, lightVolumeType, index, visibleLight.forcedVisible);
+                sortKeys[outputIndex] = HDGpuLightsBuilder.PackLightSortKey(lightCategory, gpuLightType, lightVolumeType, index);
 
                 processedLightVolumeType[index] = lightVolumeType;
                 processedEntities[index] = new HDProcessedVisibleLight()
@@ -345,7 +339,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 pixelCount = hdCamera.actualWidth * hdCamera.actualHeight,
                 enableAreaLights = ShaderConfig.s_AreaLights != 0,
                 enableRayTracing = hdCamera.frameSettings.IsEnabled(FrameSettingsField.RayTracing) && rayTracingState,
-                enablePathTracing = hdCamera.IsPathTracingEnabled() && rayTracingState,
                 showDirectionalLight = debugDisplaySettings.data.lightingDebugSettings.showDirectionalLight,
                 showPunctualLight = debugDisplaySettings.data.lightingDebugSettings.showPunctualLight,
                 showAreaLight = debugDisplaySettings.data.lightingDebugSettings.showAreaLight,

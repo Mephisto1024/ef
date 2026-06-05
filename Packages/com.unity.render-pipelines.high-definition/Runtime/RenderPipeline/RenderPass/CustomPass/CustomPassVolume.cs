@@ -1,8 +1,7 @@
 using System.Collections.Generic;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using System.Linq;
 using System;
-using System.Collections;
 using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -40,8 +39,9 @@ namespace UnityEngine.Rendering.HighDefinition
         public float fadeRadius;
 
         /// <summary>
-        /// The volume priority, used to determine the execution order when there is multiple volumes with the same injection point. Custom Pass Volume with a higher value is rendered first.
+        /// The volume priority, used to determine the execution order when there is multiple volumes with the same injection point.
         /// </summary>
+        [Tooltip("Sets the Volume priority in the stack. A higher value means higher priority. You can use negative values.")]
         public float priority;
 
         /// <summary>
@@ -96,8 +96,6 @@ namespace UnityEngine.Rendering.HighDefinition
         // The current active custom pass volume is simply the smallest overlapping volume with the trigger transform
         static HashSet<CustomPassVolume> m_ActivePassVolumes = new HashSet<CustomPassVolume>();
         static List<CustomPassVolume> m_OverlappingPassVolumes = new List<CustomPassVolume>();
-        static readonly Dictionary<CustomPassInjectionPoint, List<GlobalCustomPass>> m_GlobalCustomPasses = new();
-        static readonly List<GlobalCustomPass> s_EmptyGlobalCustomPassList = new();
 
         internal List<Collider> m_Colliders = new List<Collider>();
 
@@ -117,173 +115,6 @@ namespace UnityEngine.Rendering.HighDefinition
                     m_InjectionPoints = Enum.GetValues(typeof(CustomPassInjectionPoint)).Cast<CustomPassInjectionPoint>().ToList();
                 return m_InjectionPoints;
             }
-        }
-
-        // List used to temporarily store the passes to execute at a given injection point, static to avoid GC.Alloc
-        static readonly List<CustomPassVolume> m_CurrentInjectionPointList = new();
-
-        /// <summary>The current injection point used to render passes. Used to determine the injection point of global custom passes.</summary>
-        internal static CustomPassInjectionPoint currentGlobalInjectionPoint;
-
-        /// <summary>
-        /// Data structure used to store the global custom pass data needed for evaluation during the frame.
-        /// </summary>
-        public readonly struct GlobalCustomPass
-        {
-            /// <summary>The priority this custom pass has been added. Define in which order the global custom passes will be executed.</summary>
-            public readonly float priority;
-            /// <summary>The custom pass instance to be executed.</summary>
-            public readonly CustomPass instance;
-
-            /// <summary>
-            /// Utility function to deconstruct a global custom pass into a tuple.
-            /// You can use it directly in a foreach to avoid declaring an intermediate field to store the GlobalCustomPass instance.
-            /// </summary>
-            /// <example>
-            /// <code>
-            /// foreach (var (customPass, priority) in GetGlobalCustomPasses(injectionPoint))
-            /// </code>
-            /// </example>
-            /// <param name="instance">The instance of the custom pass stored in this GlobalCustomPass.</param>
-            /// <param name="priority">The priority stored in this GlobalCustomPass.</param>
-            public void Deconstruct(out CustomPass instance, out float priority)
-            {
-                instance = this.instance;
-                priority = this.priority;
-            }
-
-            internal GlobalCustomPass(float priority, CustomPass pass)
-            {
-                this.priority = priority;
-                this.instance = pass;
-            }
-        }
-
-        // List insertion sort by dichotomie: https://www.jacksondunstan.com/articles/3189
-        static void InsertSorted(List<GlobalCustomPass> list, GlobalCustomPass value)
-        {
-            var startIndex = 0;
-            var endIndex = list.Count;
-            while (endIndex > startIndex)
-            {
-                var windowSize = endIndex - startIndex;
-                var middleIndex = startIndex + (windowSize / 2);
-                var compareToResult = list[middleIndex].priority.CompareTo(value.priority);
-                if (compareToResult == 0)
-                {
-                    list.Insert(middleIndex, value);
-                    return;
-                }
-                else if (compareToResult < 0)
-                    startIndex = middleIndex + 1;
-                else
-                    endIndex = middleIndex;
-            }
-            list.Insert(startIndex, value);
-        }
-
-        /// <summary>
-        /// Register a custom pass instance at a given injection point. This custom pass will be executed by every camera
-        /// with custom pass enabled in their frame settings.
-        /// </summary>
-        /// <param name="injectionPoint">The injection point where the custom pass will be executed.</param>
-        /// <param name="customPassInstance">The instance of the custom pass to execute. The same custom pass instance can be registered multiple times.</param>
-        /// <param name="priority">Define the execution order of the custom pass. Custom passes are executed from high to low priority.</param>
-        public static void RegisterGlobalCustomPass(CustomPassInjectionPoint injectionPoint, CustomPass customPassInstance, float priority = 0)
-        {
-            if (!m_GlobalCustomPasses.TryGetValue(injectionPoint, out var customPassList))
-                m_GlobalCustomPasses[injectionPoint] = customPassList = new();
-            InsertSorted(customPassList, new GlobalCustomPass(priority, customPassInstance));
-        }
-
-        /// <summary>
-        /// Similar to the RegisterGlobalCustomPass with a protection ensuring that only one custom pass type is existing
-        /// at a certain injection point. The same custom pass type can still be registered to multiple injection point
-        /// as long as there is only one of this type per injection point.
-        /// </summary>
-        /// <param name="injectionPoint">The injection point where the custom pass will be executed.</param>
-        /// <param name="customPassInstance">The instance of the custom pass to execute. The type of the custom pass will also be used to check if there is already a custom pass of this type registered.</param>
-        /// <param name="priority">Define the execution order of the custom pass. Custom passes are executed from high to low priority.</param>
-        /// <returns></returns>
-        public static bool RegisterUniqueGlobalCustomPass(CustomPassInjectionPoint injectionPoint, CustomPass customPassInstance, float priority = 0)
-        {
-            var customPassType = customPassInstance.GetType();
-            if (m_GlobalCustomPasses.TryGetValue(injectionPoint, out var customPassList))
-            {
-                foreach (var customPass in customPassList)
-                {
-                    if (customPass.instance.GetType() == customPassType)
-                        return false;
-                }
-            }
-
-            RegisterGlobalCustomPass(injectionPoint, customPassInstance, priority);
-            return true;
-        }
-
-        /// <summary>
-        /// Remove a custom from the execution lists.
-        /// </summary>
-        /// <param name="customPassInstance">The custom pass instance to remove. If the custom pass instance exists at multiple injection points, they will all be removed.</param>
-        /// <returns>True if one or more custom passes were removed. False otherwise.</returns>
-        public static bool UnregisterGlobalCustomPass(CustomPass customPassInstance)
-        {
-            bool removed = false;
-            foreach (var injectionPoint in injectionPoints)
-                removed |= UnregisterGlobalCustomPass(injectionPoint, customPassInstance);
-            return removed;
-        }
-
-        /// <summary>
-        /// Unregister all global custom passes registered by any system.
-        /// This function unregister both active and inactive custom passes.
-        /// </summary>
-        /// <returns>True if at least one custom pass was removed. False otherwise.</returns>
-        public static bool UnregisterAllGlobalCustomPasses()
-        {
-            bool removed = false;
-            foreach (var injectionPoint in injectionPoints)
-                removed |= UnregisterAllGlobalCustomPasses(injectionPoint);
-            return removed;
-        }
-
-        /// <summary>
-        /// Unregister all global custom passes at a specific injection point.
-        /// This function unregister both active and inactive custom passes.
-        /// </summary>
-        /// <param name="injectionPoint">The injection point where you want all the custom passes to be removed.</param>
-        /// <returns>True if at least one custom pass was removed. False otherwise.</returns>
-        public static bool UnregisterAllGlobalCustomPasses(CustomPassInjectionPoint injectionPoint)
-        {
-            bool removed = false;
-            foreach (var (customPass, priority) in GetGlobalCustomPasses(injectionPoint))
-                removed |= UnregisterGlobalCustomPass(injectionPoint, customPass);
-            return removed;
-        }
-
-        /// <summary>
-        /// Unregister a custom from the injection point execution list. If the same custom pass instance is registered multiple times, they will all be removed.
-        /// </summary>
-        /// <param name="injectionPoint">Selects from which injection point the custom pass instance will be removed</param>
-        /// <param name="customPassInstance">The custom pass instance to unregister.</param>
-        /// <returns>True if one or more custom passes were removed. False otherwise.</returns>
-        public static bool UnregisterGlobalCustomPass(CustomPassInjectionPoint injectionPoint, CustomPass customPassInstance)
-        {
-            if (m_GlobalCustomPasses.TryGetValue(injectionPoint, out var customPassList))
-                return customPassList.RemoveAll(data => data.instance == customPassInstance) > 0;
-            return false;
-        }
-
-        /// <summary>
-        /// Gets all the custom passes registered at a specific injection point. This includes both enabled and disabled custom passes.
-        /// </summary>
-        /// <param name="injectionPoint">The injection point used to filer the resulting custom pass list.</param>
-        /// <returns>The list of all the global custom passes in the injection point provided in parameter. If no custom pass were registered for the injection point, an empty list is returned.</returns>
-        public static List<GlobalCustomPass> GetGlobalCustomPasses(CustomPassInjectionPoint injectionPoint)
-        {
-            if (m_GlobalCustomPasses.TryGetValue(injectionPoint, out var customPassList))
-                return customPassList;
-            return s_EmptyGlobalCustomPassList;
         }
 
         void OnEnable()
@@ -355,7 +186,7 @@ namespace UnityEngine.Rendering.HighDefinition
             return true;
         }
 
-        bool Execute(RenderGraph renderGraph, HDCamera hdCamera, ScriptableRenderContext renderContext, CullingResults cullingResult, CullingResults cameraCullingResult, in CustomPass.RenderTargets targets)
+        internal bool Execute(RenderGraph renderGraph, HDCamera hdCamera, CullingResults cullingResult, CullingResults cameraCullingResult, in CustomPass.RenderTargets targets)
         {
             bool executed = false;
 
@@ -366,33 +197,9 @@ namespace UnityEngine.Rendering.HighDefinition
             {
                 if (pass != null && pass.WillBeExecuted(hdCamera))
                 {
-                    pass.ExecuteInternal(renderGraph, hdCamera, renderContext, cullingResult, cameraCullingResult, targets, this);
+                    pass.ExecuteInternal(renderGraph, hdCamera, cullingResult, cameraCullingResult, targets, this);
                     executed = true;
                 }
-            }
-
-            return executed;
-        }
-
-        internal static bool ExecuteAllCustomPasses(RenderGraph renderGraph, HDCamera hdCamera, ScriptableRenderContext renderContext, CullingResults cullingResults, CullingResults cameraCullingResults, CustomPassInjectionPoint injectionPoint, in CustomPass.RenderTargets customPassTargets)
-        {
-            bool executed = false;
-
-            currentGlobalInjectionPoint = injectionPoint;
-            foreach (var (customPass, priority) in GetGlobalCustomPasses(injectionPoint))
-            {
-                if (customPass == null || !customPass.WillBeExecuted(hdCamera))
-                    continue;
-                executed = true;
-                customPass.ExecuteInternal(renderGraph, hdCamera, renderContext, cullingResults, cameraCullingResults, customPassTargets, null);
-            }
-
-            GetActivePassVolumes(injectionPoint, m_CurrentInjectionPointList);
-            foreach (var customPass in m_CurrentInjectionPointList)
-            {
-                if (customPass == null)
-                    return false;
-                executed |= customPass.Execute(renderGraph, hdCamera, renderContext, cullingResults, cameraCullingResults, customPassTargets);
             }
 
             return executed;
@@ -489,7 +296,7 @@ namespace UnityEngine.Rendering.HighDefinition
             // Sort the overlapping volumes by priority order (smaller first, then larger and finally globals)
             m_OverlappingPassVolumes.Sort((v1, v2) =>
             {
-                static float GetVolumeExtent(CustomPassVolume volume)
+                float GetVolumeExtent(CustomPassVolume volume)
                 {
                     float extent = 0;
                     foreach (var collider in volume.m_OverlappingColliders)
@@ -556,15 +363,9 @@ namespace UnityEngine.Rendering.HighDefinition
 
         internal static void Cleanup()
         {
-            // Cleanup is called when HDRP is destroyed, so we need to cleanup all the passes that were rendered
             foreach (var pass in m_ActivePassVolumes)
-                pass.CleanupPasses();
-
-            foreach (var passList in m_GlobalCustomPasses.Values)
             {
-                foreach (var pass in passList)
-                    if (pass.instance != null)
-                        pass.instance.CleanupPassInternal();
+                pass.CleanupPasses();
             }
         }
 
@@ -574,7 +375,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// </summary>
         /// <param name="injectionPoint">The injection point to get the currently active Custom Pass Volume for.</param>
         /// <returns>Returns the Custom Pass Volume instance associated with the injection point.</returns>
-        [Obsolete("In order to support multiple custom pass volume per injection points, please use GetActivePassVolumes. #from(2021.1)")]
+        [Obsolete("In order to support multiple custom pass volume per injection points, please use GetActivePassVolumes.")]
         public static CustomPassVolume GetActivePassVolume(CustomPassInjectionPoint injectionPoint)
         {
             var volumes = new List<CustomPassVolume>();
@@ -600,7 +401,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// </summary>
         /// <typeparam name="T">The type of the CustomPass to create</typeparam>
         /// <returns>The new custom</returns>
-        public T AddPassOfType<T>() where T : CustomPass => AddPassOfType(typeof(T)) as T;
+        public CustomPass AddPassOfType<T>() where T : CustomPass => AddPassOfType(typeof(T));
 
         /// <summary>
         /// Add a pass of type passType in the active pass list

@@ -19,14 +19,11 @@ The mask map contains four grayscale textures, one in each color channel. The de
 | **Blue**          | Detail mask |
 | **Alpha**         | Smoothness  |
 
-
-**Note:** The detail mask texture allows you to control where the detail texture is applied on your model. Use a value of `1` to display the detail texture and a value of `0` to mask it. For instance, if your model has skin pores, you might mask the lips and eyebrows to prevent the pores from appearing in those areas.
-
 To create a mask map, create a linear composited map in a photo editor, using the channels as described in the table above.
 
 The following example image demonstrates the individual components of a full mask map.
 
-![A full mask map, with the metallic texture in the R channel, the ambient occlusion texture in the G channel, the detail mask in the B channel, and the smoothness in the A channel.](Images/MaskMapAndDetailMap2.png)
+![](Images/MaskMapAndDetailMap2.png)
 
 <a name="DetailMap"></a>
 
@@ -45,7 +42,7 @@ To create a detail map, create a linear composited map in a photo editor, using 
 
 The following example image demonstrates the individual components of a full detail map.
 
-![A full detail map, with the desaturated albedo texture in the R channel, the red channel of the normal map in the G channel, the green channel of the normal map in the A channel, and smoothness in the B channel.](Images/MaskMapAndDetailMap3.png)
+![](Images/MaskMapAndDetailMap3.png)
 
 ### Desaturated albedo (red channel)
 
@@ -53,7 +50,7 @@ The red channel represents the albedo variation. It makes the underlying materia
 
 The image below shows the impact of the detail albedo on the final color. HDRP calculates color interpolation in sRGB space.
 
-![A red material with a gradient detail map. When Detail Albedo Scale is 1, the two textures create a smooth red gradient. When Detail Albedo Scale is 2, the gradient is banded.](Images/DetailMap-red.png)
+![](Images/DetailMap-red.png)
 
 ### Smoothness (blue channel)
 
@@ -61,8 +58,8 @@ The blue channel represents the smoothness variation and HDRP calculates it the 
 
 The image below shows the impact of the detail smoothness on the final color.
 
-![A material of smoothness 0.5 with a gradient detail map. When Detail Smoothness Scale is 1, the two textures create a smoothness gradient. When Detail Smoothness Scale is 2, the gradient transitions faster.](Images/DetailMap-blue.png)
+![](Images/DetailMap-blue.png)
 
 The following example shows the same gradient detail map as above, used by three Lit materials with different smoothness values.
 
-![Three squares with smoothness values of 0, 0.5, and 1.0. As the smoothness value increases, more of the right side of the square reflects the scene.](Images/DetailMap-smoothness.png)
+![](Images/DetailMap-smoothness.png)

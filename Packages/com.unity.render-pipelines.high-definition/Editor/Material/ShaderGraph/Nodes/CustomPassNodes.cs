@@ -19,6 +19,8 @@ namespace UnityEditor.Rendering.HighDefinition
             UpdateNodeAfterDeserialization();
         }
 
+        public override string documentationURL => Documentation.GetPageLink("SGNode-HD-Custom-Color-Node");
+
         const int kUvInputSlotId = 0;
         const string kUvInputSlotName = "UV";
 
@@ -86,7 +88,7 @@ namespace UnityEditor.Rendering.HighDefinition
             }
         }
 
-        public override string documentationURL => NodeUtils.GetDocumentationString("HD-Custom-Depth");
+        public override string documentationURL => Documentation.GetPageLink("SGNode-HD-Custom-Depth-Node");
 
         const int kUvInputSlotId = 0;
         const string kUvInputSlotName = "UV";

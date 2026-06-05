@@ -12,17 +12,10 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
     #endif
 
     #if defined(DEBUG_DISPLAY)
-    #if !defined(SHADER_STAGE_RAY_TRACING)
-    // Mipmap mode debugging isn't supported with ray tracing as it relies on derivatives
-        if (_DebugMipMapMode != DEBUGMIPMAPMODE_NONE)
-        {
-            #ifdef FRAG_INPUTS_USE_TEXCOORD0
-                surfaceData.color = GET_TEXTURE_STREAMING_DEBUG(posInput.positionSS, fragInputs.texCoord0);
-            #else
-                surfaceData.color = GET_TEXTURE_STREAMING_DEBUG_NO_UV(posInput.positionSS);
-            #endif
-        }
-    #endif
+    if (_DebugMipMapMode != DEBUGMIPMAPMODE_NONE)
+    {
+        // TODO
+    }
     #endif
 
     #ifdef _ENABLE_SHADOW_MATTE
@@ -33,7 +26,7 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
 
             // Evaluate the shadow, the normal is guaranteed if shadow matte is enabled on this shader.
             float3 shadow3;
-            ShadowLoopMin(shadowContext, posInput, normalize(fragInputs.tangentToWorld[2]), asuint(_ShadowMatteFilter), GetMeshRenderingLayerMask(), shadow3);
+            ShadowLoopMin(shadowContext, posInput, normalize(fragInputs.tangentToWorld[2]), asuint(_ShadowMatteFilter), GetMeshRenderingLightLayer(), shadow3);
 
             // Compute the average value in the fourth channel
             float4 shadow = float4(shadow3, dot(shadow3, float3(1.0/3.0, 1.0/3.0, 1.0/3.0)));

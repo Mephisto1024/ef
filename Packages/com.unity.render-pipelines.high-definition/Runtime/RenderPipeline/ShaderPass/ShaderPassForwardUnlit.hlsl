@@ -59,10 +59,6 @@ PackedVaryingsToPS VertTesselation(VaryingsToDS input)
 
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Debug/DebugDisplayMaterial.hlsl"
 
-#if defined(_TRANSPARENT_REFRACTIVE_SORT) || defined(_ENABLE_FOG_ON_TRANSPARENT)
-#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Water/Shaders/UnderWaterUtilities.hlsl"
-#endif
-
 //NOTE: some shaders set target1 to be
 //   Blend 1 SrcAlpha OneMinusSrcAlpha
 //The reason for this blend mode is to let virtual texturing alpha dither work.
@@ -70,8 +66,6 @@ PackedVaryingsToPS VertTesselation(VaryingsToDS input)
 #ifdef UNITY_VIRTUAL_TEXTURING
     #define VT_BUFFER_TARGET SV_Target1
     #define EXTRA_BUFFER_TARGET SV_Target2
-    #define BEFORE_REFRACTION_TARGET SV_Target3
-    #define BEFORE_REFRACTION_ALPHA_TARGET SV_Target4
     #if defined(SHADER_API_PSSL)
         //For exact packing on pssl, we want to write exact 16 bit unorm (respect exact bit packing).
         //In some sony platforms, the default is FMT_16_ABGR, which would incur in loss of precision.
@@ -80,8 +74,6 @@ PackedVaryingsToPS VertTesselation(VaryingsToDS input)
     #endif
 #else
     #define EXTRA_BUFFER_TARGET SV_Target1
-    #define BEFORE_REFRACTION_TARGET SV_Target2
-    #define BEFORE_REFRACTION_ALPHA_TARGET SV_Target3
 #endif
 
 float GetDeExposureMultiplier()
@@ -94,16 +86,12 @@ float GetDeExposureMultiplier()
 }
 
 void Frag(PackedVaryingsToPS packedInput,
-        out float4 outColor : SV_Target0
+            out float4 outColor : SV_Target0
         #ifdef UNITY_VIRTUAL_TEXTURING
-            , out float4 outVTFeedback : VT_BUFFER_TARGET
+            ,out float4 outVTFeedback : VT_BUFFER_TARGET
         #endif
         #ifdef _WRITE_TRANSPARENT_MOTION_VECTOR
             , out float4 outMotionVec : EXTRA_BUFFER_TARGET
-            #ifdef _TRANSPARENT_REFRACTIVE_SORT
-              , out float4 outBeforeRefractionColor : BEFORE_REFRACTION_TARGET
-              , out float4 outBeforeRefractionAlpha : BEFORE_REFRACTION_ALPHA_TARGET
-            #endif
         #endif
         #ifdef _DEPTHOFFSET_ON
             , out float outputDepth : DEPTH_OFFSET_SEMANTIC
@@ -123,13 +111,8 @@ void Frag(PackedVaryingsToPS packedInput,
 
     AdjustFragInputsToOffScreenRendering(input, _OffScreenRendering > 0, _OffScreenDownsampleFactor);
 
-#if defined(_ENABLE_SHADOW_MATTE)
-    // In case we use the shadow matte, we need to ensure that the tile is loaded properly.
-    uint2 tileIndex = uint2(input.positionSS.xy) / GetTileSize();
-    PositionInputs posInput = GetPositionInput(input.positionSS.xy, _ScreenSize.zw, input.positionSS.z, input.positionSS.w, input.positionRWS.xyz, tileIndex);
-#else
+    // input.positionSS is SV_Position
     PositionInputs posInput = GetPositionInput(input.positionSS.xy, _ScreenSize.zw, input.positionSS.z, input.positionSS.w, input.positionRWS.xyz);
-#endif
 
 #ifdef VARYINGS_NEED_POSITION_WS
     float3 V = GetWorldSpaceNormalizeViewDir(input.positionRWS);
@@ -168,14 +151,7 @@ void Frag(PackedVaryingsToPS packedInput,
 
     // Note: we must not access bsdfData in shader pass, but for unlit we make an exception and assume it should have a color field
     float4 outResult = ApplyBlendMode(bsdfData.color * GetDeExposureMultiplier() + builtinData.emissiveColor * GetCurrentExposureMultiplier(), builtinData.opacity);
-
-    #ifdef _ENABLE_FOG_ON_TRANSPARENT
     outResult = EvaluateAtmosphericScattering(posInput, V, outResult);
-    #endif
-
-    #if defined(_TRANSPARENT_REFRACTIVE_SORT) && defined(_WRITE_TRANSPARENT_MOTION_VECTOR)
-    ComputeRefractionSplitColor(posInput, outResult, outBeforeRefractionColor, outBeforeRefractionAlpha);
-    #endif
 
 #ifdef DEBUG_DISPLAY
     float4 debugColor = 0;

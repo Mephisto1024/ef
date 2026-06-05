@@ -5,10 +5,7 @@
 
 float GetHeightFogTransmittance(float3 origin, float3 direction, float t)
 {
-    float cosZenith = dot(direction, _PlanetUp);
-    float startHeight = dot(origin, _PlanetUp);
-
-    return TransmittanceHeightFog(_HeightFogBaseExtinction, _HeightFogBaseHeight, _HeightFogExponents, cosZenith, startHeight, min(t, _MaxFogDistance));
+    return TransmittanceHeightFog(_HeightFogBaseExtinction, _HeightFogBaseHeight, _HeightFogExponents, direction.y, origin.y, min(t, _MaxFogDistance));
 }
 
 float3 GetHeightFogColor(float3 direction, float t)
@@ -16,8 +13,8 @@ float3 GetHeightFogColor(float3 direction, float t)
     return GetFogColor(-direction, min(t, _MaxFogDistance)) * _HeightFogBaseScattering.xyz / _HeightFogBaseExtinction;
 }
 
-// Used in path tracing
-void ApplyFogAttenuation(float3 origin, float3 direction, float t, inout float3 value, inout float3 unlitShadowColor, inout float alpha, inout float alphaShadowTint, inout float3 throughput, inout float3 segmentThroughput, inout float3 neeValue, bool useFogColor = true)
+// Used on continuation rays
+void ApplyFogAttenuation(float3 origin, float3 direction, float t, inout float3 value, inout float alpha, inout float3 throughput, bool useFogColor = true)
 {
     if (_FogEnabled)
     {
@@ -25,24 +22,6 @@ void ApplyFogAttenuation(float3 origin, float3 direction, float t, inout float3 
         float3 fogColor = useFogColor? GetHeightFogColor(direction, t) : 0.0;
 
         value = lerp(fogColor, value, fogTransmittance);
-        unlitShadowColor = lerp(fogColor, unlitShadowColor, fogTransmittance);
-        alpha = saturate(1.0 - fogTransmittance) + fogTransmittance * alpha;
-        alphaShadowTint = saturate(1.0 - fogTransmittance) + fogTransmittance * alphaShadowTint;
-        throughput *= fogTransmittance;
-        segmentThroughput *= fogTransmittance;
-        neeValue *= fogTransmittance;
-    }
-}
-
-void ApplyFogAttenuation(float3 origin, float3 direction, float t, inout float3 value, inout float3 unlitShadowColor, inout float alpha, inout float3 throughput, bool useFogColor = true)
-{
-    if (_FogEnabled)
-    {
-        float fogTransmittance = GetHeightFogTransmittance(origin, direction, t);
-        float3 fogColor = useFogColor? GetHeightFogColor(direction, t) : 0.0;
-
-        value = lerp(fogColor, value, fogTransmittance);
-        unlitShadowColor = lerp(fogColor, unlitShadowColor, fogTransmittance);
         alpha = saturate(1.0 - fogTransmittance) + fogTransmittance * alpha;
         throughput *= fogTransmittance;
     }

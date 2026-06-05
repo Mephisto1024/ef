@@ -38,9 +38,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>The user provides the radius of the sphere used to cull objects out of the ray tracing acceleration structure.</summary>
         Sphere,
         /// <summary>HDRP does not perform any culling step on the ray tracing acceleration structure.</summary>
-        None,
-        /// <summary>The user provides the minimum solid angle relative to the camera position to accept object to the ray tracing acceleration structure.</summary>
-        SolidAngle
+        None
     }
 
     /// <summary>
@@ -60,10 +58,8 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds the general settings for ray traced effects.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Ray Tracing/Ray Tracing Settings")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Ray-Tracing-Settings")]
-    [DisplayInfo(name = "Ray Tracing Settings")]
+    [HDRPHelpURLAttribute("Ray-Tracing-Settings")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Ray Tracing/Ray Tracing Settings (Preview)", typeof(HDRenderPipeline))]
     public sealed class RayTracingSettings : VolumeComponent
     {
         /// <summary>
@@ -111,9 +107,9 @@ namespace UnityEngine.Rendering.HighDefinition
         public RTASBuildModeParameter buildMode = new RTASBuildModeParameter(RTASBuildMode.Automatic);
 
         /// <summary>
-        /// Specifies the method used for the ray tracing culling.
+        /// Controls how the maximum distance for the ray tracing culling is defined.
         /// </summary>
-        [Tooltip("Specifies the method used for the ray tracing culling.")]
+        [Tooltip("Controls how the maximum distance for the ray tracing culling is defined.")]
         [AdditionalProperty]
         public RTASCullingModeParameter cullingMode = new RTASCullingModeParameter(RTASCullingMode.ExtendedFrustum);
 
@@ -124,9 +120,11 @@ namespace UnityEngine.Rendering.HighDefinition
         public MinFloatParameter cullingDistance = new MinFloatParameter(1000.0f, 0.01f);
 
         /// <summary>
-        /// Specifies the minimum object solid angle in degrees relative to the camera position to accept objects to the ray tracing acceleration structure when the culling mode is set to Solid Angle.
+        /// Default constructor for the ray tracing settings volume component.
         /// </summary>
-        [Tooltip("Specifies the minimum object solid angle in degrees relative to the camera position to accept objects to the ray tracing acceleration structure when the culling mode is set to Solid Angle.")]
-        public ClampedFloatParameter minSolidAngle = new ClampedFloatParameter(4.0f, 0.01f, 180f);
+        public RayTracingSettings()
+        {
+            displayName = "Ray Tracing Settings (Preview)";
+        }
     }
 }

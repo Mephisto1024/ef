@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
-using RayTracingMode = UnityEngine.Rendering.HighDefinition.RayTracingMode;
 
 namespace UnityEditor.Rendering.HighDefinition
 {
@@ -14,7 +13,6 @@ namespace UnityEditor.Rendering.HighDefinition
         SerializedDataParameter m_Enable;
         SerializedDataParameter m_Tracing;
         SerializedDataParameter m_RayMiss;
-        SerializedDataParameter m_APVMask;
 
         // Screen space global illumination parameters
         SerializedDataParameter m_FullResolutionSS;
@@ -62,7 +60,6 @@ namespace UnityEditor.Rendering.HighDefinition
             m_Enable = Unpack(o.Find(x => x.enable));
             m_Tracing = Unpack(o.Find(x => x.tracing));
             m_RayMiss = Unpack(o.Find(x => x.rayMiss));
-            m_APVMask = Unpack(o.Find(x => x.adaptiveProbeVolumesLayerMask));
 
             // SSGI Parameters
             m_FullResolutionSS = Unpack(o.Find(x => x.fullResolutionSS));
@@ -147,6 +144,7 @@ namespace UnityEditor.Rendering.HighDefinition
             using (new QualityScope(this))
             {
                 PropertyField(m_RayLength, k_RayLengthText);
+                PropertyField(m_ClampValue);
                 PropertyField(m_FullResolution);
                 if (mixed)
                     PropertyField(m_MaxMixedRaySteps, k_MaxMixedRaySteps);
@@ -159,6 +157,7 @@ namespace UnityEditor.Rendering.HighDefinition
             using (new QualityScope(this))
             {
                 PropertyField(m_RayLength, k_RayLengthText);
+                PropertyField(m_ClampValue);
                 PropertyField(m_SampleCount);
                 PropertyField(m_BounceCount);
                 DenoiserGUI();
@@ -167,18 +166,14 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.SSGI);
-
             HDRenderPipelineAsset currentAsset = HDRenderPipeline.currentAsset;
-            bool notSupported = !currentAsset?.currentPlatformRenderPipelineSettings.supportSSGI ?? false;
-            if (notSupported)
+            if (!currentAsset?.currentPlatformRenderPipelineSettings.supportSSGI ?? false)
             {
                 EditorGUILayout.Space();
-                HDEditorUtils.QualitySettingsHelpBox("The current HDRP Asset does not support Screen Space Global illumination.", MessageType.Warning,
-                    HDRenderPipelineUI.ExpandableGroup.Lighting,
-                    HDRenderPipelineUI.ExpandableLighting.Reflection, "m_RenderPipelineSettings.supportSSGI");
+                HDEditorUtils.QualitySettingsHelpBox("The current HDRP Asset does not support Screen Space Global illumination.", MessageType.Error,
+                    HDRenderPipelineUI.Expandable.Reflection, "m_RenderPipelineSettings.supportSSGI");
+                return;
             }
-            using var disableScope = new EditorGUI.DisabledScope(notSupported);
 
             PropertyField(m_Enable, EditorGUIUtility.TrTextContent("State"));
             EditorGUILayout.Space();
@@ -197,7 +192,6 @@ namespace UnityEditor.Rendering.HighDefinition
             {
                 if (rayTracingSettingsDisplayed)
                 {
-                    HDEditorUtils.EnsureFrameSetting(FrameSettingsField.RayTracing);
                     if (RenderPipelineManager.currentPipeline is not HDRenderPipeline { rayTracingSupported: true })
                         HDRenderPipelineUI.DisplayRayTracingSupportBox();
 
@@ -214,8 +208,6 @@ namespace UnityEditor.Rendering.HighDefinition
                             PropertyField(m_AmbientProbeDimmer);
                         }
                     }
-
-                    PropertyField(m_ClampValue);
 
                     if (currentAsset.currentPlatformRenderPipelineSettings.supportedRayTracingMode == RenderPipelineSettings.SupportedRayTracingMode.Both)
                     {
@@ -250,7 +242,7 @@ namespace UnityEditor.Rendering.HighDefinition
                             RayTracingQualityModeGUI();
                         else
                             HDEditorUtils.QualitySettingsHelpBox("The current HDRP Asset does not support the mixed mode which is only available in performance mode.", MessageType.Error,
-                            HDRenderPipelineUI.ExpandableGroup.Rendering, "m_RenderPipelineSettings.supportedRayTracingMode");
+                            HDRenderPipelineUI.Expandable.Rendering, "m_RenderPipelineSettings.supportedRayTracingMode");
                     }
                     else
                     {
@@ -272,9 +264,6 @@ namespace UnityEditor.Rendering.HighDefinition
                     PropertyField(m_DepthBufferThickness, k_DepthBufferThicknessText);
                     PropertyField(m_RayMiss, k_RayMissFallbackHierarchyText);
                 }
-
-                if (currentAsset?.currentPlatformRenderPipelineSettings.lightProbeSystem == RenderPipelineSettings.LightProbeSystem.AdaptiveProbeVolumes)
-                    PropertyField(m_APVMask);
             }
         }
 
@@ -336,6 +325,7 @@ namespace UnityEditor.Rendering.HighDefinition
             {
                 // RTGI
                 CopySetting(ref m_RayLength, settings.lightingQualitySettings.RTGIRayLength[level]);
+                CopySetting(ref m_ClampValue, settings.lightingQualitySettings.RTGIClampValue[level]);
                 CopySetting(ref m_FullResolution, settings.lightingQualitySettings.RTGIFullResolution[level]);
                 CopySetting(ref m_MaxMixedRaySteps, settings.lightingQualitySettings.RTGIRaySteps[level]);
                 CopySetting(ref m_Denoise, settings.lightingQualitySettings.RTGIDenoise[level]);

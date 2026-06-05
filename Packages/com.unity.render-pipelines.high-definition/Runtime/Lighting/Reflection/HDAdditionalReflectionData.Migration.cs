@@ -15,8 +15,7 @@ namespace UnityEngine.Rendering.HighDefinition
             ModeAndTextures,
             ProbeSettings,
             SeparatePassThrough,
-            UpgradeFrameSettingsToStruct,
-            AddProbeImportance,
+            UpgradeFrameSettingsToStruct
         }
 
         static readonly MigrationDescription<ReflectionProbeVersion, HDAdditionalReflectionData> k_ReflectionProbeMigration
@@ -99,8 +98,7 @@ namespace UnityEngine.Rendering.HighDefinition
 #pragma warning restore 618
             }),
             MigrationStep.New(ReflectionProbeVersion.SeparatePassThrough, (HDAdditionalReflectionData t) => k_Migration.ExecuteStep(t, Version.SeparatePassThrough)),
-            MigrationStep.New(ReflectionProbeVersion.UpgradeFrameSettingsToStruct, (HDAdditionalReflectionData t) => k_Migration.ExecuteStep(t, Version.UpgradeFrameSettingsToStruct)),
-            MigrationStep.New(ReflectionProbeVersion.AddProbeImportance, (HDAdditionalReflectionData t) => k_Migration.ExecuteStep(t, Version.AddProbeImportance))
+            MigrationStep.New(ReflectionProbeVersion.UpgradeFrameSettingsToStruct, (HDAdditionalReflectionData t) => k_Migration.ExecuteStep(t, Version.UpgradeFrameSettingsToStruct))
             );
 
         [SerializeField, FormerlySerializedAs("version"), FormerlySerializedAs("m_Version")]
@@ -110,21 +108,21 @@ namespace UnityEngine.Rendering.HighDefinition
         #region Deprecated Fields
 #pragma warning disable 649 //never assigned
         //data only kept for migration, to be removed in future version
-        [SerializeField, FormerlySerializedAs("influenceShape"), System.Obsolete("influenceShape is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("influenceShape"), System.Obsolete("influenceShape is deprecated, use influenceVolume parameters instead")]
         InfluenceShape m_ObsoleteInfluenceShape;
-        [SerializeField, FormerlySerializedAs("influenceSphereRadius"), System.Obsolete("influenceSphereRadius is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("influenceSphereRadius"), System.Obsolete("influenceSphereRadius is deprecated, use influenceVolume parameters instead")]
         float m_ObsoleteInfluenceSphereRadius = 3.0f;
-        [SerializeField, FormerlySerializedAs("blendDistancePositive"), System.Obsolete("blendDistancePositive is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("blendDistancePositive"), System.Obsolete("blendDistancePositive is deprecated, use influenceVolume parameters instead")]
         Vector3 m_ObsoleteBlendDistancePositive = Vector3.zero;
-        [SerializeField, FormerlySerializedAs("blendDistanceNegative"), System.Obsolete("blendDistanceNegative is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("blendDistanceNegative"), System.Obsolete("blendDistanceNegative is deprecated, use influenceVolume parameters instead")]
         Vector3 m_ObsoleteBlendDistanceNegative = Vector3.zero;
-        [SerializeField, FormerlySerializedAs("blendNormalDistancePositive"), System.Obsolete("blendNormalDistancePositive is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("blendNormalDistancePositive"), System.Obsolete("blendNormalDistancePositive is deprecated, use influenceVolume parameters instead")]
         Vector3 m_ObsoleteBlendNormalDistancePositive = Vector3.zero;
-        [SerializeField, FormerlySerializedAs("blendNormalDistanceNegative"), System.Obsolete("blendNormalDistanceNegative is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("blendNormalDistanceNegative"), System.Obsolete("blendNormalDistanceNegative is deprecated, use influenceVolume parameters instead")]
         Vector3 m_ObsoleteBlendNormalDistanceNegative = Vector3.zero;
-        [SerializeField, FormerlySerializedAs("boxSideFadePositive"), System.Obsolete("boxSideFadePositive is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("boxSideFadePositive"), System.Obsolete("boxSideFadePositive is deprecated, use influenceVolume parameters instead")]
         Vector3 m_ObsoleteBoxSideFadePositive = Vector3.one;
-        [SerializeField, FormerlySerializedAs("boxSideFadeNegative"), System.Obsolete("boxSideFadeNegative is deprecated, use influenceVolume parameters instead. #from(2021.1)")]
+        [SerializeField, FormerlySerializedAs("boxSideFadeNegative"), System.Obsolete("boxSideFadeNegative is deprecated, use influenceVolume parameters instead")]
         Vector3 m_ObsoleteBoxSideFadeNegative = Vector3.one;
 #pragma warning restore 649 //never assigned
         #endregion

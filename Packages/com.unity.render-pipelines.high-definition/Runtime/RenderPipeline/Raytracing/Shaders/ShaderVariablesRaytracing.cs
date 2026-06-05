@@ -1,14 +1,5 @@
 namespace UnityEngine.Rendering.HighDefinition
 {
-    [GenerateHLSL]
-    class HDLightClusterDefinitions
-    {
-        public static Vector3Int s_ClusterSize = new Vector3Int(64, 32, 64);
-        public static int s_ClusterCellCount = s_ClusterSize.x * s_ClusterSize.y * s_ClusterSize.z;
-
-        public static int s_CellMetaDataSize = 5;
-    }
-
     [GenerateHLSL(needAccessors = false, generateCBuffer = true, constantRegister = (int)ConstantRegister.RayTracing)]
     unsafe struct ShaderVariablesRaytracing
     {
@@ -47,8 +38,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
         // Bit mask that defines which fall back to use when a ray misses.
         public int _RayTracingRayMissFallbackHierarchy;
-        // Flag that defines if we should use the ambient probe instead of the sky. Used for RTGI - performance mode.
-        public int _RayTracingRayMissUseAmbientProbeAsSky;
         // Flag that defines if the sky should be used as an environment light.
         public int _RayTracingLastBounceFallbackHierarchy;
         // Flag that defines if
@@ -62,9 +51,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public float _RayTracingRayBias;
         // Far plane ray bias
         public float _RayTracingDistantRayBias;
-        // Ray Frame Index for reflection signals
-        public int _RayTracingReflectionFrameIndex;
-        // Layer Mask to use when sampling APV
-        public uint _RaytracingAPVLayerMask;
+        // Padding
+        public int _PaddingRT0;
     }
 }

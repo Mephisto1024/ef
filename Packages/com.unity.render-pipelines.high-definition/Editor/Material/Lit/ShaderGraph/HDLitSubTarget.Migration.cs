@@ -39,7 +39,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
 
             // Set data
             systemData.surfaceType = (SurfaceType)pbrMasterNode.m_SurfaceType;
-            systemData.blendingMode = HDSubShaderUtilities.UpgradeLegacyAlphaModeToBlendMode((int)pbrMasterNode.m_AlphaMode);
+            systemData.blendMode = HDSubShaderUtilities.UpgradeLegacyAlphaModeToBlendMode((int)pbrMasterNode.m_AlphaMode);
             systemData.doubleSidedMode = pbrMasterNode.m_TwoSided ? DoubleSidedMode.Enabled : DoubleSidedMode.Disabled;
             // Previous master node wasn't having any renderingPass. Assign it correctly now.
             systemData.renderQueueType = systemData.surfaceType == SurfaceType.Opaque ? HDRenderQueue.RenderQueueType.Opaque : HDRenderQueue.RenderQueueType.Transparent;
@@ -51,7 +51,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
             lightingData.receiveDecals = false;
             lightingData.receiveSSR = true;
             lightingData.receiveSSRTransparent = false;
-            litData.materialTypeMask = pbrMasterNode.m_Model == PBRMasterNode1.Model.Specular ? HDLitData.MaterialTypeMask.SpecularColor : HDLitData.MaterialTypeMask.Standard;
+            litData.materialType = pbrMasterNode.m_Model == PBRMasterNode1.Model.Specular ? HDLitData.MaterialType.SpecularColor : HDLitData.MaterialType.Standard;
             litData.energyConservingSpecular = false;
             litData.clearCoat = false;
             target.customEditorGUI = pbrMasterNode.m_OverrideEnabled ? pbrMasterNode.m_ShaderGUIOverride : "";
@@ -73,7 +73,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
             // PBRMasterNode adds/removes Metallic/Specular based on settings
             BlockFieldDescriptor specularMetallicBlock;
             int specularMetallicId;
-            if (litData.HasMaterialType(HDLitData.MaterialTypeMask.SpecularColor))
+            if (litData.materialType == HDLitData.MaterialType.SpecularColor)
             {
                 specularMetallicBlock = BlockFields.SurfaceDescription.Specular;
                 specularMetallicId = 3;
@@ -105,7 +105,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         {
             // Set data
             systemData.surfaceType = (SurfaceType)hdLitMasterNode.m_SurfaceType;
-            systemData.blendingMode = HDSubShaderUtilities.UpgradeLegacyAlphaModeToBlendMode((int)hdLitMasterNode.m_AlphaMode);
+            systemData.blendMode = HDSubShaderUtilities.UpgradeLegacyAlphaModeToBlendMode((int)hdLitMasterNode.m_AlphaMode);
             systemData.renderQueueType = HDRenderQueue.MigrateRenderQueueToHDRP10(hdLitMasterNode.m_RenderingPass);
             if (systemData.renderQueueType == HDRenderQueue.RenderQueueType.PreRefraction && !hdLitMasterNode.m_DrawBeforeRefraction)
                 systemData.renderQueueType = HDRenderQueue.RenderQueueType.Transparent;
@@ -142,15 +142,13 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
             lightingData.specularAA = hdLitMasterNode.m_SpecularAA;
             lightingData.specularOcclusionMode = hdLitMasterNode.m_SpecularOcclusionMode;
             lightingData.overrideBakedGI = hdLitMasterNode.m_overrideBakedGI;
+            HDLitData.MaterialType materialType = (HDLitData.MaterialType)hdLitMasterNode.m_MaterialType;
 
             litData.clearCoat = UpgradeCoatMask(hdLitMasterNode);
             litData.energyConservingSpecular = hdLitMasterNode.m_EnergyConservingSpecular;
             litData.rayTracing = hdLitMasterNode.m_RayTracing;
             litData.refractionModel = hdLitMasterNode.m_RefractionModel;
-#pragma warning disable 618
-            litData.materialType = (HDLitData.MaterialType)hdLitMasterNode.m_MaterialType;
-            UpgradeToMaterialType();
-#pragma warning restore 618
+            litData.materialType = materialType;
             litData.sssTransmission = hdLitMasterNode.m_SSSTransmission;
 
             target.customEditorGUI = hdLitMasterNode.m_OverrideEnabled ? hdLitMasterNode.m_ShaderGUIOverride : "";
@@ -207,7 +205,7 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
                 switch (slotMask)
                 {
                     case HDLitMasterNode1.SlotMask.Thickness:
-                        return litData.sssTransmission || litData.HasMaterialType(HDLitData.MaterialTypeMask.Translucent);
+                        return litData.sssTransmission || litData.materialType == HDLitData.MaterialType.Translucent;
                     case HDLitMasterNode1.SlotMask.SpecularOcclusion:
                         return lightingData.specularOcclusionMode == SpecularOcclusionMode.Custom;
                     case HDLitMasterNode1.SlotMask.AlphaThreshold:
@@ -302,18 +300,6 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
             {
                 blockMap.Add(HDBlockFields.SurfaceDescription.DepthOffset, HDLitMasterNode1.DepthOffsetSlotId);
             }
-        }
-
-        void UpgradeToMaterialType()
-        {
-#pragma warning disable 618
-            if (litData.materialType == HDLitData.MaterialType.Standard)
-                litData.materialTypeMask = HDLitData.MaterialTypeMask.Standard;
-            else if (litData.materialType == HDLitData.MaterialType.SubsurfaceScattering)
-                litData.materialTypeMask = HDLitData.MaterialTypeMask.SubsurfaceScattering;
-            else
-                litData.materialTypeMask = (HDLitData.MaterialTypeMask)(1 << (int)(litData.materialType));
-#pragma warning restore 618
         }
     }
 }

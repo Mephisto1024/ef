@@ -12,7 +12,7 @@ Shader "Hidden/HDRP/DebugFullScreen"
 
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+            #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
             #pragma vertex Vert
             #pragma fragment Frag
@@ -29,24 +29,15 @@ Shader "Hidden/HDRP/DebugFullScreen"
 
             CBUFFER_START (UnityDebug)
             float _FullScreenDebugMode;
-            float _ApplyExposure;
             float4 _FullScreenDebugDepthRemap;
             float _TransparencyOverdrawMaxPixelCost;
             float _QuadOverdrawMaxQuadCost;
             float _VertexDensityMaxPixelCost;
             uint _DebugContactShadowLightIndex;
-            float4 _DebugDepthPyramidParams; // (mip index, offset_x, offset_y, unused)
+            int _DebugDepthPyramidMip;
             float _MinMotionVector;
-            float4 _MotionVecIntensityParams;
             float _FogVolumeOverdrawMaxValue;
-            int _ComputeThicknessLayerIndex;
-            int _ComputeThicknessShowOverlapCount;
-            float _ComputeThicknessScale;
-            int _VolumetricCloudsDebugMode;
             CBUFFER_END
-
-            #define _MotionVecIntensityScale _MotionVecIntensityParams.x
-            #define _MotionVecHeatMode _MotionVecIntensityParams.y
 
             TEXTURE2D_X(_DebugFullScreenTexture);
 
@@ -91,23 +82,6 @@ Shader "Hidden/HDRP/DebugFullScreen"
                 float4(0.5f, 0.0f, 0.0f, 1.0f),
                 float4(0.0f, 0.0f, 0.5f, 1.0f)
             };
-
-            // Compute polynomial order-3: c[0] + c[1]*x + c[2]*x^2 + c[3]*x^3
-            float HornerForm3(float x, float4 c)
-            {
-                return mad(x, mad(x, mad(x, c[3], c[2]), c[1]), c[0]);
-            }
-
-            // Input x [0.0f; 1.0f]
-            // Colorscale 'Viridis' perceptualy linear and compliant with all colorblind type.
-            float3 Viridis(float x)
-            {
-                return float3(
-                        HornerForm3(x, float4(0.336877f, -0.310721f, -1.62633f, 2.34395f)) / HornerForm3(x, float4(1.21945f, -1.70046f, 0.233104f, 1.0f)),
-                        HornerForm3(x, float4(0.00259495f, 1.21637f, -2.61721f, 1.72375f)) / HornerForm3(x, float4(0.800986f, -1.04614f, -0.395385f, 1.0f)),
-                        HornerForm3(x, float4(0.0754636f, 0.685555f, -1.65847f, 0.902681f)) / HornerForm3(x, float4(0.234944f, 0.606111f, -1.80461f, 1.0f))
-                    );
-            }
 
             // Motion vector debug utilities
             float DistanceToLine(float2 p, float2 p1, float2 p2)
@@ -175,65 +149,22 @@ Shader "Hidden/HDRP/DebugFullScreen"
             {
                 float2 motionVectorNDC;
                 DecodeMotionVector(SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, coords), motionVectorNDC);
+
                 return motionVectorNDC;
             }
             // end motion vector utilties
-
-            float3 ToHeat(float value)
-            {
-                float3 r = value * 2.1f - float3(1.8f, 1.14f, 0.3f);
-                return 1.0f - r * r;
-            }
 
             float4 Frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                // Note: If mipmap debug mode is enabled, we don't render other full screen debug modes
-                // and the value of _FullScreenDebugMode is forced to 0
-                if (_DebugMipMapMode != DEBUGMIPMAPMODE_NONE)
-                {
-                    // just passing through
-                    float4 color = SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord);
-
-                    // draw legend
-                    switch(_DebugMipMapMode)
-                    {
-                        case DEBUGMIPMAPMODE_MIP_COUNT:
-                            DrawMipCountLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, color.rgb);
-                            break;
-                        case DEBUGMIPMAPMODE_MIP_RATIO:
-                            DrawMipRatioLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, color.rgb);
-                            break;
-                        case DEBUGMIPMAPMODE_MIP_STREAMING_STATUS:
-                            if (_DebugMipMapStatusMode == DEBUGMIPMAPSTATUSMODE_TEXTURE)
-                                DrawMipStreamingStatusLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, _DebugMipMapShowStatusCode, color.rgb);
-                            else
-                                DrawMipStreamingStatusPerMaterialLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, color.rgb);
-                            break;
-                        case DEBUGMIPMAPMODE_MIP_STREAMING_PERFORMANCE:
-                            DrawTextureStreamingPerformanceLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, color.rgb);
-                            break;
-                        case DEBUGMIPMAPMODE_MIP_STREAMING_PRIORITY:
-                            DrawMipPriorityLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, color.rgb);
-                            break;
-                        case DEBUGMIPMAPMODE_MIP_STREAMING_ACTIVITY:
-                            DrawMipRecentlyUpdatedLegend(input.texcoord / _RTHandleScale.xy, _ScreenSize, _DebugMipMapStatusMode == DEBUGMIPMAPSTATUSMODE_MATERIAL, color.rgb);
-                            break;
-                    }
-
-                    return color;
-                }
-
                 // Note: If the single shadow debug mode is enabled, we don't render other full screen debug modes
                 // and the value of _FullScreenDebugMode is forced to 0
-                if (_DebugShadowMapMode == SHADOWMAPDEBUGMODE_SINGLE_SHADOW || _FullScreenDebugMode == FULLSCREENDEBUGMODE_NONE)
+                if (_DebugShadowMapMode == SHADOWMAPDEBUGMODE_SINGLE_SHADOW)
                 {
                     float4 color = SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord);
-                    color *= _ApplyExposure > 0.0 ? GetCurrentExposureMultiplier() : 1.0;
                     return color;
                 }
-
                 // SSAO
                 if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_SCREEN_SPACE_AMBIENT_OCCLUSION)
                 {
@@ -277,17 +208,12 @@ Shader "Hidden/HDRP/DebugFullScreen"
                 if ( _FullScreenDebugMode == FULLSCREENDEBUGMODE_VOLUMETRIC_CLOUDS)
                 {
                     float4 color = SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord);
-                    return (_VolumetricCloudsDebugMode == 0) ? float4(color.xyz, 1.0) : color.x;
+                    return float4(color.xyz * color.w, 1.0);
                 }
                 if ( _FullScreenDebugMode == FULLSCREENDEBUGMODE_VOLUMETRIC_CLOUDS_SHADOW)
                 {
                     float4 color = SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord);
-                    return float4(color.yyy, 1.0);
-                }
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_VOLUMETRIC_FOG)
-                {
-                    float4 color = SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord);
-                    return float4(color.rgb, 1.0);
+                    return float4(color.xxx, 1.0);
                 }
                 if ( _FullScreenDebugMode == FULLSCREENDEBUGMODE_SCREEN_SPACE_SHADOWS)
                 {
@@ -297,17 +223,6 @@ Shader "Hidden/HDRP/DebugFullScreen"
                 if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_RAY_TRACING_ACCELERATION_STRUCTURE)
                 {
                     return SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord);
-                }
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_MOTION_VECTORS_INTENSITY)
-                {
-                    float2 mv = SampleMotionVectors(input.texcoord);
-                    float mvLen = length(mv) * _MotionVecIntensityScale;
-
-                    if (_MotionVecHeatMode)
-                        return float4(ToHeat(saturate(mvLen)), 1);
-
-                    return float4(mvLen.xxx, 1);
-
                 }
                 if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_MOTION_VECTORS)
                 {
@@ -398,11 +313,6 @@ Shader "Hidden/HDRP/DebugFullScreen"
 
                     return float4(color, 1.0);
                 }
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_DEPTH_OF_FIELD_TILE_CLASSIFICATION)
-                {
-                    float3 color = SAMPLE_TEXTURE2D_X(_DebugFullScreenTexture, s_point_clamp_sampler, input.texcoord).rgb;
-                    return float4(color, 1.0);
-                }
                 if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_CONTACT_SHADOWS)
                 {
                     uint2 samplePosition = (uint2)((input.texcoord.xy / _RTHandleScale.xy) * _DebugViewportSize.xy);
@@ -445,13 +355,11 @@ Shader "Hidden/HDRP/DebugFullScreen"
                 }
                 if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_DEPTH_PYRAMID)
                 {
-                    int debugDepthPyramidMip = _DebugDepthPyramidParams.x;
-                    int2 debugDepthPyramidOffset = int2(_DebugDepthPyramidParams.yz);
-
                     // Reuse depth display function from DebugViewMaterial
-                    uint2 samplePosition = (uint2)((input.texcoord.xy / _RTHandleScale.xy) * _DebugViewportSize.xy);
-                    uint2 pixCoord = (uint2)samplePosition >> debugDepthPyramidMip;
-                    float depth = LOAD_TEXTURE2D_X(_CameraDepthTexture, pixCoord + debugDepthPyramidOffset).r;
+                    int2 mipOffset = _DebugDepthPyramidOffsets[_DebugDepthPyramidMip];
+                    uint2 remappedPos = (uint2)(input.texcoord.xy * _DebugViewportSize.xy);
+                    uint2 pixCoord = (uint2)remappedPos.xy >> _DebugDepthPyramidMip;
+                    float depth = LOAD_TEXTURE2D_X(_CameraDepthTexture, pixCoord + mipOffset).r;
                     PositionInputs posInput = GetPositionInput(input.positionCS.xy, _ScreenSize.zw, depth, UNITY_MATRIX_I_VP, UNITY_MATRIX_V);
 
                     // We square the factors to have more precision near zero which is where people usually want to visualize depth.
@@ -559,56 +467,10 @@ Shader "Hidden/HDRP/DebugFullScreen"
 
                 }
 
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_LENS_FLARE_DATA_DRIVEN || _FullScreenDebugMode == FULLSCREENDEBUGMODE_LENS_FLARE_SCREEN_SPACE)
+                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_LENS_FLARE_DATA_DRIVEN)
                 {
                     uint2 samplePosition = (uint2)((input.texcoord / _RTHandleScale.xy) * _DebugViewportSize.xy);
                     return LOAD_TEXTURE2D_X(_DebugFullScreenTexture, samplePosition);
-                }
-
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_COMPUTE_THICKNESS)
-                {
-                    float2 pos = input.texcoord / _RTHandleScale.xy;
-                    float2 thicknessValues = SampleThickness(pos, _ComputeThicknessLayerIndex);
-
-                    float thickness = _ComputeThicknessShowOverlapCount ? thicknessValues.y : thicknessValues.x;
-
-                    float thicknessRemap = 1.0f - exp2(-thickness * _ComputeThicknessScale);
-
-                    // Layer not used
-                    if (thickness == -1.0f)
-                        return float4(0.50888f, 0.14413f, 0.50888f, 1.0f);
-                    // Open meshes, double sided
-                    else if (thickness < 0.0f)
-                        return float4(0.87962f, 0.0356f, 0.02956f, 1.0f);
-                    // Compute Thickness feature not enabled
-                    else if (_EnableComputeThickness == 0)
-                        return float4(0.82279f, 0.11193f, 0.0f, 1.0f);
-                    // Backround or Z-Fight
-                    else if (thickness == 0.0f)
-                        return float4(0.03955f, 0.03955f, 0.03955f, 1.0f);
-                    else
-                    {
-                        float v = saturate(thicknessRemap);
-                        return float4(SRGBToLinear(Viridis(v)), 1.0f);
-                    }
-                }
-
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_HIGH_QUALITY_LINES)
-                {
-                    uint2 samplePosition = (uint2)((input.texcoord / _RTHandleScale.xy) * _DebugViewportSize.xy);
-                    samplePosition.y = _DebugViewportSize.y - samplePosition.y;
-                    return LOAD_TEXTURE2D_X(_DebugFullScreenTexture, samplePosition);
-                }
-
-                if (_FullScreenDebugMode == FULLSCREENDEBUGMODE_STP)
-                {
-                    uint2 samplePosition = (uint2)((input.texcoord / _RTHandleScale.xy) * _DebugViewportSize.xy);
-                    float4 stp = LOAD_TEXTURE2D_X(_DebugFullScreenTexture, samplePosition);
-
-                    // This is encoded in gamma 2.0 (so the square is needed to get it back to linear).
-                    stp.rgb *= stp.rgb;
-
-                    return stp;
                 }
 
                 return float4(0.0, 0.0, 0.0, 0.0);

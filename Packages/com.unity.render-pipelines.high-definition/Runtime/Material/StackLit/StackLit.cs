@@ -35,7 +35,6 @@ namespace UnityEngine.Rendering.HighDefinition
             // Computer Graphics Forum, Wiley, 2018, 37, <10.1111/cgf.13475>. <hal-01818666v2>
             // https://hal.inria.fr/hal-01818666v2
             // Submitted on 6 Jul 2018
-            FromDiffusionProfile = 2,
         };
 
         //-----------------------------------------------------------------------------
@@ -173,7 +172,7 @@ namespace UnityEngine.Rendering.HighDefinition
             [SurfaceDataAttributes("Subsurface Mask")]
             public float subsurfaceMask;
             [SurfaceDataAttributes("Transmission Mask")]
-            public Vector3 transmissionMask;
+            public float transmissionMask;
 
             // Transmission
             // + Diffusion Profile
@@ -228,8 +227,6 @@ namespace UnityEngine.Rendering.HighDefinition
             public float perceptualRoughnessB;
             public float lobeMix;
 
-            public float diffusePower;
-
             // Anisotropic
             [SurfaceDataAttributes("", true)]
             public Vector3 tangentWS;
@@ -283,7 +280,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         public StackLit() { }
 
-        public override void Build(HDRenderPipeline _)
+        public override void Build(HDRenderPipelineAsset hdAsset, HDRenderPipelineRuntimeResources defaultResources)
         {
             PreIntegratedFGD.instance.Build(PreIntegratedFGD.FGDIndex.FGD_GGXAndDisneyDiffuse);
             LTCAreaLight.instance.Build();

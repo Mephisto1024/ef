@@ -10,7 +10,6 @@ namespace UnityEngine.Rendering.HighDefinition
     [HDRPHelpURLAttribute("Planar-Reflection-Probe")]
     [ExecuteAlways]
     [AddComponentMenu("Rendering/Planar Reflection Probe")]
-    [Icon("PlanarReflections")]
     public sealed partial class PlanarReflectionProbe : HDProbe
     {
         // Serialized data

@@ -17,8 +17,8 @@ namespace UnityEditor.Rendering.HighDefinition
 
         #region Fields
         // Material
-        public static FieldDescriptor Anisotropy = new FieldDescriptor(kMaterial, "Anisotropy", "_MATERIAL_FEATURE_ANISOTROPY 1");
-        public static FieldDescriptor Iridescence = new FieldDescriptor(kMaterial, "Iridescence", "_MATERIAL_FEATURE_IRIDESCENCE 1");
+        public static FieldDescriptor Anisotropy = new FieldDescriptor(kMaterial, "Anisotropy", "_MATERIAL_FEATURE_TRANSMISSION 1");
+        public static FieldDescriptor Iridescence = new FieldDescriptor(kMaterial, "Iridescence", "_MATERIAL_FEATURE_TRANSMISSION 1");
         public static FieldDescriptor SubsurfaceScattering = new FieldDescriptor(kMaterial, "SubsurfaceScattering", "_MATERIAL_FEATURE_SUBSURFACE_SCATTERING 1");
         public static FieldDescriptor Transmission = new FieldDescriptor(kMaterial, "Transmission", "_MATERIAL_FEATURE_TRANSMISSION 1");
 
@@ -64,7 +64,6 @@ namespace UnityEditor.Rendering.HighDefinition
         public static FieldDescriptor RayTracing = new FieldDescriptor(string.Empty, "RayTracing", string.Empty);
         public static FieldDescriptor Unlit = new FieldDescriptor(string.Empty, "Unlit", string.Empty);
         public static FieldDescriptor UseProfileIor = new FieldDescriptor(string.Empty, "UseProfileIor", string.Empty);
-        public static FieldDescriptor UseProfileLobes = new FieldDescriptor(string.Empty, "UseProfileLobes", string.Empty);
 
         // Custom motion vector
         public static FieldDescriptor CustomVelocity = new FieldDescriptor(string.Empty, "CustomVelocity", "CUSTOM_VELOCITY 1");

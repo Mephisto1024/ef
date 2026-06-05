@@ -30,9 +30,11 @@ namespace UnityEngine.Rendering.HighDefinition
         Vector4 currentScreenSize = new Vector4(1.0f, 1.0f, 1.0f, 1.0f);
         MaterialPropertyBlock m_MaterialPropertyBlock = new MaterialPropertyBlock();
 
-        public IBLFilterGGX(HDRenderPipeline renderPipeline, MipGenerator mipGenerator)
-            : base(renderPipeline, mipGenerator)
+
+        public IBLFilterGGX(HDRenderPipelineRuntimeResources renderPipelineResources, MipGenerator mipGenerator)
         {
+            m_RenderPipelineResources = renderPipelineResources;
+            m_MipGenerator = mipGenerator;
         }
 
         public override bool IsInitialized()
@@ -44,20 +46,20 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             if (!m_ComputeGgxIblSampleDataCS)
             {
-                m_ComputeGgxIblSampleDataCS = m_RenderPipeline.runtimeShaders.computeGgxIblSampleDataCS;
+                m_ComputeGgxIblSampleDataCS = m_RenderPipelineResources.shaders.computeGgxIblSampleDataCS;
                 m_ComputeGgxIblSampleDataKernel = m_ComputeGgxIblSampleDataCS.FindKernel("ComputeGgxIblSampleData");
             }
 
             if (!m_BuildProbabilityTablesCS)
             {
-                m_BuildProbabilityTablesCS = m_RenderPipeline.runtimeShaders.buildProbabilityTablesCS;
+                m_BuildProbabilityTablesCS = m_RenderPipelineResources.shaders.buildProbabilityTablesCS;
                 m_ConditionalDensitiesKernel = m_BuildProbabilityTablesCS.FindKernel("ComputeConditionalDensities");
                 m_MarginalRowDensitiesKernel = m_BuildProbabilityTablesCS.FindKernel("ComputeMarginalRowDensities");
             }
 
             if (!m_convolveMaterial)
             {
-                m_convolveMaterial = CoreUtils.CreateEngineMaterial(m_RenderPipeline.runtimeShaders.GGXConvolvePS);
+                m_convolveMaterial = CoreUtils.CreateEngineMaterial(m_RenderPipelineResources.shaders.GGXConvolvePS);
             }
 
             if (!m_GgxIblSampleData)
@@ -76,7 +78,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
             if (!m_PlanarReflectionFilteringCS)
             {
-                m_PlanarReflectionFilteringCS = m_RenderPipeline.runtimeShaders.planarReflectionFilteringCS;
+                m_PlanarReflectionFilteringCS = m_RenderPipelineResources.shaders.planarReflectionFilteringCS;
                 m_PlanarReflectionDepthConversionKernel = m_PlanarReflectionFilteringCS.FindKernel("DepthConversion");
                 m_PlanarReflectionDownScaleKernel = m_PlanarReflectionFilteringCS.FindKernel("DownScale");
                 m_PlanarReflectionFilteringKernel = m_PlanarReflectionFilteringCS.FindKernel("FilterPlanarReflection");
@@ -122,7 +124,7 @@ namespace UnityEngine.Rendering.HighDefinition
             cmd.GetTemporaryRT(k_PlanarReflectionFilterDepthTex1ID, MakeRenderTextureDescriptor(texWidth, texHeight, GraphicsFormat.R32_SFloat, false));
         }
 
-        private static void ReleaseIntermediateTextures(CommandBuffer cmd)
+        private static void ReleaseItrermediateTextures(CommandBuffer cmd)
         {
             cmd.ReleaseTemporaryRT(k_PlanarReflectionFilterTex0ID);
             cmd.ReleaseTemporaryRT(k_PlanarReflectionFilterTex1ID);
@@ -349,7 +351,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 mipIndex++;
             }
 
-            ReleaseIntermediateTextures(cmd);
+            ReleaseItrermediateTextures(cmd);
         }
     }
 }

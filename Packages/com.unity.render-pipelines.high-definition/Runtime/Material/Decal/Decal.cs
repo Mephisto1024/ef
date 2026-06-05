@@ -27,15 +27,6 @@ namespace UnityEngine.Rendering.HighDefinition
             Count = 4
         };
 
-        [GenerateHLSL]
-        public enum DecalAtlasTextureType
-        {
-            Diffuse,
-            Normal,
-            Mask,
-            Count
-        }
-
         //-----------------------------------------------------------------------------
         // DBuffer management
         //-----------------------------------------------------------------------------
@@ -73,9 +64,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public Vector4 maskScaleBias;
         public Vector4 baseColor;
         public Vector4 remappingAOS;
-        public Vector2 remappingMetallic;   // (min, max) or metallic value if no texture is used
-        public float scalingBlueMaskMap;
-        public float sampleNormalAlpha;
+        public Vector4 scalingBAndRemappingM; // x unused, y blue mask map, zw metallic remapping
         public Vector3 blendParams; // x normal blend source, y mask blend source, z mask blend mode
         public uint decalLayerMask;
     };

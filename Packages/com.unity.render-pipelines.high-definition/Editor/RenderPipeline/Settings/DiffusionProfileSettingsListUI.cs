@@ -70,6 +70,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 }
 
                 parameter.InsertArrayElementAtIndex(parameter.arraySize);
+                parameter.serializedObject.ApplyModifiedProperties();
             };
         }
     }

@@ -10,12 +10,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Water", "UnpackData_Water")]
+    [Title("Utility", "High Definition Render Pipeline", "Water", "UnpackData_Water (Preview)")]
     class UnpackData_Water : AbstractMaterialNode, IGeneratesBodyCode, IMayRequireMeshUV
     {
         public UnpackData_Water()
         {
-            name = "Unpack Water Data";
+            name = "Unpack Water Data (Preview)";
             UpdateNodeAfterDeserialization();
         }
 
@@ -24,8 +24,14 @@ namespace UnityEditor.Rendering.HighDefinition
         const int kLowFrequencyHeightOutputSlotId = 0;
         const string kLowFrequencyHeightSlotName = "LowFrequencyHeight";
 
-        const int kDisplacementOutputSlotId = 1;
-        const string kDisplacementSlotName = "Displacement";
+        const int kHorizontalDisplacementOutputSlotId = 1;
+        const string kHorizontalDisplacementSlotName = "HorizontalDisplacement";
+
+        const int kSSSMaskOutputSlotId = 2;
+        const string kSSSMaskSlotName = "SSSMask";
+
+        const int kCustomFoamOutputSlotId = 3;
+        const string kCustomFoamSlotName = "CustomFoam";
 
         public override bool hasPreview { get { return false; } }
 
@@ -33,31 +39,28 @@ namespace UnityEditor.Rendering.HighDefinition
         {
             // Outputs
             AddSlot(new Vector1MaterialSlot(kLowFrequencyHeightOutputSlotId, kLowFrequencyHeightSlotName, kLowFrequencyHeightSlotName, SlotType.Output, 0));
-            AddSlot(new Vector3MaterialSlot(kDisplacementOutputSlotId, kDisplacementSlotName, kDisplacementSlotName, SlotType.Output, Vector3.zero));
+            AddSlot(new Vector1MaterialSlot(kHorizontalDisplacementOutputSlotId, kHorizontalDisplacementSlotName, kHorizontalDisplacementSlotName, SlotType.Output, 0));
+            AddSlot(new Vector1MaterialSlot(kSSSMaskOutputSlotId, kSSSMaskSlotName, kSSSMaskSlotName, SlotType.Output, 0));
+            AddSlot(new Vector1MaterialSlot(kCustomFoamOutputSlotId, kCustomFoamSlotName, kCustomFoamSlotName, SlotType.Output, 0));
 
             RemoveSlotsNameNotMatching(new[]
             {
                 // Outputs
                 kLowFrequencyHeightOutputSlotId,
-                kDisplacementOutputSlotId,
+                kHorizontalDisplacementOutputSlotId,
+                kSSSMaskOutputSlotId,
+                kCustomFoamOutputSlotId
             });
         }
 
         public void GenerateNodeCode(ShaderStringBuilder sb, GenerationMode generationMode)
         {
-            // See PackWaterVertexData
-
-            // Low Frequency Height
-            sb.AppendLine("$precision {0} = saturate(IN.{1}.z);",
+            sb.AppendLine("$precision {1} = saturate(IN.{0}.x); $precision {2} = IN.{0}.y; $precision {3} = IN.{0}.z; $precision {4} = IN.{0}.w;",
+                ShaderGeneratorNames.GetUVName(UVChannel.UV1),
                 GetVariableNameForSlot(kLowFrequencyHeightOutputSlotId),
-                ShaderGeneratorNames.GetUVName(UVChannel.UV0)
-            );
-
-            // Displacement
-            sb.AppendLine("$precision3 {0} = float3(IN.{1}.w, IN.{1}.z, IN.{2}.w);",
-                GetVariableNameForSlot(kDisplacementOutputSlotId),
-                ShaderGeneratorNames.GetUVName(UVChannel.UV0), 
-                ShaderGeneratorNames.GetUVName(UVChannel.UV1) 
+                GetVariableNameForSlot(kCustomFoamOutputSlotId),
+                GetVariableNameForSlot(kSSSMaskOutputSlotId),
+                GetVariableNameForSlot(kHorizontalDisplacementOutputSlotId)
             );
         }
 

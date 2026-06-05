@@ -210,23 +210,22 @@ namespace UnityEditor.Rendering.HighDefinition
             EditorGUI.BeginProperty(levelRect, label, self.useOverride);
             {
                 EditorGUI.BeginChangeCheck();
-
-                using (new EditorGUI.MixedValueScope(self.useOverride.hasMultipleDifferentValues || !self.useOverride.boolValue && self.level.hasMultipleDifferentValues))
+                var prevMixedValue = EditorGUI.showMixedValue;
+                EditorGUI.showMixedValue = self.useOverride.hasMultipleDifferentValues || !self.useOverride.boolValue && self.level.hasMultipleDifferentValues;
+                var (level, useOverride) = LevelFieldGUI(
+                    levelRect,
+                    GUIContent.none,
+                    schema,
+                    EditorGUI.showMixedValue ? -1 : self.level.intValue, // Force the GUI to update even if we select the same level as the first item
+                    self.useOverride.boolValue
+                );
+                if (EditorGUI.EndChangeCheck())
                 {
-                    var (level, useOverride) = LevelFieldGUI(
-                        levelRect,
-                        GUIContent.none,
-                        schema,
-                        EditorGUI.showMixedValue ? -1 : self.level.intValue, // Force the GUI to update even if we select the same level as the first item
-                        self.useOverride.boolValue
-                    );
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        self.useOverride.boolValue = useOverride;
-                        if (!self.useOverride.boolValue)
-                            self.level.intValue = level;
-                    }
+                    self.useOverride.boolValue = useOverride;
+                    if (!self.useOverride.boolValue)
+                        self.level.intValue = level;
                 }
+                EditorGUI.showMixedValue = prevMixedValue;
             }
             EditorGUI.EndProperty();
             EditorGUI.EndProperty();

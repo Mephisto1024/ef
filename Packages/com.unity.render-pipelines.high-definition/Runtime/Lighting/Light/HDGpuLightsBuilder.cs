@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Mathematics;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -49,24 +48,22 @@ namespace UnityEngine.Rendering.HighDefinition
         public HDRenderPipeline.ScreenSpaceShadowData[] currentScreenSpaceShadowData => m_CurrentScreenSpaceShadowData;
 
         //Packs a sort key for a light
-        public static uint PackLightSortKey(LightCategory lightCategory, GPULightType gpuLightType, LightVolumeType lightVolumeType, int lightIndex, bool offscreen)
+        public static uint PackLightSortKey(LightCategory lightCategory, GPULightType gpuLightType, LightVolumeType lightVolumeType, int lightIndex)
         {
             //We sort directional lights to be in the beginning of the list.
             //This ensures that we can access directional lights very easily after we sort them.
             uint isDirectionalMSB = gpuLightType == GPULightType.Directional ? 0u : 1u;
-            uint isOffscreen = offscreen ? 1u : 0u;
-            uint sortKey = (uint)isDirectionalMSB << 31 | (uint)isOffscreen << 30 | (uint)lightCategory << 26 | (uint)gpuLightType << 21 | (uint)lightVolumeType << 16 | (uint)lightIndex;
+            uint sortKey = (uint)isDirectionalMSB << 31 | (uint)lightCategory << 27 | (uint)gpuLightType << 22 | (uint)lightVolumeType << 17 | (uint)lightIndex;
             return sortKey;
         }
 
         //Unpacks a sort key for a light
-        public static void UnpackLightSortKey(uint sortKey, out LightCategory lightCategory, out GPULightType gpuLightType, out LightVolumeType lightVolumeType, out int lightIndex, out bool offscreen)
+        public static void UnpackLightSortKey(uint sortKey, out LightCategory lightCategory, out GPULightType gpuLightType, out LightVolumeType lightVolumeType, out int lightIndex)
         {
-            lightCategory = (LightCategory)((sortKey >> 26) & 0xF);
-            gpuLightType = (GPULightType)((sortKey >> 21) & 0x1F);
-            lightVolumeType = (LightVolumeType)((sortKey >> 16) & 0x1F);
+            lightCategory = (LightCategory)((sortKey >> 27) & 0xF);
+            gpuLightType = (GPULightType)((sortKey >> 22) & 0x1F);
+            lightVolumeType = (LightVolumeType)((sortKey >> 17) & 0x1F);
             lightIndex = (int)(sortKey & 0xFFFF);
-            offscreen = ((sortKey >> 30) & 0x1) > 0;
         }
 
         //Initialization of builder
@@ -115,32 +112,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
             if (m_LightTypeCounters.IsCreated)
                 m_LightTypeCounters.Dispose();
-
-            if (m_CachedPointUpdateInfos.IsCreated)
-            {
-                m_CachedPointUpdateInfos.Dispose();
-                m_CachedSpotUpdateInfos.Dispose();
-                m_CachedAreaRectangleUpdateInfos.Dispose();
-                m_CachedDirectionalUpdateInfos.Dispose();
-                m_DynamicPointUpdateInfos.Dispose();
-                m_DynamicSpotUpdateInfos.Dispose();
-                m_DynamicAreaRectangleUpdateInfos.Dispose();
-                m_DynamicDirectionalUpdateInfos.Dispose();
-            }
-
-            if (m_ShadowIndicesScratchpadArray.IsCreated)
-            {
-                m_ShadowIndicesScratchpadArray.Dispose();
-                m_ShadowIndicesScratchpadArray = default;
-            }
-
-#if UNITY_EDITOR
-            if (m_ShadowRequestCountsScratchpad.IsCreated)
-            {
-                m_ShadowRequestCountsScratchpad.Dispose();
-                m_ShadowRequestCountsScratchpad = default;
-            }
-#endif
         }
         #endregion
 
@@ -190,20 +161,6 @@ namespace UnityEngine.Rendering.HighDefinition
 
         private int m_BoundsEyeDataOffset = 0;
 
-        private NativeArray<int> m_ShadowIndicesScratchpadArray;
-#if UNITY_EDITOR
-        NativeArray<int> m_ShadowRequestCountsScratchpad;
-#endif
-
-        private NativeList<ShadowRequestIntermediateUpdateData> m_CachedPointUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_CachedSpotUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_CachedAreaRectangleUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_CachedDirectionalUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_DynamicPointUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_DynamicSpotUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_DynamicAreaRectangleUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-        private NativeList<ShadowRequestIntermediateUpdateData> m_DynamicDirectionalUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-
         private void AllocateLightData(int lightCount, int directionalLightCount)
         {
             int requestedLightCount = Math.Max(1, lightCount);
@@ -221,45 +178,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 m_DirectionalLights.ResizeArray(m_DirectionalLightCapacity);
             }
             m_DirectionalLightCount = directionalLightCount;
-        }
-
-        private void EnsureScratchpadCapacity(int lightCount)
-        {
-#if UNITY_EDITOR
-            if (m_ShadowRequestCountsScratchpad.IsCreated && m_ShadowRequestCountsScratchpad.Length < lightCount)
-            {
-                m_ShadowRequestCountsScratchpad.Dispose();
-                m_ShadowRequestCountsScratchpad = default;
-            }
-
-            if (!m_ShadowRequestCountsScratchpad.IsCreated)
-            {
-                m_ShadowRequestCountsScratchpad = new NativeArray<int>(lightCount, Allocator.Persistent);
-            }
-#endif
-
-            if (m_ShadowIndicesScratchpadArray.IsCreated && m_ShadowIndicesScratchpadArray.Length < lightCount)
-            {
-                m_ShadowIndicesScratchpadArray.Dispose();
-                m_ShadowIndicesScratchpadArray = default;
-            }
-
-            if (!m_ShadowIndicesScratchpadArray.IsCreated)
-            {
-                m_ShadowIndicesScratchpadArray = new NativeArray<int>(lightCount, Allocator.Persistent);
-            }
-
-            if (!m_CachedPointUpdateInfos.IsCreated)
-            {
-                m_CachedPointUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_CachedSpotUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_CachedAreaRectangleUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_CachedDirectionalUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_DynamicPointUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_DynamicSpotUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_DynamicAreaRectangleUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-                m_DynamicDirectionalUpdateInfos = new NativeList<ShadowRequestIntermediateUpdateData>(Allocator.Persistent);
-            }
         }
 
         #endregion

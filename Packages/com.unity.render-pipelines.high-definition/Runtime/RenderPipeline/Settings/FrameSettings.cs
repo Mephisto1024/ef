@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using System.Linq;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -28,7 +28,6 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>Set the current quality settings value.</summary>
         OverrideQualitySettings,
     }
-
     /// <summary>
     /// Defines how the MaximumLOD is computed.
     /// </summary>
@@ -41,7 +40,6 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>Set the current quality settings value.</summary>
         OverrideQualitySettings,
     }
-
     /// <summary>
     /// Defines how the SssSampleBudget is computed.
     /// </summary>
@@ -117,81 +115,51 @@ namespace UnityEngine.Rendering.HighDefinition
         [FrameSettingsField(0, displayedName: "Full Depth Prepass within Deferred", positiveDependencies: new[] { LitShaderMode }, tooltip: "When enabled, HDRP processes a full depth prepass (All meshes are sent) for Cameras using these Frame Settings. Set Lit Shader Mode to Deferred to access this option.")]
         DepthPrepassWithDeferredRendering = 1,
         /// <summary>When enabled, HDRP clear GBuffers for Cameras using these Frame Settings. Set Lit Shader Mode to Deferred to access this option.</summary>
-        [FrameSettingsField(0, displayedName: "Clear GBuffers", positiveDependencies: new[] { LitShaderMode }, customOrderInGroup: 0, tooltip: "When enabled, HDRP clear GBuffers for Cameras using these Frame Settings. Set Lit Shader Mode to Deferred to access this option.")]
+        [FrameSettingsField(0, displayedName: "Clear GBuffers", positiveDependencies: new[] { LitShaderMode }, customOrderInGroup: 2, tooltip: "When enabled, HDRP clear GBuffers for Cameras using these Frame Settings. Set Lit Shader Mode to Deferred to access this option.")]
         ClearGBuffers = 5,
         /// <summary>When enabled, Cameras using these Frame Settings calculate MSAA when they render the Scene. Set Lit Shader Mode to Forward to access this option.</summary>
-        [Obsolete("#from(2021.2)")]
+        [Obsolete]
         MSAA = 31,
         /// <summary>Specify the level of MSAA used when rendering the Scene. Set Lit Shader Mode to Forward to access this option.</summary>
-        [FrameSettingsField(0, displayedName: "MSAA Within Forward", type: FrameSettingsFieldAttribute.DisplayType.Others, targetType: typeof(MSAAMode), customOrderInGroup: 1, tooltip: "Specifies the MSAA mode for Cameras using these Frame Settings. Set Lit Shader Mode to Forward to access this option. Note that MSAA is disabled when using ray tracing.")]
+        [FrameSettingsField(0, displayedName: "MSAA Within Forward", type: FrameSettingsFieldAttribute.DisplayType.Others, targetType: typeof(MSAAMode), customOrderInGroup: 3, tooltip: "Specifies the MSAA mode for Cameras using these Frame Settings. Set Lit Shader Mode to Forward to access this option. Note that MSAA is disabled when using ray tracing.")]
         MSAAMode = 4,
         /// <summary>When enabled, Cameras using these Frame Settings use Alpha To Mask. Activate MSAA to access this option.</summary>
-        [Obsolete("#from(2022.1)")]
-        [FrameSettingsField(0, displayedName: "Alpha To Mask", tooltip: "When enabled, Cameras using these Frame Settings use Alpha To Mask. Activate MSAA to access this option.")]
+        [Obsolete]
+        [FrameSettingsField(0, displayedName: "Alpha To Mask", customOrderInGroup: 3, tooltip: "When enabled, Cameras using these Frame Settings use Alpha To Mask. Activate MSAA to access this option.")]
         AlphaToMask = 56,
         /// <summary>When enabled, Cameras using these Frame Settings render opaque GameObjects.</summary>
-        [FrameSettingsField(0, autoName: OpaqueObjects, customOrderInGroup: 2, tooltip: "When enabled, Cameras using these Frame Settings render opaque GameObjects.")]
+        [FrameSettingsField(0, autoName: OpaqueObjects, customOrderInGroup: 4, tooltip: "When enabled, Cameras using these Frame Settings render opaque GameObjects.")]
         OpaqueObjects = 2,
-
         /// <summary>When enabled, Cameras using these Frame Settings render Transparent GameObjects.</summary>
-        [FrameSettingsField(0, autoName: TransparentObjects, customOrderInGroup: 3, tooltip: "When enabled, Cameras using these Frame Settings render Transparent GameObjects.")]
+        [FrameSettingsField(0, autoName: TransparentObjects, customOrderInGroup: 5, tooltip: "When enabled, Cameras using these Frame Settings render Transparent GameObjects.")]
         TransparentObjects = 3,
-        /// <summary>When enabled, HDRP processes a transparent prepass for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, autoName: TransparentPrepass, positiveDependencies: new[] { TransparentObjects }, customOrderInGroup: 3, tooltip: "When enabled, HDRP processes a transparent prepass for Cameras using these Frame Settings.")]
-        TransparentPrepass = 8,
-        /// <summary>When enabled, HDRP processes a transparent postpass for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, autoName: TransparentPostpass, positiveDependencies: new[] { TransparentObjects }, customOrderInGroup: 3, tooltip: "When enabled, HDRP processes a transparent postpass for Cameras using these Frame Settings.")]
-        TransparentPostpass = 9,
-        /// <summary>When enabled, HDRP processes a transparent pass in a lower resolution for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, displayedName: "Low Resolution Transparent", positiveDependencies: new[] { TransparentObjects }, customOrderInGroup: 3, tooltip: "When enabled, HDRP processes a transparent pass in a lower resolution for Cameras using these Frame Settings.")]
-        LowResTransparent = 18,
-        /// <summary>When enabled, HDRP processes a refraction render pass for Cameras using these Frame Settings. This add a resolve of ColorBuffer after the drawing of opaque materials to be use for Refraction effect during transparent pass.</summary>
-        [FrameSettingsField(0, autoName: Refraction, positiveDependencies: new[] { TransparentObjects }, customOrderInGroup: 4, tooltip: "When enabled, HDRP processes a refraction render pass for Cameras using these Frame Settings. This add a resolve of ColorBuffer after the drawing of opaque materials to be use for Refraction effect during transparent pass.")]
-        Refraction = 13,
-        //NOTE: Obsoletes must follow the proper enums, otherwise the compiler occludes them.
-        /// <summary>When enabled, HDRP processes a refraction render pass for Cameras using these Frame Settings. This add a resolve of ColorBuffer after the drawing of opaque materials to be use for Refraction effect during transparent pass.</summary>
-        [Obsolete("#from(2021.1)")]
-        RoughRefraction = 13,
-        /// <summary>When enabled, Cameras using these Frame Settings render water surfaces.</summary>
-        [FrameSettingsField(0, autoName: Water, positiveDependencies: new[] { TransparentObjects, Refraction }, customOrderInGroup: 4, tooltip: "When enabled, Cameras using these Frame Settings render water surfaces.")]
-        Water = 99,
-        /// <summary>When enabled, Cameras using these Frame Settings will support water deformers.</summary>
-        [FrameSettingsField(0, autoName: WaterDecals, positiveDependencies: new[] { TransparentObjects, Refraction, Water }, customOrderInGroup: 4, tooltip: "When enabled, Cameras using these Frame Settings will support water decals.")]
-        WaterDecals = 102,
-        /// <summary>When enabled, Cameras using these Frame Settings will support water excluders.</summary>
-        [FrameSettingsField(0, autoName: WaterExclusion, positiveDependencies: new[] { TransparentObjects, Refraction, Water }, customOrderInGroup: 4, tooltip: "When enabled, Cameras using these Frame Settings will support water excluders.")]
-        WaterExclusion = 101,
-
-        /// <summary>When enabled, Cameras using these Frame Settings allow generation of Texture of Thickness per GameObject.layer.</summary>
-        [FrameSettingsField(0, displayedName: "Compute Thickness", customOrderInGroup: 5, tooltip: "When enabled, Cameras using these Frame Settings compute Texture of thickness per Layer.")]
-        ComputeThickness = 119,
         /// <summary>When enabled, HDRP processes a decal render pass for Cameras using these Frame Settings.</summary>
         [FrameSettingsField(0, autoName: Decals, customOrderInGroup: 6, tooltip: "When enabled, HDRP processes a decal render pass for Cameras using these Frame Settings.")]
         Decals = 12,
         /// <summary>When enabled, Cameras that use these Frame Settings make use of DecalLayers.</summary>
         [FrameSettingsField(0, autoName: DecalLayers, customOrderInGroup: 6, positiveDependencies: new[] { Decals }, tooltip: "When enabled, Cameras that use these Frame Settings make use of DecalLayers (Depends on \"Decal Layers\" in current HDRP Asset).")]
         DecalLayers = 96,
-        /// <summary>When enabled, Cameras that use these Frame Settings produce a buffer containing the Rendering Layer Mask of rendered meshes.</summary>
-        [FrameSettingsField(0, autoName: RenderingLayerMaskBuffer, customOrderInGroup: 7, tooltip: "When enabled, Cameras that use these Frame Settings produce a buffer containing the Rendering Layer Mask of rendered meshes.")]
-        RenderingLayerMaskBuffer = 50,
+        /// <summary>When enabled, HDRP processes a transparent prepass for Cameras using these Frame Settings.</summary>
+        [FrameSettingsField(0, autoName: TransparentPrepass, customOrderInGroup: 7, tooltip: "When enabled, HDRP processes a transparent prepass for Cameras using these Frame Settings.")]
+        TransparentPrepass = 8,
+        /// <summary>When enabled, HDRP processes a transparent postpass for Cameras using these Frame Settings.</summary>
+        [FrameSettingsField(0, autoName: TransparentPostpass, customOrderInGroup: 8, tooltip: "When enabled, HDRP processes a transparent postpass for Cameras using these Frame Settings.")]
+        TransparentPostpass = 9,
+        /// <summary>When enabled, HDRP processes a transparent pass in a lower resolution for Cameras using these Frame Settings.</summary>
+        [FrameSettingsField(0, displayedName: "Low Resolution Transparent", customOrderInGroup: 9, tooltip: "When enabled, HDRP processes a transparent pass in a lower resolution for Cameras using these Frame Settings.")]
+        LowResTransparent = 18,
         /// <summary>When enabled, HDRP updates ray tracing for Cameras using these Frame Settings.</summary>
         [FrameSettingsField(0, displayedName: "Ray Tracing", customOrderInGroup: 10, tooltip: "When enabled, HDRP updates ray tracing for Cameras using these Frame Settings (Depends on \"Realtime RayTracing\" in current HDRP Asset).")]
         RayTracing = 92,
-        /// <summary>When enabled, HDRP will include visual effects in the ray tracing acceleration structure.</summary>
-        [FrameSettingsField(0, displayedName: "RaytracingVFX", positiveDependencies: new[] { RayTracing }, customOrderInGroup: 10, tooltip: "When enabled, HDRP will include visual effects in the ray tracing acceleration structure.")]
-        RaytracingVFX = 100,
         /// <summary>When enabled, HDRP renders custom passes contained in CustomPassVolume components.</summary>
         [FrameSettingsField(0, autoName: CustomPass, customOrderInGroup: 11, tooltip: "When enabled, HDRP renders custom passes contained in CustomPassVolume components.")]
         CustomPass = 6,
-        /// <summary>When enabled, HDRP renders custom passes contained in CustomPassVolume components.</summary>
-        [FrameSettingsField(0, autoName: VariableRateShading, positiveDependencies: new[] { CustomPass }, customOrderInGroup: 12, tooltip: "When enabled, HDRP updates variable rate shading for Cameras using these Frame Settings.")]
-        VariableRateShading = 7,
         /// <summary>When enabled, HDRP can use virtual texturing.</summary>
         [FrameSettingsField(0, autoName: VirtualTexturing, customOrderInGroup: 105, tooltip: "Virtual Texturing needs to be enabled first in Project Settings > Player > Other Settings > Virtual Texturing.")]
         VirtualTexturing = 68,
-        /// <summary>When enabled, HDRP renders line topology with high quality anti-aliasing and transparency.</summary>
-        [FrameSettingsField(0, autoName: HighQualityLineRendering, customOrderInGroup: 109, tooltip: "When enabled, Cameras using these Frame Settings render line topology with high quality anti-aliasing and transparency.")]
-        HighQualityLineRendering = 103,
+        /// <summary>When enabled, Cameras using these Frame Settings render water surfaces.</summary>
+        [FrameSettingsField(0, autoName: Water, customOrderInGroup: 106, tooltip: "When enabled, Cameras using these Frame Settings render water surfaces.")]
+        Water = 99,
         /// <summary>When enabled, HDRP accounts for asymmetry in the projection matrix when evaluating the view direction based on pixel coordinates.</summary>
         [FrameSettingsField(0, displayedName: "Asymmetric Projection", customOrderInGroup: 107, tooltip: "When enabled HDRP will account for asymmetric projection when evaluating the view direction based on pixel coordinates.")]
         AsymmetricProjection = 78,
@@ -209,6 +177,13 @@ namespace UnityEngine.Rendering.HighDefinition
         [FrameSettingsField(0, displayedName: "Transparent Object Motion", positiveDependencies: new[] { MotionVectors }, customOrderInGroup: 14, tooltip: "When enabled, transparent GameObjects use Motion Vectors. You must also enable TransparentWritesVelocity for Materials that you want to use motion vectors with.")]
         TransparentsWriteMotionVector = 16,
 
+        /// <summary>When enabled, HDRP processes a refraction render pass for Cameras using these Frame Settings. This add a resolve of ColorBuffer after the drawing of opaque materials to be use for Refraction effect during transparent pass.</summary>
+        [FrameSettingsField(0, autoName: Refraction, customOrderInGroup: 15, tooltip: "When enabled, HDRP processes a refraction render pass for Cameras using these Frame Settings. This add a resolve of ColorBuffer after the drawing of opaque materials to be use for Refraction effect during transparent pass.")]
+        Refraction = 13,
+        //NOTE: Obsoletes must precede the proper enums, otherwise the compiler occludes them.
+        /// <summary>When enabled, HDRP processes a refraction render pass for Cameras using these Frame Settings. This add a resolve of ColorBuffer after the drawing of opaque materials to be use for Refraction effect during transparent pass.</summary>
+        [Obsolete]
+        RoughRefraction = 13,
         /// <summary>When enabled, HDRP processes a distortion render pass for Cameras using these Frame Settings.</summary>
         [FrameSettingsField(0, autoName: Distortion, customOrderInGroup: 16, tooltip: "When enabled, HDRP processes a distortion render pass for Cameras using these Frame Settings (Depends on \"Distortion\" in current HDRP Asset).")]
         Distortion = 14,
@@ -236,41 +211,38 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>When enabled, HDRP adds bloom to Cameras affected by a Volume containing the Bloom override.</summary>
         [FrameSettingsField(0, autoName: Bloom, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds bloom to Cameras affected by a Volume containing the Bloom override.")]
         Bloom = 84,
-        /// <summary>When enabled, HDRP adds Screen Space lens flare post process to Cameras affected by a Volume containing the Screen Space Lens Flare override.</summary>
-        [FrameSettingsField(0, displayedName: "Screen Space Lens Flare", positiveDependencies: new[] { Postprocess, Bloom }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds Screen Space Lens Flare post process to Cameras affected by a Volume containing the Screen Space Lens Flare override.")]
-        LensFlareScreenSpace = 104,
         /// <summary>When enabled, HDRP adds lens flare to Cameras.</summary>
-        [FrameSettingsField(0, autoName: LensFlareDataDriven, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP adds lens flare to Cameras.")]
+        [FrameSettingsField(0, autoName: LensFlareDataDriven, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds lens flare to Cameras.")]
         LensFlareDataDriven = 97,
         /// <summary>When enabled, HDRP adds lens distortion to Cameras affected by a Volume containing the Lens Distortion override.</summary>
-        [FrameSettingsField(0, autoName: LensDistortion, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP adds lens distortion to Cameras affected by a Volume containing the Lens Distortion override.")]
+        [FrameSettingsField(0, autoName: LensDistortion, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds lens distortion to Cameras affected by a Volume containing the Lens Distortion override.")]
         LensDistortion = 85,
         /// <summary>When enabled, HDRP adds chromatic aberration to Cameras affected by a Volume containing the Chromatic Aberration override.</summary>
-        [FrameSettingsField(0, autoName: ChromaticAberration, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP adds chromatic aberration to Cameras affected by a Volume containing the Chromatic Aberration override.")]
+        [FrameSettingsField(0, autoName: ChromaticAberration, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds chromatic aberration to Cameras affected by a Volume containing the Chromatic Aberration override.")]
         ChromaticAberration = 86,
         /// <summary>When enabled, HDRP adds vignette to Cameras affected by a Volume containing the Vignette override.</summary>
-        [FrameSettingsField(0, autoName: Vignette, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP adds vignette to Cameras affected by a Volume containing the Vignette override.")]
+        [FrameSettingsField(0, autoName: Vignette, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds vignette to Cameras affected by a Volume containing the Vignette override.")]
         Vignette = 87,
         /// <summary>When enabled, HDRP processes color grading for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, autoName: ColorGrading, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP processes color grading for Cameras using these Frame Settings.")]
+        [FrameSettingsField(0, autoName: ColorGrading, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP processes color grading for Cameras using these Frame Settings.")]
         ColorGrading = 88,
         /// <summary>When enabled, HDRP processes tonemapping for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, autoName: Tonemapping, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP processes tonemapping for Cameras using these Frame Settings.")]
+        [FrameSettingsField(0, autoName: Tonemapping, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP processes tonemapping for Cameras using these Frame Settings.")]
         Tonemapping = 93,
         /// <summary>When enabled, HDRP adds film grain to Cameras affected by a Volume containing the Film Grain override.</summary>
-        [FrameSettingsField(0, autoName: FilmGrain, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP adds film grain to Cameras affected by a Volume containing the Film Grain override.")]
+        [FrameSettingsField(0, autoName: FilmGrain, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP adds film grain to Cameras affected by a Volume containing the Film Grain override.")]
         FilmGrain = 89,
         /// <summary>When enabled, HDRP processes dithering for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, autoName: Dithering, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP processes dithering for Cameras using these Frame Settings.")]
+        [FrameSettingsField(0, autoName: Dithering, positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP processes dithering for Cameras using these Frame Settings.")]
         Dithering = 90,
         /// <summary>When enabled, HDRP processes anti-aliasing for camera using these Frame Settings.</summary>
-        [FrameSettingsField(0, displayedName: "Anti-aliasing", positiveDependencies: new[] { Postprocess }, customOrderInGroup: 20, tooltip: "When enabled, HDRP processes anti-aliasing for camera using these Frame Settings.")]
+        [FrameSettingsField(0, displayedName: "Anti-aliasing", positiveDependencies: new[] { Postprocess }, customOrderInGroup: 19, tooltip: "When enabled, HDRP processes anti-aliasing for camera using these Frame Settings.")]
         Antialiasing = 91,
         /// <summary>When enabled, HDRP processes a post-processing render pass for Cameras using these Frame Settings.</summary>
-        [FrameSettingsField(0, displayedName: "After Post-process", customOrderInGroup: 21, tooltip: "When enabled, HDRP processes a post-processing render pass for Cameras using these Frame Settings.")]
+        [FrameSettingsField(0, displayedName: "After Post-process", customOrderInGroup: 20, tooltip: "When enabled, HDRP processes a post-processing render pass for Cameras using these Frame Settings.")]
         AfterPostprocess = 17,
         /// <summary>When enabled, Cameras that don't use TAA process a depth test for Materials in the AfterPostProcess rendering pass.</summary>
-        [FrameSettingsField(0, displayedName: "Depth Test", positiveDependencies: new[] { AfterPostprocess }, customOrderInGroup: 21, tooltip: "When enabled, Cameras that don't use TAA process a depth test for Materials in the AfterPostProcess rendering pass.")]
+        [FrameSettingsField(0, displayedName: "Depth Test", positiveDependencies: new[] { AfterPostprocess }, customOrderInGroup: 20, tooltip: "When enabled, Cameras that don't use TAA process a depth test for Materials in the AfterPostProcess rendering pass.")]
         ZTestAfterPostProcessTAA = 19,
 
         // true <=> Fixed, false <=> FromQualitySettings (default)
@@ -281,7 +253,7 @@ namespace UnityEngine.Rendering.HighDefinition
         [FrameSettingsField(0, autoName: LODBias, type: FrameSettingsFieldAttribute.DisplayType.Others, positiveDependencies: new[] { LODBiasMode }, tooltip: "Sets the Level Of Detail Bias or the Scale on it.")]
         LODBias = 61,
         /// <summary>The quality level to use when fetching the value from the quality settings.</summary>
-        [FrameSettingsField(0, displayedName: "Tier Level", type: FrameSettingsFieldAttribute.DisplayType.Others, customOrderInGroup: 100, positiveDependencies: new[] { LODBiasMode }, tooltip: "The quality level to use when fetching the value from the quality settings.")]
+        [FrameSettingsField(0, displayedName: "Quality Level", type: FrameSettingsFieldAttribute.DisplayType.Others, customOrderInGroup: 100, positiveDependencies: new[] { LODBiasMode }, tooltip: "The quality level to use when fetching the value from the quality settings.")]
         LODBiasQualityLevel = 64,
         // true <=> Fixed, false <=> FromQualitySettings (default)
         /// <summary>Specifies the Maximum Level Of Detail Mode for Cameras using these Frame Settings to use to render the Scene. Offset allows you to add an offset factor while Override allows you to set a specific value.</summary>
@@ -291,7 +263,7 @@ namespace UnityEngine.Rendering.HighDefinition
         [FrameSettingsField(0, autoName: MaximumLODLevel, type: FrameSettingsFieldAttribute.DisplayType.Others, positiveDependencies: new[] { MaximumLODLevelMode }, tooltip: "Sets the Maximum Level Of Detail Level or the Offset on it.")]
         MaximumLODLevel = 63,
         /// <summary>The quality level to use when fetching the value from the quality settings.</summary>
-        [FrameSettingsField(0, displayedName: "Tier Level", type: FrameSettingsFieldAttribute.DisplayType.Others, customOrderInGroup: 102, positiveDependencies: new[] { MaximumLODLevelMode }, tooltip: "The quality level to use when fetching the value from the quality settings.")]
+        [FrameSettingsField(0, displayedName: "Quality Level", type: FrameSettingsFieldAttribute.DisplayType.Others, customOrderInGroup: 102, positiveDependencies: new[] { MaximumLODLevelMode }, tooltip: "The quality level to use when fetching the value from the quality settings.")]
         MaximumLODLevelQualityLevel = 65,
         /// <summary>The quality level to use when fetching the value from the quality settings.</summary>
         [FrameSettingsField(0, autoName: MaterialQualityLevel, type: FrameSettingsFieldAttribute.DisplayType.Others, tooltip: "The material quality level to use.")]
@@ -319,7 +291,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>When enabled, Cameras using these Frame Settings calculate Screen Space Ambient Occlusion.</summary>
         [FrameSettingsField(1, displayedName: "Screen Space Ambient Occlusion", tooltip: "When enabled, Cameras using these Frame Settings calculate Screen Space Ambient Occlusion (Depends on \"Screen Space Ambient Occlusion\" in current HDRP Asset).")]
         SSAO = 24,
-        /// <summary>When enabled, Cameras using these Frame Settings calculate Screen Space Global Illumination.</summary>
+        /// <summary>When enabled, Cameras using these Frame Settings calculate Transparent Screen Space Global Illumination.</summary>
         [FrameSettingsField(1, displayedName: "Screen Space Global Illumination", customOrderInGroup: 25, tooltip: "When enabled, Cameras using these Frame Settings calculate Screen Space Global Illumination (Depends on \"Screen Space Global Illumination\" in current HDRP Asset).")]
         SSGI = 95,
         /// <summary>When enabled, Cameras using these Frame Settings render subsurface scattering (SSS) effects for GameObjects that use a SSS Material.</summary>
@@ -327,26 +299,22 @@ namespace UnityEngine.Rendering.HighDefinition
             tooltip: "When enabled, Cameras using these Frame Settings render subsurface scattering (SSS) effects for GameObjects that use a SSS Material (Depends on \"Subsurface Scattering\" in current HDRP Asset).")]
         SubsurfaceScattering = 46,
         /// <summary>Configures the sample budget of the Subsurface Scattering algorithm using Quality Levels. You can either pick from one of the existing values in the Quality Settings, or request a custom number of samples.</summary>
-        [FrameSettingsField(1, customOrderInGroup: 47, displayedName: "Tier Mode", positiveDependencies: new[] { SubsurfaceScattering }, type: FrameSettingsFieldAttribute.DisplayType.Others, targetType: typeof(SssQualityMode),
+        [FrameSettingsField(1, customOrderInGroup: 47, displayedName: "Quality Mode", positiveDependencies: new[] { SubsurfaceScattering }, type: FrameSettingsFieldAttribute.DisplayType.Others, targetType: typeof(SssQualityMode),
             tooltip: "Configures the way the sample budget of the Subsurface Scattering algorithm is determined. You can either pick from one of the existing values in the Quality Settings, or request a custom number of samples.")]
         SssQualityMode = 47,
         /// <summary>Sets the Quality Level of the Subsurface Scattering algorithm.</summary>
-        [FrameSettingsField(1, customOrderInGroup: 48, displayedName: "Tier Level", positiveDependencies: new[] { SubsurfaceScattering }, type: FrameSettingsFieldAttribute.DisplayType.Others,
+        [FrameSettingsField(1, customOrderInGroup: 48, displayedName: "Quality Level", positiveDependencies: new[] { SubsurfaceScattering }, type: FrameSettingsFieldAttribute.DisplayType.Others,
             tooltip: "Sets the Quality Level of the Subsurface Scattering algorithm.")]
         SssQualityLevel = 48,
         /// <summary>Sets the custom sample budget of the Subsurface Scattering algorithm.</summary>
         [FrameSettingsField(1, customOrderInGroup: 49, displayedName: "Custom Sample Budget", positiveDependencies: new[] { SubsurfaceScattering }, type: FrameSettingsFieldAttribute.DisplayType.Others,
             tooltip: "Sets the custom sample budget of the Subsurface Scattering algorithm.")]
         SssCustomSampleBudget = 49,
-        /// <summary>Sets the custom number of downsample steps used by the Subsurface Scattering algorithm.</summary>
-        [FrameSettingsField(1, customOrderInGroup: 50, displayedName: "Custom Downsample Level", positiveDependencies: new[] { SubsurfaceScattering }, type: FrameSettingsFieldAttribute.DisplayType.Others,
-            tooltip: "Sets the custom number of downsample steps done to the source irradance textrure before it is used by the Subsurface Scattering algorithm. Higher value will improve performance, but might lower quality.")]
-        SssCustomDownsampleSteps = 51,
         /// <summary>When enabled, Cameras using these Frame Settings calculate Volumetric Clouds.</summary>
         [FrameSettingsField(1, autoName: VolumetricClouds, customOrderInGroup: 50, tooltip: "When enabled, Cameras using these Frame Settings calculate Volumetric Clouds.")]
         VolumetricClouds = 79,
         /// <summary>When enabled, Cameras using these Frame Settings calculate Volumetric Clouds at full resolution when evaluating the sky texture.</summary>
-        [FrameSettingsField(1, autoName: FullResolutionCloudsForSky, customOrderInGroup: 52, positiveDependencies: new[] { VolumetricClouds }, tooltip: "When enabled, Cameras using these Frame Settings calculate Volumetric Clouds at full resolution when evaluating the sky texture.")]
+        [FrameSettingsField(1, autoName: FullResolutionCloudsForSky, customOrderInGroup: 51, positiveDependencies: new[] { VolumetricClouds }, tooltip: "When enabled, Cameras using these Frame Settings calculate Volumetric Clouds at full resolution when evaluating the sky texture.")]
         FullResolutionCloudsForSky = 98,
 
         /// <summary>When enabled, Cameras using these Frame Settings render subsurface scattering (SSS) Materials with an added transmission effect (only if you enable Transmission on the SSS Material in the Material's Inspector).</summary>
@@ -356,7 +324,7 @@ namespace UnityEngine.Rendering.HighDefinition
         [FrameSettingsField(1, displayedName: "Fog", tooltip: "When enabled, Cameras using these Frame Settings render fog effects.")]
         AtmosphericScattering = 27,
         /// <summary>When enabled, Cameras using these Frame Settings render volumetric effects such as volumetric fog and lighting.</summary>
-        [FrameSettingsField(1, displayedName: "Volumetric Fog", positiveDependencies: new[] { AtmosphericScattering }, tooltip: "When enabled, Cameras using these Frame Settings render volumetric effects such as volumetric fog and lighting (Depends on \"Volumetrics\" in current HDRP Asset).")]
+        [FrameSettingsField(1, autoName: Volumetrics, positiveDependencies: new[] { AtmosphericScattering }, tooltip: "When enabled, Cameras using these Frame Settings render volumetric effects such as volumetric fog and lighting (Depends on \"Volumetrics\" in current HDRP Asset).")]
         Volumetrics = 28,
         /// <summary>When enabled, Cameras using these Frame Settings use several previous frames to calculate volumetric effects which increases their overall quality at run time.</summary>
         [FrameSettingsField(1, displayedName: "Reprojection", positiveDependencies: new[] { AtmosphericScattering, Volumetrics }, tooltip: "When enabled, Cameras using these Frame Settings use several previous frames to calculate volumetric effects which increases their overall quality at run time.")]
@@ -382,11 +350,12 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>When enabled, Cameras that use these Frame Settings render Direct Specular lighting. This is a useful Frame Setting to use for baked Reflection Probes to remove view dependent lighting.</summary>
         [FrameSettingsField(1, autoName: DirectSpecularLighting, tooltip: "When enabled, Cameras that use these Frame Settings render Direct Specular lighting. This is a useful Frame Setting to use for baked Reflection Probes to remove view dependent lighting.")]
         DirectSpecularLighting = 38,
+
         /// <summary>When enabled, HDRP uses probe volumes for baked lighting.</summary>
-        [FrameSettingsField(1, customOrderInGroup: 3, displayedName: "Adaptive Probe Volumes", tooltip: "Enable Adaptive Probe Volumes for rendering and debug visualisations. Enabling this feature causes HDRP to process Adaptive Probe Volumes for this Camera/Reflection Probe.")]
-        AdaptiveProbeVolume = 127,
+        [FrameSettingsField(1, customOrderInGroup: 3, autoName: ProbeVolume, tooltip: "Enable to debug and make HDRP process Probe Volumes. Enabling this feature causes HDRP to process Probe Volumes for this Camera/Reflection Probe.")]
+        ProbeVolume = 127,
         /// <summary>When enabled, HDRP uses probe volumes to normalize the data sampled from reflection probes so they better match the lighting at the sampling location.</summary>
-        [FrameSettingsField(1, customOrderInGroup: 4, displayedName: "Normalize Reflection Probes", positiveDependencies: new[] { AdaptiveProbeVolume })]
+        [FrameSettingsField(1, customOrderInGroup: 4, displayedName: "Normalize Reflection Probes", positiveDependencies: new[] { ProbeVolume })]
         NormalizeReflectionProbeWithProbeVolume = 126,
 
         //async settings (group 2)
@@ -408,9 +377,6 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>When enabled, HDRP calculates volumetric voxelization asynchronously.</summary>
         [FrameSettingsField(2, displayedName: "Volume Voxelizations", positiveDependencies: new[] { AsyncCompute }, tooltip: "When enabled, HDRP calculates volumetric voxelization asynchronously.")]
         VolumeVoxelizationsAsync = 45,
-        /// <summary>When enabled, HDRP calculates High Quality Lines partially asynchronously.</summary>
-        [FrameSettingsField(2, displayedName: "High Quality Line Rendering", positiveDependencies: new[] { AsyncCompute }, tooltip: "When enabled, HDRP calculates High Quality Lines partially asynchronously")]
-        HighQualityLinesAsync = 52,
 
         //lightLoop settings (group 3)
         /// <summary>When enabled, HDRP uses FPTL for forward opaque.</summary>
@@ -419,11 +385,17 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>When enabled, HDRP uses a big tile prepass for light visibility.</summary>
         [FrameSettingsField(3, autoName: BigTilePrepass, tooltip: "When enabled, HDRP uses a big tile prepass for light visibility.")]
         BigTilePrepass = 121,
+        /// <summary>When enabled, HDRP uses tiles to compute deferred lighting.</summary>
+        [FrameSettingsField(3, autoName: DeferredTile, tooltip: "When enabled, HDRP uses tiles to compute deferred lighting.")]
+        DeferredTile = 122,
+        /// <summary>When enabled, HDRP uses a compute shader to compute deferred lighting.</summary>
+        [FrameSettingsField(3, autoName: ComputeLightEvaluation, positiveDependencies: new[] { DeferredTile }, tooltip: "When enabled, HDRP uses a compute shader to compute deferred lighting.")]
+        ComputeLightEvaluation = 123,
         /// <summary>When enabled, HDRP uses light variant classification to compute lighting.</summary>
-        [FrameSettingsField(3, autoName: ComputeLightVariants, tooltip: "When enabled, HDRP uses light variant classification to compute lighting.")]
+        [FrameSettingsField(3, autoName: ComputeLightVariants, positiveDependencies: new[] { DeferredTile }, tooltip: "When enabled, HDRP uses light variant classification to compute lighting.")]
         ComputeLightVariants = 124,
         /// <summary>When enabled, HDRP uses material variant classification to compute lighting.</summary>
-        [FrameSettingsField(3, autoName: ComputeMaterialVariants, tooltip: "When enabled, HDRP uses material variant classification to compute lighting.")]
+        [FrameSettingsField(3, autoName: ComputeMaterialVariants, positiveDependencies: new[] { DeferredTile }, tooltip: "When enabled, HDRP uses material variant classification to compute lighting.")]
         ComputeMaterialVariants = 125,
 
         //only 128 booleans saved. For more, change the BitArray used
@@ -447,47 +419,259 @@ namespace UnityEngine.Rendering.HighDefinition
     [DebuggerTypeProxy(typeof(FrameSettingsDebugView))]
     partial struct FrameSettings
     {
+        internal static FrameSettings NewDefaultCamera() => new FrameSettings()
+        {
+            bitDatas = new BitArray128(new uint[]
+            {
+                (uint)FrameSettingsField.ShadowMaps,
+                (uint)FrameSettingsField.ContactShadows,
+                (uint)FrameSettingsField.Shadowmask,
+                (uint)FrameSettingsField.ScreenSpaceShadows,
+                (uint)FrameSettingsField.SSR,
+                (uint)FrameSettingsField.TransparentSSR,
+                (uint)FrameSettingsField.SSAO,
+                (uint)FrameSettingsField.SSGI,
+                (uint)FrameSettingsField.SubsurfaceScattering,
+                (uint)FrameSettingsField.Transmission,   // Caution: this is only for debug, it doesn't save the cost of Transmission execution
+                (uint)FrameSettingsField.AtmosphericScattering,
+                (uint)FrameSettingsField.Volumetrics,
+                (uint)FrameSettingsField.ReprojectionForVolumetrics,
+                (uint)FrameSettingsField.LightLayers,
+                (uint)FrameSettingsField.ExposureControl,
+                (uint)FrameSettingsField.LitShaderMode, //deffered ; enum with only two value saved as a bool
+                (uint)FrameSettingsField.TransparentPrepass,
+                (uint)FrameSettingsField.TransparentPostpass,
+                (uint)FrameSettingsField.CustomPass,
+                (uint)FrameSettingsField.VirtualTexturing,
+                (uint)FrameSettingsField.MotionVectors, // Enable/disable whole motion vectors pass (Camera + Object).
+                (uint)FrameSettingsField.ObjectMotionVectors,
+                (uint)FrameSettingsField.Decals,
+                (uint)FrameSettingsField.DecalLayers,
+                (uint)FrameSettingsField.Refraction, // Depends on DepthPyramid - If not enable, just do a copy of the scene color (?) - how to disable refraction ?
+                (uint)FrameSettingsField.Distortion,
+                (uint)FrameSettingsField.RoughDistortion,
+                (uint)FrameSettingsField.Postprocess,
+                (uint)FrameSettingsField.CustomPostProcess,
+                (uint)FrameSettingsField.StopNaN,
+                (uint)FrameSettingsField.DepthOfField,
+                (uint)FrameSettingsField.MotionBlur,
+                (uint)FrameSettingsField.PaniniProjection,
+                (uint)FrameSettingsField.Bloom,
+                (uint)FrameSettingsField.LensFlareDataDriven,
+                (uint)FrameSettingsField.LensDistortion,
+                (uint)FrameSettingsField.ChromaticAberration,
+                (uint)FrameSettingsField.Vignette,
+                (uint)FrameSettingsField.ColorGrading,
+                (uint)FrameSettingsField.Tonemapping,
+                (uint)FrameSettingsField.FilmGrain,
+                (uint)FrameSettingsField.Dithering,
+                (uint)FrameSettingsField.Antialiasing,
+                (uint)FrameSettingsField.AfterPostprocess,
+                (uint)FrameSettingsField.LowResTransparent,
+                (uint)FrameSettingsField.ZTestAfterPostProcessTAA,
+                (uint)FrameSettingsField.OpaqueObjects,
+                (uint)FrameSettingsField.TransparentObjects,
+                (uint)FrameSettingsField.AsyncCompute,
+                (uint)FrameSettingsField.LightListAsync,
+                (uint)FrameSettingsField.SSRAsync,
+                (uint)FrameSettingsField.SSRAsync,
+                (uint)FrameSettingsField.SSAOAsync,
+                (uint)FrameSettingsField.ContactShadowsAsync,
+                (uint)FrameSettingsField.VolumeVoxelizationsAsync,
+                (uint)FrameSettingsField.DeferredTile,
+                (uint)FrameSettingsField.ComputeLightEvaluation,
+                (uint)FrameSettingsField.ComputeLightVariants,
+                (uint)FrameSettingsField.ComputeMaterialVariants,
+                (uint)FrameSettingsField.FPTLForForwardOpaque,
+                (uint)FrameSettingsField.BigTilePrepass,
+                (uint)FrameSettingsField.TransparentsWriteMotionVector,
+                (uint)FrameSettingsField.ReflectionProbe,
+                (uint)FrameSettingsField.PlanarProbe,
+                (uint)FrameSettingsField.SkyReflection,
+                (uint)FrameSettingsField.DirectSpecularLighting,
+                (uint)FrameSettingsField.RayTracing,
+                (uint)FrameSettingsField.ProbeVolume,
+                (uint)FrameSettingsField.VolumetricClouds,
+                (uint)FrameSettingsField.Water,
+                // (uint)FullResolutionCloudsForSky
+            }),
+            lodBias = 1,
+            sssQualityMode = SssQualityMode.FromQualitySettings,
+            sssQualityLevel = 0,
+            sssCustomSampleBudget = (int)DefaultSssSampleBudgetForQualityLevel.Low,
+            msaaMode = MSAAMode.None,
+        };
+        internal static FrameSettings NewDefaultRealtimeReflectionProbe() => new FrameSettings()
+        {
+            bitDatas = new BitArray128(new uint[]
+            {
+                (uint)FrameSettingsField.ShadowMaps,
+                //(uint)FrameSettingsField.ContactShadow,
+                //(uint)FrameSettingsField.ShadowMask,
+                //(uint)FrameSettingsField.SSR,
+                //(uint)FrameSettingsField.SSAO,
+                //(uint)FrameSettingsField.SSGI,
+                (uint)FrameSettingsField.SubsurfaceScattering,
+                (uint)FrameSettingsField.Transmission,   // Caution: this is only for debug, it doesn't save the cost of Transmission execution
+                //(uint)FrameSettingsField.AtmosphericScaterring,
+                (uint)FrameSettingsField.Volumetrics,
+                (uint)FrameSettingsField.ReprojectionForVolumetrics,
+                (uint)FrameSettingsField.LightLayers,
+                //(uint)FrameSettingsField.ExposureControl,
+                (uint)FrameSettingsField.LitShaderMode, //deffered ; enum with only two value saved as a bool
+                (uint)FrameSettingsField.TransparentPrepass,
+                (uint)FrameSettingsField.TransparentPostpass,
+                (uint)FrameSettingsField.CustomPass,
+                (uint)FrameSettingsField.VirtualTexturing,
+                (uint)FrameSettingsField.MotionVectors, // Enable/disable whole motion vectors pass (Camera + Object).
+                (uint)FrameSettingsField.ObjectMotionVectors,
+                (uint)FrameSettingsField.Decals,
+                (uint)FrameSettingsField.DecalLayers,
+                //(uint)FrameSettingsField.Refraction, // Depends on DepthPyramid - If not enable, just do a copy of the scene color (?) - how to disable refraction ?
+                //(uint)FrameSettingsField.Distortion,
+                //(uint)FrameSettingsField.RoughDistortion,
+                //(uint)FrameSettingsField.Postprocess,
+                //(uint)FrameSettingsField.CustomPostProcess,
+                //(uint)FrameSettingsField.AfterPostprocess,
+                (uint)FrameSettingsField.OpaqueObjects,
+                (uint)FrameSettingsField.TransparentObjects,
+                (uint)FrameSettingsField.AsyncCompute,
+                (uint)FrameSettingsField.LightListAsync,
+                (uint)FrameSettingsField.SSRAsync,
+                (uint)FrameSettingsField.SSRAsync,
+                (uint)FrameSettingsField.SSAOAsync,
+                (uint)FrameSettingsField.ContactShadowsAsync,
+                (uint)FrameSettingsField.VolumeVoxelizationsAsync,
+                (uint)FrameSettingsField.DeferredTile,
+                (uint)FrameSettingsField.ComputeLightEvaluation,
+                (uint)FrameSettingsField.ComputeLightVariants,
+                (uint)FrameSettingsField.ComputeMaterialVariants,
+                (uint)FrameSettingsField.FPTLForForwardOpaque,
+                (uint)FrameSettingsField.BigTilePrepass,
+                (uint)FrameSettingsField.ReflectionProbe,
+                (uint)FrameSettingsField.RayTracing,
+                // (uint)FrameSettingsField.EnableSkyReflection,
+                (uint)FrameSettingsField.ProbeVolume,
+                (uint)FrameSettingsField.DirectSpecularLighting,
+                // (uint)FrameSettingsField.VolumetricClouds,
+                // (uint)FrameSettingsField.Water,
+                // (uint)FullResolutionCloudsForSky
+            }),
+            lodBias = 1,
+            sssQualityMode = SssQualityMode.FromQualitySettings,
+            sssQualityLevel = 0,
+            sssCustomSampleBudget = (int)DefaultSssSampleBudgetForQualityLevel.Low,
+            msaaMode = MSAAMode.None,
+        };
+        internal static FrameSettings NewDefaultCustomOrBakeReflectionProbe() => new FrameSettings()
+        {
+            bitDatas = new BitArray128(new uint[]
+            {
+                (uint)FrameSettingsField.ShadowMaps,
+                (uint)FrameSettingsField.ContactShadows,
+                (uint)FrameSettingsField.Shadowmask,
+                //(uint)FrameSettingsField.SSR,
+                (uint)FrameSettingsField.SSAO,
+                //(uint)FrameSettingsField.SSGI,
+                (uint)FrameSettingsField.SubsurfaceScattering,
+                (uint)FrameSettingsField.Transmission,   // Caution: this is only for debug, it doesn't save the cost of Transmission execution
+                (uint)FrameSettingsField.AtmosphericScattering,
+                (uint)FrameSettingsField.Volumetrics,
+                (uint)FrameSettingsField.ReprojectionForVolumetrics,
+                (uint)FrameSettingsField.LightLayers,
+                //(uint)FrameSettingsField.ExposureControl,
+                (uint)FrameSettingsField.LitShaderMode, //deffered ; enum with only two value saved as a bool
+                (uint)FrameSettingsField.TransparentPrepass,
+                (uint)FrameSettingsField.TransparentPostpass,
+                (uint)FrameSettingsField.CustomPass,
+                (uint)FrameSettingsField.VirtualTexturing,
+                //(uint)FrameSettingsField.MotionVectors, // Enable/disable whole motion vectors pass (Camera + Object).
+                //(uint)FrameSettingsField.ObjectMotionVectors,
+                (uint)FrameSettingsField.Decals,
+                (uint)FrameSettingsField.DecalLayers,
+                (uint)FrameSettingsField.Refraction, // Depends on DepthPyramid - If not enable, just do a copy of the scene color (?) - how to disable rough refraction ?
+                (uint)FrameSettingsField.Distortion,
+                (uint)FrameSettingsField.RoughDistortion,
+                //(uint)FrameSettingsField.Postprocess,
+                //(uint)FrameSettingsField.CustomPostProcess,
+                //(uint)FrameSettingsField.AfterPostprocess,
+                (uint)FrameSettingsField.OpaqueObjects,
+                (uint)FrameSettingsField.TransparentObjects,
+                (uint)FrameSettingsField.AsyncCompute,
+                (uint)FrameSettingsField.LightListAsync,
+                //(uint)FrameSettingsField.SSRAsync,
+                (uint)FrameSettingsField.SSAOAsync,
+                (uint)FrameSettingsField.ContactShadowsAsync,
+                (uint)FrameSettingsField.VolumeVoxelizationsAsync,
+                (uint)FrameSettingsField.DeferredTile,
+                (uint)FrameSettingsField.ComputeLightEvaluation,
+                (uint)FrameSettingsField.ComputeLightVariants,
+                (uint)FrameSettingsField.ComputeMaterialVariants,
+                (uint)FrameSettingsField.FPTLForForwardOpaque,
+                (uint)FrameSettingsField.BigTilePrepass,
+                (uint)FrameSettingsField.ReplaceDiffuseForIndirect,
+                // (uint)FrameSettingsField.EnableSkyReflection,
+                // (uint)FrameSettingsField.DirectSpecularLighting,
+                (uint)FrameSettingsField.VolumetricClouds,
+                (uint)FrameSettingsField.Water,
+                (uint)FrameSettingsField.ProbeVolume,
+                // (uint)FullResolutionCloudsForSky
+            }),
+            lodBias = 1,
+            sssQualityMode = SssQualityMode.FromQualitySettings,
+            sssQualityLevel = 0,
+            sssCustomSampleBudget = (int)DefaultSssSampleBudgetForQualityLevel.Low,
+            msaaMode = MSAAMode.None,
+        };
+
         // Each time you add data in the framesettings. Attempt to add boolean one only if possible.
         // BitArray is quick in computation and take not a lot of space. It can contains only boolean value.
         // If anyone wants more than 128 bit, the BitArray256 already exist. Just replace this one with it should be enough.
         // For more, you should write one using previous as exemple.
         [SerializeField]
-        internal BitArray128 bitDatas;
+        BitArray128 bitDatas;
 
         /// <summary>
         /// If <c>lodBiasMode</c> is <c>LODBiasMode.Fixed</c>, then this value overwrites <c>QualitySettings.lodBias</c>.
         /// If <c>lodBiasMode</c> is <c>LODBiasMode.ScaleQualitySettings</c>, then this value scales <c>QualitySettings.lodBias</c>.
         /// </summary>
+        [SerializeField]
         public float lodBias;
         /// <summary>Specifies how HDRP calculates <c>QualitySettings.lodBias</c>.</summary>
+        [SerializeField]
         public LODBiasMode lodBiasMode;
         /// <summary>The quality level the rendering component uses when it fetches the quality setting value.</summary>
+        [SerializeField]
         public int lodBiasQualityLevel;
         /// <summary>
         /// If <c>maximumLODLevelMode</c> is <c>MaximumLODLevelMode.FromQualitySettings</c>, then this value overwrites <c>QualitySettings.maximumLODLevel</c>
         /// If <c>maximumLODLevelMode</c> is <c>MaximumLODLevelMode.OffsetQualitySettings</c>, then this value offsets <c>QualitySettings.maximumLODLevel</c>
         /// </summary>
+        [SerializeField]
         public int maximumLODLevel;
         /// <summary>Specifies how HDRP calculates <c>QualitySettings.maximumLODLevel</c>.</summary>
+        [SerializeField]
         public MaximumLODLevelMode maximumLODLevelMode;
         /// <summary>The maximum quality level the rendering component uses when it fetches the quality setting value.</summary>
+        [SerializeField]
         public int maximumLODLevelQualityLevel;
 
         /// <summary>Stores SssQualityMode on disk.</summary>
+        [SerializeField]
         public SssQualityMode sssQualityMode;
         /// <summary>Stores SssQualityLevel on disk.</summary>
+        [SerializeField]
         public int sssQualityLevel;
         /// <summary>Stores SssCustomSampleBudget on disk.</summary>
+        [SerializeField]
         public int sssCustomSampleBudget;
-        /// <summary>Stores SssCustomDownsampleSteps on disk.</summary>
-        public int sssCustomDownsampleSteps;
 
         /// <summary>Stores MSAA Mode on disk.</summary>
+        [SerializeField]
         public MSAAMode msaaMode;
 
         /// <summary>The actual value used by the Subsurface Scattering algorithm. Updated every frame.</summary>
         internal int sssResolvedSampleBudget;
-        internal int sssResolvedDownsampleSteps;
 
         /// <summary>
         /// The material quality level this rendering component uses.
@@ -562,23 +746,6 @@ namespace UnityEngine.Rendering.HighDefinition
         }
 
         /// <summary>
-        /// Returns the number downsample steps that will be performed on the source
-        /// irradiance texture before the main Subsurface algorithm executes.
-        /// </summary>
-        /// <param name="hdrp">The HDRP Asset to use.</param>
-        /// <returns>The number downsample steps.</returns>
-        public int GetResolvedSssDownsampleSteps(HDRenderPipelineAsset hdrp)
-        {
-            var source = hdrp.currentPlatformRenderPipelineSettings.sssDownsampleSteps;
-            switch (sssQualityMode)
-            {
-                case SssQualityMode.FromQualitySettings: return source[sssQualityLevel];
-                case SssQualityMode.OverrideQualitySettings: return sssCustomDownsampleSteps;
-                default: throw new ArgumentOutOfRangeException(nameof(sssCustomDownsampleSteps));
-            }
-        }
-
-        /// <summary>
         /// Calculates the Maximum LOD level to use.
         /// </summary>
         /// <param name="hdrp">The HDRP Asset to use</param>
@@ -596,24 +763,13 @@ namespace UnityEngine.Rendering.HighDefinition
         internal float specularGlobalDimmer => bitDatas[(int)FrameSettingsField.DirectSpecularLighting] ? 1f : 0f;
 
         // When render graph debug is active, we need async information to be accurate even if not supported. Actual execution will be disabled down the line.
-        bool asyncEnabled => (SystemInfo.supportsAsyncCompute || RenderGraph.isRenderGraphViewerActive) && bitDatas[(int)FrameSettingsField.AsyncCompute];
+        bool asyncEnabled => (SystemInfo.supportsAsyncCompute || RenderGraph.requireDebugData) && bitDatas[(int)FrameSettingsField.AsyncCompute];
 
         internal bool BuildLightListRunsAsync() => asyncEnabled && bitDatas[(int)FrameSettingsField.LightListAsync];
         internal bool SSRRunsAsync() => asyncEnabled && bitDatas[(int)FrameSettingsField.SSRAsync];
         internal bool SSAORunsAsync() => asyncEnabled && bitDatas[(int)FrameSettingsField.SSAOAsync];
         internal bool ContactShadowsRunsAsync() => asyncEnabled && bitDatas[(int)FrameSettingsField.ContactShadowsAsync];
         internal bool VolumeVoxelizationRunsAsync() => asyncEnabled && bitDatas[(int)FrameSettingsField.VolumeVoxelizationsAsync];
-        internal bool HighQualityLinesRunsAsync() => SystemInfo.supportsAsyncCompute && bitDatas[(int)FrameSettingsField.AsyncCompute] && bitDatas[(uint)FrameSettingsField.HighQualityLinesAsync];
-
-        /// <summary>Construct and initialize a <see cref="FrameSettings"/></summary>
-        /// <returns>A new <see cref="FrameSettings"/> initialized</returns>
-        public static FrameSettings Create()
-        {
-            var res = new FrameSettings();
-            //Initialize default values that are not the C# defaults
-            res.msaaMode = MSAAMode.None;
-            return res;
-        }
 
         /// <summary>Override a frameSettings according to a mask.</summary>
         /// <param name="overriddenFrameSettings">Overrided FrameSettings. Must contains default data before attempting the override.</param>
@@ -631,8 +787,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 overriddenFrameSettings.sssQualityLevel = overridingFrameSettings.sssQualityLevel;
             if (frameSettingsOverideMask.mask[(uint)FrameSettingsField.SssCustomSampleBudget])
                 overriddenFrameSettings.sssCustomSampleBudget = overridingFrameSettings.sssCustomSampleBudget;
-            if (frameSettingsOverideMask.mask[(uint)FrameSettingsField.SssCustomDownsampleSteps])
-                overriddenFrameSettings.sssCustomDownsampleSteps = overridingFrameSettings.sssCustomDownsampleSteps;
             if (frameSettingsOverideMask.mask[(uint)FrameSettingsField.LODBias])
                 overriddenFrameSettings.lodBias = overridingFrameSettings.lodBias;
             if (frameSettingsOverideMask.mask[(uint)FrameSettingsField.LODBiasMode])
@@ -663,7 +817,7 @@ namespace UnityEngine.Rendering.HighDefinition
             bool reflectionPlanar = GeometryUtils.IsProjectionMatrixOblique(camera.projectionMatrix);
             bool preview = HDUtils.IsRegularPreviewCamera(camera);
             bool sceneViewFog = CoreUtils.IsSceneViewFogEnabled(camera);
-            bool temporalAccumulationAllowed = !reflection || (reflection && reflectionPlanar);
+            bool temporalAccumulationAllowed = (!reflection || (reflection && reflectionPlanar));
 
             switch (renderPipelineSettings.supportedLitShaderMode)
             {
@@ -678,17 +832,12 @@ namespace UnityEngine.Rendering.HighDefinition
                     break;
             }
 
-            bool notPreview = !preview;
-            bool transparentObjects = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentObjects];
-            bool opaqueObjects = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.OpaqueObjects];
-
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ShadowMaps] &= notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Shadowmask] &= renderPipelineSettings.supportShadowMask && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ContactShadows] &= notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ShadowMaps] &= !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Shadowmask] &= renderPipelineSettings.supportShadowMask && !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ContactShadows] &= !preview;
             bool pipelineSupportsRayTracing = HDRenderPipeline.PipelineSupportsRayTracing(renderPipelineSettings);
             // Ray tracing effects are not allowed on reflection probes due to the accumulation process.
-            bool rayTracingActive = sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.RayTracing] &= pipelineSupportsRayTracing && notPreview && temporalAccumulationAllowed;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.RaytracingVFX] &= rayTracingActive;
+            bool rayTracingActive = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.RayTracing] &= pipelineSupportsRayTracing && !preview && temporalAccumulationAllowed;
 
             //MSAA only supported in forward and when not using ray tracing or water.
             if (sanitizedFrameSettings.litShaderMode != LitShaderMode.Forward || pipelineSupportsRayTracing || renderPipelineSettings.supportWater)
@@ -696,95 +845,84 @@ namespace UnityEngine.Rendering.HighDefinition
             bool msaa = sanitizedFrameSettings.msaaMode == MSAAMode.FromHDRPAsset ? renderPipelineSettings.msaaSampleCount != MSAASamples.None : sanitizedFrameSettings.msaaMode != MSAAMode.None;
 
             // Screen space shadows are not compatible with MSAA
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ScreenSpaceShadows] &= renderPipelineSettings.hdShadowInitParams.supportScreenSpaceShadows && opaqueObjects & !msaa;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ScreenSpaceShadows] &= renderPipelineSettings.hdShadowInitParams.supportScreenSpaceShadows && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.OpaqueObjects] & !msaa;
 
             // No recursive reflections
-            bool ssr = sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SSR] &= renderPipelineSettings.supportSSR && !msaa && notPreview && temporalAccumulationAllowed;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.TransparentSSR] &= ssr && renderPipelineSettings.supportSSRTransparent && transparentObjects && renderPipelineSettings.supportTransparentDepthPrepass;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Refraction] &= transparentObjects && notPreview;
+            bool ssr = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SSR] &= renderPipelineSettings.supportSSR && !msaa && !preview && temporalAccumulationAllowed;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentSSR] &= ssr && renderPipelineSettings.supportSSRTransparent && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentObjects] && renderPipelineSettings.supportTransparentDepthPrepass;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Refraction] &= !preview;
             // Because the camera is shared between the faces of the reflection probes, we cannot allow effects that rely on the accumulation process
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SSAO] &= renderPipelineSettings.supportSSAO && notPreview && opaqueObjects && temporalAccumulationAllowed;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SSGI] &= renderPipelineSettings.supportSSGI && notPreview && opaqueObjects && temporalAccumulationAllowed;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SubsurfaceScattering] &= renderPipelineSettings.supportSubsurfaceScattering;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VolumetricClouds] &= renderPipelineSettings.supportVolumetricClouds && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.FullResolutionCloudsForSky] &= sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VolumetricClouds];
-
-            bool water = sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Water] &= sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Refraction] && renderPipelineSettings.supportWater && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.WaterDecals] &= water && renderPipelineSettings.supportWaterDecals;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.WaterExclusion] &= water && renderPipelineSettings.supportWaterExclusion;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SSAO] &= renderPipelineSettings.supportSSAO && !preview && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.OpaqueObjects] && temporalAccumulationAllowed;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SSGI] &= renderPipelineSettings.supportSSGI && !preview && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.OpaqueObjects] && temporalAccumulationAllowed;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SubsurfaceScattering] &= renderPipelineSettings.supportSubsurfaceScattering;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.VolumetricClouds] &= renderPipelineSettings.supportVolumetricClouds && !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.FullResolutionCloudsForSky] &= sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.VolumetricClouds];
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Water] &= renderPipelineSettings.supportWater && !preview;
 
             // Disable Lens Flares if they are unchecked in the HDRP Assets
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LensFlareScreenSpace] &= sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Bloom] && sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LensFlareScreenSpace] && renderPipelineSettings.supportScreenSpaceLensFlare;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LensFlareDataDriven] &= sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LensFlareDataDriven] && renderPipelineSettings.supportDataDrivenLensFlare;
-
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.LensFlareDataDriven] &= sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.LensFlareDataDriven] && renderPipelineSettings.supportDataDrivenLensFlare;
+            
             // We must take care of the scene view fog flags in the editor
-            bool atmosphericScattering = sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.AtmosphericScattering] &= sceneViewFog && notPreview;
+            bool atmosphericScattering = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.AtmosphericScattering] &= sceneViewFog && !preview;
 
             // Volumetric are disabled if there is no atmospheric scattering
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Volumetrics] &= renderPipelineSettings.supportVolumetrics && atmosphericScattering; //&& notPreview induced by atmospheric scattering
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ReprojectionForVolumetrics] &= notPreview && temporalAccumulationAllowed;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Volumetrics] &= renderPipelineSettings.supportVolumetrics && atmosphericScattering; //&& !preview induced by atmospheric scattering
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ReprojectionForVolumetrics] &= !preview && temporalAccumulationAllowed;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.RenderingLayerMaskBuffer] &= renderPipelineSettings.renderingLayerMaskBuffer && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LightLayers] &= renderPipelineSettings.supportLightLayers && notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.LightLayers] &= renderPipelineSettings.supportLightLayers && !preview;
             // We allow the user to enable exposure control on planar reflections, but not on reflection probes.
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ExposureControl] &= (!reflection || (reflectionPlanar && reflection)) && notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ExposureControl] &= (!reflection || (reflectionPlanar && reflection)) && !preview;
 
             // Planar and real time cubemap doesn't need post process and render in FP16
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Postprocess] &= !reflection && notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Postprocess] &= !reflection && !preview;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.TransparentPrepass] &= renderPipelineSettings.supportTransparentDepthPrepass && notPreview && transparentObjects;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentPrepass] &= renderPipelineSettings.supportTransparentDepthPrepass && !preview && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentObjects];
 
-            bool motionVector = sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.MotionVectors] &= renderPipelineSettings.supportMotionVectors && notPreview;
+            bool motionVector = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.MotionVectors] &= renderPipelineSettings.supportMotionVectors && !preview;
 
             // Object motion vector are disabled if motion vector are disabled
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ObjectMotionVectors] &= motionVector && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.TransparentsWriteMotionVector] &= motionVector && notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ObjectMotionVectors] &= motionVector && !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentsWriteMotionVector] &= motionVector && !preview;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Decals] &= renderPipelineSettings.supportDecals && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.DecalLayers] &= renderPipelineSettings.supportDecalLayers && sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Decals];
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.TransparentPostpass] &= renderPipelineSettings.supportTransparentDepthPostpass && notPreview && transparentObjects;
-            bool distortion = sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.Distortion] &= renderPipelineSettings.supportDistortion && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.RoughDistortion] &= distortion && notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Decals] &= renderPipelineSettings.supportDecals && !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.DecalLayers] &= renderPipelineSettings.supportDecalLayers && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Decals];
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentPostpass] &= renderPipelineSettings.supportTransparentDepthPostpass && !preview && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentObjects];
+            bool distortion = sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.Distortion] &= renderPipelineSettings.supportDistortion && !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.RoughDistortion] &= distortion && !preview;
 
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LowResTransparent] &= renderPipelineSettings.lowresTransparentSettings.enabled && transparentObjects;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.LowResTransparent] &= renderPipelineSettings.lowresTransparentSettings.enabled && sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.TransparentObjects];
 
-            bool isAsyncEnabled = sanitizedFrameSettings.asyncEnabled;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.LightListAsync] &= isAsyncEnabled;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SSRAsync] &= isAsyncEnabled;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SSAOAsync] &= isAsyncEnabled;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ContactShadowsAsync] &= (isAsyncEnabled && !rayTracingActive);
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VolumeVoxelizationsAsync] &= isAsyncEnabled;
-			sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.HighQualityLinesAsync] &= isAsyncEnabled;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.LightListAsync] &= sanitizedFrameSettings.asyncEnabled;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SSRAsync] &= sanitizedFrameSettings.asyncEnabled;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SSAOAsync] &= sanitizedFrameSettings.asyncEnabled;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ContactShadowsAsync] &= (sanitizedFrameSettings.asyncEnabled && !rayTracingActive);
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.VolumeVoxelizationsAsync] &= sanitizedFrameSettings.asyncEnabled;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.CustomPass] &= renderPipelineSettings.supportCustomPass;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.CustomPass] &= camera.cameraType != CameraType.Preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.CustomPass] &= renderPipelineSettings.supportCustomPass;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.CustomPass] &= camera.cameraType != CameraType.Preview;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VariableRateShading] &= renderPipelineSettings.supportCustomPass;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VariableRateShading] &= renderPipelineSettings.supportVariableRateShading;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VariableRateShading] &= camera.cameraType == CameraType.Game;
-
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.CustomPostProcess] &= camera.cameraType != CameraType.Preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.CustomPostProcess] &= camera.cameraType != CameraType.Preview;
 
             // Deferred opaque are always using Fptl. Forward opaque can use Fptl or Cluster, transparent use cluster.
             // When MSAA is enabled we disable Fptl as it become expensive compare to cluster
             // In HD, MSAA is only supported for forward only rendering, no MSAA in deferred mode (for code complexity reasons)
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.FPTLForForwardOpaque] &= !msaa;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.FPTLForForwardOpaque] &= !msaa;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.AdaptiveProbeVolume] &= renderPipelineSettings.supportProbeVolume && notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.NormalizeReflectionProbeWithProbeVolume] &= renderPipelineSettings.supportProbeVolume;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ProbeVolume] &= renderPipelineSettings.supportProbeVolume && !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.NormalizeReflectionProbeWithProbeVolume] &= renderPipelineSettings.supportProbeVolume;
 
             // We disable reflection probes and planar reflections in regular preview rendering for two reasons.
             // - Performance: Realtime reflection are 99% not necessary in previews
             // - Static lighting consistency: When rendering a planar probe from a preview camera it may induce a recomputing of the static lighting
             //   but with the preview lights which are different from the ones in the scene and will change the result inducing flickering.
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.ReflectionProbe] &= notPreview;
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.PlanarProbe] &= notPreview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.ReflectionProbe] &= !preview;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.PlanarProbe] &= !preview;
 
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.SubsurfaceScattering] &= opaqueObjects;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.SubsurfaceScattering] &= sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.OpaqueObjects];
 
 #if !ENABLE_VIRTUALTEXTURES
-            sanitizedFrameSettings.bitDatas[(uint)FrameSettingsField.VirtualTexturing] = false;
+            sanitizedFrameSettings.bitDatas[(int)FrameSettingsField.VirtualTexturing] = false;
 #endif
         }
 
@@ -793,17 +931,14 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <param name="camera">The camera rendering.</param>
         /// <param name="additionalData">Additional data of the camera rendering.</param>
         /// <param name="hdrpAsset">HDRenderPipelineAsset contening default FrameSettings.</param>
-        internal static void AggregateFrameSettings(RenderingPathFrameSettings defaultRenderingPathFrameSettings, ref FrameSettings aggregatedFrameSettings, Camera camera,
-            HDAdditionalCameraData additionalData, HDRenderPipelineAsset hdrpAsset)
-        {
-            var type = additionalData != null ? additionalData.defaultFrameSettings : FrameSettingsRenderType.Camera;
-            AggregateFrameSettings(
+        internal static void AggregateFrameSettings(ref FrameSettings aggregatedFrameSettings, Camera camera, HDAdditionalCameraData additionalData, HDRenderPipelineAsset hdrpAsset)
+            => AggregateFrameSettings(
                 ref aggregatedFrameSettings,
                 camera,
                 additionalData,
-                ref defaultRenderingPathFrameSettings.GetDefaultFrameSettings(type), //fallback on Camera for SceneCamera and PreviewCamera
-                hdrpAsset.currentPlatformRenderPipelineSettings);
-        }
+                ref HDRenderPipelineGlobalSettings.instance.GetDefaultFrameSettings(additionalData?.defaultFrameSettings ?? FrameSettingsRenderType.Camera), //fallback on Camera for SceneCamera and PreviewCamera
+                hdrpAsset.currentPlatformRenderPipelineSettings
+            );
 
         // Note: this version is the one tested as there is issue getting HDRenderPipelineAsset in batchmode in unit test framework currently.
         /// <summary>Aggregation is default with override of the renderer then sanitized depending on supported features of hdrpasset.</summary>
@@ -815,7 +950,7 @@ namespace UnityEngine.Rendering.HighDefinition
         internal static void AggregateFrameSettings(ref FrameSettings aggregatedFrameSettings, Camera camera, HDAdditionalCameraData additionalData, ref FrameSettings defaultFrameSettings, RenderPipelineSettings supportedFeatures)
         {
             aggregatedFrameSettings = defaultFrameSettings; //fallback on Camera for SceneCamera and PreviewCamera
-            if (additionalData != null && additionalData.customRenderingSettings)
+            if (additionalData && additionalData.customRenderingSettings)
                 Override(ref aggregatedFrameSettings, additionalData.renderingPathCustomFrameSettings, additionalData.renderingPathCustomFrameSettingsOverrideMask);
             Sanitize(ref aggregatedFrameSettings, camera, supportedFeatures);
         }
@@ -831,7 +966,6 @@ namespace UnityEngine.Rendering.HighDefinition
             && a.sssQualityMode == b.sssQualityMode
             && a.sssQualityLevel == b.sssQualityLevel
             && a.sssCustomSampleBudget == b.sssCustomSampleBudget
-            && a.sssCustomDownsampleSteps == b.sssCustomDownsampleSteps
             && a.lodBias == b.lodBias
             && a.lodBiasMode == b.lodBiasMode
             && a.lodBiasQualityLevel == b.lodBiasQualityLevel
@@ -860,7 +994,6 @@ namespace UnityEngine.Rendering.HighDefinition
             && sssQualityMode.Equals(((FrameSettings)obj).sssQualityMode)
             && sssQualityLevel.Equals(((FrameSettings)obj).sssQualityLevel)
             && sssCustomSampleBudget.Equals(((FrameSettings)obj).sssCustomSampleBudget)
-            && sssCustomDownsampleSteps.Equals(((FrameSettings)obj).sssCustomDownsampleSteps)
             && lodBias.Equals(((FrameSettings)obj).lodBias)
             && lodBiasMode.Equals(((FrameSettings)obj).lodBiasMode)
             && lodBiasQualityLevel.Equals(((FrameSettings)obj).lodBiasQualityLevel)
@@ -883,7 +1016,6 @@ namespace UnityEngine.Rendering.HighDefinition
             hashCode = hashCode * -1521134295 + sssQualityMode.GetHashCode();
             hashCode = hashCode * -1521134295 + sssQualityLevel.GetHashCode();
             hashCode = hashCode * -1521134295 + sssCustomSampleBudget.GetHashCode();
-            hashCode = hashCode * -1521134295 + sssCustomDownsampleSteps.GetHashCode();
             hashCode = hashCode * -1521134295 + lodBias.GetHashCode();
             hashCode = hashCode * -1521134295 + lodBiasMode.GetHashCode();
             hashCode = hashCode * -1521134295 + lodBiasQualityLevel.GetHashCode();
@@ -971,7 +1103,6 @@ namespace UnityEngine.Rendering.HighDefinition
                         new DebuggerEntry("sssQualityMode", m_FrameSettings.sssQualityMode),
                         new DebuggerEntry("sssQualityLevel", m_FrameSettings.sssQualityLevel),
                         new DebuggerEntry("sssCustomSampleBudget", m_FrameSettings.sssCustomSampleBudget),
-                        new DebuggerEntry("sssCustomDownSampleSteps", m_FrameSettings.sssCustomDownsampleSteps),
                         new DebuggerEntry("lodBias", m_FrameSettings.lodBias),
                         new DebuggerEntry("lodBiasMode", m_FrameSettings.lodBiasMode),
                         new DebuggerEntry("lodBiasQualityLevel", m_FrameSettings.lodBiasQualityLevel),
@@ -988,36 +1119,5 @@ namespace UnityEngine.Rendering.HighDefinition
         }
 
         #endregion
-    }
-
-    //Keep it internal for now. We need to update the whole system of FrameSettings in future versions
-    /// <summary>
-    /// Use this attribute to specify path to a FrameSettingsOverrideMask to use when drawing Inspectors
-    /// </summary>
-    /// <example>
-    ///     public class FrameSettingsHandler : MonoBehaviour
-    ///     {
-    ///         [UseOverrideMask(nameof(m_FrameSettingsOverride))]
-    ///         [SerializeField] FrameSettings m_FrameSettings = FrameSettings.Create();
-    ///         [SerializeField, HideInInspector] FrameSettingsOverrideMask m_FrameSettingsOverride;
-    ///     }
-    /// </example>
-    [AttributeUsage(AttributeTargets.Field)]
-    class UseOverrideMaskAttribute : Attribute
-    {
-#if UNITY_EDITOR
-        /// <summary>Path to look for mask</summary>
-        public readonly string pathToOverrideMask;
-        public readonly FrameSettingsRenderType defaultValuesToUse;
-#endif
-        /// <summary> Constructor </summary>
-        /// <param name="pathToOverrideMask">Path to look for mask</param>
-        public UseOverrideMaskAttribute(string pathToOverrideMask, FrameSettingsRenderType defaultValuesToUse)
-        {
-#if UNITY_EDITOR
-            this.pathToOverrideMask = pathToOverrideMask;
-            this.defaultValuesToUse = defaultValuesToUse;
-#endif
-        }
     }
 }

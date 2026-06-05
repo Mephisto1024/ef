@@ -86,17 +86,17 @@ float BilUpSingle_Uniform(float HiDepth, float4 LowDepths, float4 lowValue)
 // them in this structure
 struct NeighborhoodUpsampleData3x3
 {
-    // Low resolution scene depths
+    // Low resolution depths
     float4 lowDepthA;
     float4 lowDepthB;
     float lowDepthC;
 
-    // The low resolution depth values
-    float4 lowDepthValueA;
-    float4 lowDepthValueB;
-    float lowDepthValueC;
+    // The low resolution masks
+    float4 lowMasksA;
+    float4 lowMasksB;
+    float lowMasksC;
 
-    // The low resolution color values
+    // The low resolution values
     float4 lowValue0;
     float4 lowValue1;
     float4 lowValue2;
@@ -113,10 +113,60 @@ struct NeighborhoodUpsampleData3x3
     float lowWeightC;
 };
 
+void EvaluateMaskValidity(float linearHighDepth, float lowDepth, int currentIndex,
+                            inout float inputMask, inout int closestNeighhor,
+                            inout float currentDistance, inout float rejectedNeighborhood)
+{
+    if(inputMask == 0.0f)
+        return;
+
+    // Convert the depths to linear
+    float candidateLinearDepth = Linear01Depth(lowDepth, _ZBufferParams);
+
+    // Compute the distance between the two values
+    float candidateDistance = abs(linearHighDepth - candidateLinearDepth);
+
+    // Evaluate if this becomes the closest neighbor
+    if (candidateDistance < currentDistance)
+    {
+        closestNeighhor = currentIndex;
+        currentDistance = candidateDistance;
+    }
+
+    bool validSample = candidateDistance < (linearHighDepth * 0.3);
+    inputMask = validSample ? 1.0f : 0.0f;
+    rejectedNeighborhood *= (validSample ? 0.0f : 1.0f);
+}
+
+void OverrideMaskValues(float highDepth, inout NeighborhoodUpsampleData3x3 data,
+                        out float rejectedNeighborhood, out int closestNeighhor)
+{
+    // First of all compute the linear version of the high depth
+    float linearHighDepth = Linear01Depth(highDepth, _ZBufferParams);
+
+    // Flag that tells us which pixel holds valid information
+    rejectedNeighborhood = 1.0f;
+    closestNeighhor = 4;
+    float currentDistance = 1.0f;
+
+    // The center has precedence over the other pixels
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthB.x, 4, data.lowMasksB.x, closestNeighhor, currentDistance, rejectedNeighborhood);
+
+    // Then the plus
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthA.y, 1, data.lowMasksA.y, closestNeighhor, currentDistance, rejectedNeighborhood);
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthA.w, 3, data.lowMasksA.w, closestNeighhor, currentDistance, rejectedNeighborhood);
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthB.y, 5, data.lowMasksB.y, closestNeighhor, currentDistance, rejectedNeighborhood);
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthB.w, 7, data.lowMasksB.w, closestNeighhor, currentDistance, rejectedNeighborhood);
+
+    // Then the cross
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthA.x, 0, data.lowMasksA.x, closestNeighhor, currentDistance, rejectedNeighborhood);
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthA.z, 2, data.lowMasksA.z, closestNeighhor, currentDistance, rejectedNeighborhood);
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthB.z, 6, data.lowMasksB.z, closestNeighhor, currentDistance, rejectedNeighborhood);
+    EvaluateMaskValidity(linearHighDepth, data.lowDepthC, 8, data.lowMasksC, closestNeighhor, currentDistance, rejectedNeighborhood);
+}
+
 // The bilateral upscale function (3x3 neighborhood)
-// Perform joint bilateral upsampling using the scene depth as guide signal
-// https://bartwronski.com/2019/09/22/local-linear-models-guided-filter/
-void BilUpColor3x3(float highDepth, in NeighborhoodUpsampleData3x3 data, out float4 outColor, out float outDepth)
+float4 BilUpColor3x3(float highDepth, in NeighborhoodUpsampleData3x3 data)
 {
     float4 combinedWeightsA = data.lowWeightA / (abs(highDepth - data.lowDepthA) + _UpsampleTolerance);
     float4 combinedWeightsB = data.lowWeightB / (abs(highDepth - data.lowDepthB) + _UpsampleTolerance);
@@ -124,7 +174,8 @@ void BilUpColor3x3(float highDepth, in NeighborhoodUpsampleData3x3 data, out flo
 
     float TotalWeight = combinedWeightsA.x + combinedWeightsA.y + combinedWeightsA.z + combinedWeightsA.w
                     + combinedWeightsB.x + combinedWeightsB.y + combinedWeightsB.z + combinedWeightsB.w
-                    + combinedWeightsC;
+                    + combinedWeightsC
+                    + _NoiseFilterStrength;
 
     float4 WeightedSum = data.lowValue0 * combinedWeightsA.x
                         + data.lowValue1 * combinedWeightsA.y
@@ -135,24 +186,8 @@ void BilUpColor3x3(float highDepth, in NeighborhoodUpsampleData3x3 data, out flo
                         + data.lowValue6 * combinedWeightsB.z
                         + data.lowValue7 * combinedWeightsB.w
                         + data.lowValue8 * combinedWeightsC
-                        + float4(_NoiseFilterStrength.xxx, 0.0f);
-
-    float WeightedDepth = dot(data.lowDepthValueA, combinedWeightsA)
-                        + dot(data.lowDepthValueB, combinedWeightsB)
-                        + data.lowDepthValueC * combinedWeightsC
-                        + _NoiseFilterStrength;
-
-    // This branch shouldn't be needed if we do the neighbor analysis mentionned in BuildRay
-    if (TotalWeight == 0.0f)
-    {
-        outColor = float4(0, 0, 0, 1);
-        outDepth = UNITY_NEAR_CLIP_VALUE;
-    }
-    else
-    {
-        outColor = WeightedSum / (TotalWeight + _NoiseFilterStrength);
-        outDepth = WeightedDepth / (TotalWeight + _NoiseFilterStrength);
-    }
+                        + float4(_NoiseFilterStrength, _NoiseFilterStrength, _NoiseFilterStrength, 0.0);
+    return WeightedSum / TotalWeight;
 }
 
 // Due to compiler issues, it is not possible to use arrays to store the neighborhood values, we then store them in this structure

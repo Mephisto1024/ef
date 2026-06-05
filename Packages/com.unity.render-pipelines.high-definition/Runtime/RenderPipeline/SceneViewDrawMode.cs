@@ -11,19 +11,22 @@ namespace UnityEngine.Rendering.HighDefinition
 
         static private bool RejectDrawMode(SceneView.CameraMode cameraMode)
         {
-            return cameraMode.drawMode != DrawCameraMode.ShadowCascades &&
-                cameraMode.drawMode != DrawCameraMode.RenderPaths &&
-                cameraMode.drawMode != DrawCameraMode.AlphaChannel &&
-                cameraMode.drawMode != DrawCameraMode.Overdraw &&
-                cameraMode.drawMode != DrawCameraMode.Mipmaps &&
-                cameraMode.drawMode != DrawCameraMode.DeferredDiffuse &&
-                cameraMode.drawMode != DrawCameraMode.DeferredSpecular &&
-                cameraMode.drawMode != DrawCameraMode.DeferredSmoothness &&
-                cameraMode.drawMode != DrawCameraMode.DeferredNormal &&
-                cameraMode.drawMode != DrawCameraMode.ValidateAlbedo &&
-                cameraMode.drawMode != DrawCameraMode.ValidateMetalSpecular &&
-                cameraMode.drawMode != DrawCameraMode.SpriteMask &&
-                cameraMode.drawMode != DrawCameraMode.TextureStreaming;
+            if (cameraMode.drawMode == DrawCameraMode.ShadowCascades ||
+                cameraMode.drawMode == DrawCameraMode.RenderPaths ||
+                cameraMode.drawMode == DrawCameraMode.AlphaChannel ||
+                cameraMode.drawMode == DrawCameraMode.Overdraw ||
+                cameraMode.drawMode == DrawCameraMode.Mipmaps ||
+                cameraMode.drawMode == DrawCameraMode.DeferredDiffuse ||
+                cameraMode.drawMode == DrawCameraMode.DeferredSpecular ||
+                cameraMode.drawMode == DrawCameraMode.DeferredSmoothness ||
+                cameraMode.drawMode == DrawCameraMode.DeferredNormal ||
+                cameraMode.drawMode == DrawCameraMode.ValidateAlbedo ||
+                cameraMode.drawMode == DrawCameraMode.ValidateMetalSpecular ||
+                cameraMode.drawMode == DrawCameraMode.SpriteMask
+            )
+                return false;
+
+            return true;
         }
 
         static void UpdateSceneViewStates()

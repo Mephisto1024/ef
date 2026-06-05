@@ -32,8 +32,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public SerializedProperty maxShadowRequests;
 
-        public SerializedProperty punctualShadowFilteringQuality;
-        public SerializedProperty directionalShadowFilteringQuality;
+        public SerializedProperty shadowFilteringQuality;
         public SerializedProperty areaShadowFilteringQuality;
 
         public SerializedProperty supportScreenSpaceShadows;
@@ -72,8 +71,7 @@ namespace UnityEditor.Rendering.HighDefinition
             maxAreaShadowMapResolution = root.Find((HDShadowInitParameters s) => s.maxAreaShadowMapResolution);
             allowDirectionalMixedCachedShadows = root.Find((HDShadowInitParameters s) => s.allowDirectionalMixedCachedShadows);
 
-            punctualShadowFilteringQuality = root.Find((HDShadowInitParameters s) => s.punctualShadowFilteringQuality);
-            directionalShadowFilteringQuality = root.Find((HDShadowInitParameters s) => s.directionalShadowFilteringQuality);
+            shadowFilteringQuality = root.Find((HDShadowInitParameters s) => s.shadowFilteringQuality);
             areaShadowFilteringQuality = root.Find((HDShadowInitParameters s) => s.areaShadowFilteringQuality);
             supportScreenSpaceShadows = root.Find((HDShadowInitParameters s) => s.supportScreenSpaceShadows);
             maxScreenSpaceShadowSlots = root.Find((HDShadowInitParameters s) => s.maxScreenSpaceShadowSlots);

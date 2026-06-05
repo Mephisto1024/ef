@@ -1,12 +1,13 @@
 using System;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.Rendering;
 
 // Include material common properties names
 using static UnityEngine.Rendering.HighDefinition.HDMaterialProperties;
 
-namespace UnityEngine.Rendering.HighDefinition
+namespace UnityEditor.Rendering.HighDefinition
 {
     // Extension class to setup material keywords on unlit materials
     static class BaseUnlitAPI
@@ -22,14 +23,11 @@ namespace UnityEngine.Rendering.HighDefinition
             SurfaceType surfaceType = material.GetSurfaceType();
             CoreUtils.SetKeyword(material, "_SURFACE_TYPE_TRANSPARENT", surfaceType == SurfaceType.Transparent);
 
-            bool refractiveSort = (surfaceType == SurfaceType.Transparent) && HDRenderQueue.k_RenderQueue_PreRefraction.Contains(material.renderQueue) && material.HasProperty(kPerPixelSorting) && material.GetInt(kPerPixelSorting) > 0;
-            CoreUtils.SetKeyword(material, "_TRANSPARENT_REFRACTIVE_SORT", refractiveSort);
-
-            bool transparentWritesMotionVec = (surfaceType == SurfaceType.Transparent) && !refractiveSort && material.HasProperty(kTransparentWritingMotionVec) && material.GetInt(kTransparentWritingMotionVec) > 0;
+            bool transparentWritesMotionVec = (surfaceType == SurfaceType.Transparent) && material.HasProperty(kTransparentWritingMotionVec) && material.GetInt(kTransparentWritingMotionVec) > 0;
             CoreUtils.SetKeyword(material, "_TRANSPARENT_WRITES_MOTION_VEC", transparentWritesMotionVec);
 
             if (material.HasProperty(kAddPrecomputedVelocity))
-                CoreUtils.SetKeyword(material, "_ADD_PRECOMPUTED_VELOCITY", material.GetAddPrecomputedVelocity());
+                CoreUtils.SetKeyword(material, "_ADD_PRECOMPUTED_VELOCITY", material.GetInt(kAddPrecomputedVelocity) != 0);
 
             HDRenderQueue.RenderQueueType renderQueueType = HDRenderQueue.GetTypeByRenderQueueValue(material.renderQueue);
             bool needOffScreenBlendFactor = renderQueueType == HDRenderQueue.RenderQueueType.AfterPostprocessTransparent || renderQueueType == HDRenderQueue.RenderQueueType.LowTransparent;
@@ -66,9 +64,8 @@ namespace UnityEngine.Rendering.HighDefinition
             if (surfaceType == SurfaceType.Opaque)
             {
                 material.SetOverrideTag("RenderType", alphaTestEnable ? "TransparentCutout" : "");
-                material.SetInt(HDShaderIDs._SrcBlend, (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt(HDShaderIDs._DstBlend, (int)UnityEngine.Rendering.BlendMode.Zero);
-                material.SetInt(HDShaderIDs._DstBlend2, (int)UnityEngine.Rendering.BlendMode.Zero);
+                material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
                 // Caution:  we need to setup One for src and Zero for Dst for all element as users could switch from transparent to Opaque and keep remaining value.
                 // Unity will disable Blending based on these default value.
                 // Note that for after postprocess we setup 0 in opacity inside the shaders, so we correctly end with 0 in opacity for the compositing pass
@@ -80,11 +77,10 @@ namespace UnityEngine.Rendering.HighDefinition
             {
                 material.SetOverrideTag("RenderType", "Transparent");
                 material.SetInt(kZWrite, material.GetTransparentZWrite() ? 1 : 0);
-                material.SetInt(HDShaderIDs._DstBlend2, (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
 
                 if (material.HasProperty(kBlendMode))
                 {
-                    var blendMode = material.GetBlendMode();
+                    BlendMode blendMode = material.GetBlendMode();
 
                     // When doing off-screen transparency accumulation, we change blend factors as described here: https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch23.html
                     switch (blendMode)
@@ -92,9 +88,9 @@ namespace UnityEngine.Rendering.HighDefinition
                         // Alpha
                         // color: src * src_a + dst * (1 - src_a)
                         // src * src_a is done in the shader as it allow to reduce precision issue when using _BLENDMODE_PRESERVE_SPECULAR_LIGHTING (See Material.hlsl)
-                        case BlendingMode.Alpha:
-                            material.SetInt(HDShaderIDs._SrcBlend, (int)UnityEngine.Rendering.BlendMode.One);
-                            material.SetInt(HDShaderIDs._DstBlend, (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        case BlendMode.Alpha:
+                            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
                             if (needOffScreenBlendFactor)
                             {
                                 material.SetInt("_AlphaSrcBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
@@ -110,9 +106,9 @@ namespace UnityEngine.Rendering.HighDefinition
                         // Additive
                         // color: src * src_a + dst
                         // src * src_a is done in the shader
-                        case BlendingMode.Additive:
-                            material.SetInt(HDShaderIDs._SrcBlend, (int)UnityEngine.Rendering.BlendMode.One);
-                            material.SetInt(HDShaderIDs._DstBlend, (int)UnityEngine.Rendering.BlendMode.One);
+                        case BlendMode.Additive:
+                            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
                             if (needOffScreenBlendFactor)
                             {
                                 material.SetInt("_AlphaSrcBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
@@ -128,9 +124,9 @@ namespace UnityEngine.Rendering.HighDefinition
                         // PremultipliedAlpha
                         // color: src * src_a + dst * (1 - src_a)
                         // src is supposed to have been multiplied by alpha in the texture on artists side.
-                        case BlendingMode.Premultiply:
-                            material.SetInt(HDShaderIDs._SrcBlend, (int)UnityEngine.Rendering.BlendMode.One);
-                            material.SetInt(HDShaderIDs._DstBlend, (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        case BlendMode.Premultiply:
+                            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
                             if (needOffScreenBlendFactor)
                             {
                                 material.SetInt("_AlphaSrcBlend", (int)UnityEngine.Rendering.BlendMode.Zero);
@@ -231,7 +227,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 material.SetColor(kEmissionColor, Color.white); // kEmissionColor must always be white to allow our own material to control the GI (this allow to fallback from builtin unity to our system).
                                                                 // as it happen with old material that it isn't the case, we force it.
 #if UNITY_EDITOR
-                UnityEditor.MaterialEditor.FixupEmissiveFlag(material);
+                MaterialEditor.FixupEmissiveFlag(material);
 #endif
             }
 
@@ -335,11 +331,9 @@ namespace UnityEngine.Rendering.HighDefinition
 
             if (material.HasProperty(kTransparentDepthPrepassEnable))
             {
-                bool isTransparent = material.GetSurfaceType() == SurfaceType.Transparent;
-                bool depthWriteEnable = material.GetFloat(kTransparentDepthPrepassEnable) > 0.0f;
-                bool ssrTransparent = material.ReceiveSSRTransparent();
-                bool isRefractive = material.GetRefractionModel() != ScreenSpaceRefraction.RefractionModel.None;
-                material.SetShaderPassEnabled(HDShaderPassNames.s_TransparentDepthPrepassStr, isTransparent && (depthWriteEnable || ssrTransparent || isRefractive));
+                bool depthWriteEnable = (material.GetFloat(kTransparentDepthPrepassEnable) > 0.0f) && ((SurfaceType)material.GetFloat(kSurfaceType) == SurfaceType.Transparent);
+                bool ssrTransparent = material.HasProperty(kReceivesSSRTransparent) ? (material.GetFloat(kReceivesSSRTransparent) > 0.0f) && ((SurfaceType)material.GetFloat(kSurfaceType) == SurfaceType.Transparent) : false;
+                material.SetShaderPassEnabled(HDShaderPassNames.s_TransparentDepthPrepassStr, depthWriteEnable || ssrTransparent);
             }
 
             if (material.HasProperty(kTransparentDepthPostpassEnable))

@@ -51,9 +51,6 @@ namespace UnityEditor.Rendering.HighDefinition
             MaterialExternalReferences matExternalRefs = null;
             foreach (var subAsset in subAssets)
             {
-                if (subAsset == null)
-                    continue;
-                
                 if (subAsset.GetType() == typeof(MaterialExternalReferences))
                 {
                     matExternalRefs = subAsset as MaterialExternalReferences;

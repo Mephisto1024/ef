@@ -7,12 +7,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Water", "EvaluateTipThickness_Water")]
+    [Title("Utility", "High Definition Render Pipeline", "Water", "EvaluateTipThickness_Water (Preview)")]
     class EvaluateTipThickness_Water : AbstractMaterialNode, IGeneratesBodyCode, IMayRequireViewDirection
     {
         public EvaluateTipThickness_Water()
         {
-            name = "Evaluate Tip Thickness Water";
+            name = "Evaluate Tip Thickness Water (Preview)";
             UpdateNodeAfterDeserialization();
         }
 

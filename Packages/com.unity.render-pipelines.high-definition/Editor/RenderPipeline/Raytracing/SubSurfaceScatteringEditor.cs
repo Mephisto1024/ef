@@ -20,19 +20,21 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-                        HDEditorUtils.EnsureFrameSetting(FrameSettingsField.RayTracing);
-
             HDRenderPipelineAsset currentAsset = HDRenderPipeline.currentAsset;
-            bool notSupported = currentAsset != null && !currentAsset.currentPlatformRenderPipelineSettings.supportRayTracing;
-            if (notSupported)
+
+            if (currentAsset == null)
             {
                 EditorGUILayout.Space();
-                HDEditorUtils.QualitySettingsHelpBox(HDRenderPipelineUI.Styles.rayTracingUnsupportedMessage,
-                    MessageType.Warning, HDRenderPipelineUI.ExpandableGroup.Rendering,
-                    "m_RenderPipelineSettings.supportRayTracing");
+                EditorGUILayout.HelpBox("The current pipeline is not HDRP", MessageType.Error, wide: true);
+                return;
             }
 
-            using var disableScope = new EditorGUI.DisabledScope(notSupported);
+            if (!currentAsset.currentPlatformRenderPipelineSettings.supportRayTracing)
+            {
+                EditorGUILayout.Space();
+                HDEditorUtils.QualitySettingsHelpBox("The current HDRP Asset does not support Ray Tracing.", MessageType.Error, HDRenderPipelineUI.Expandable.Rendering, "m_RenderPipelineSettings.supportRayTracing");
+                return;
+            }
 
             PropertyField(m_RayTracing);
             if (m_RayTracing.overrideState.boolValue && m_RayTracing.value.boolValue)

@@ -10,12 +10,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Water", "EvaluateSimulationCaustics_Water")]
+    [Title("Utility", "High Definition Render Pipeline", "Water", "EvaluateSimulationCaustics_Water (Preview)")]
     class EvaluateSimulationCaustics_Water : AbstractMaterialNode, IGeneratesBodyCode, IMayRequirePosition
     {
         public EvaluateSimulationCaustics_Water()
         {
-            name = "Evaluate Simulation Caustics Water";
+            name = "Evaluate Simulation Caustics Water (Preview)";
             UpdateNodeAfterDeserialization();
         }
 
@@ -61,7 +61,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 string waterNDC = GetSlotValue(kDistordedWaterNDCInputSlotId, generationMode);
                 string positionAWS = $"IN.{CoordinateSpace.World.ToVariableName(InterpolatorType.Position)}";
 
-                sb.AppendLine("$precision {3} = EvaluateSimulationCaustics({0}, abs(dot({1} - {0}, _WaterUpDirection.xyz)), {2});",
+                sb.AppendLine("$precision {3} = EvaluateSimulationCaustics({0}, {1}, {2});",
                     refractedPosWS,
                     positionAWS,
                     waterNDC,

@@ -15,7 +15,7 @@ HDRP includes the following Shader Graphs:
 - StackLit
 - Unlit
 
-The [Lit](lit-material.md), [LayeredLit](layered-lit-material.md), and [Unlit](unlit-shader.md) Shaders are available as standard Shaders (without Shader Graph). This means that you can use them without creating a Shader Graph instance, and edit them in the Inspector. To use these, select a Material to view it in the Inspector and click on the **Shader** drop-down. Go to the **HDRP** section to see a list of every HDRP Shader that does not require a Shader Graph instance.
+The [Lit](Lit-Shader.md), [LayeredLit](Layered-Lit-Shader.md), and [Unlit](Unlit-Shader.md) Shaders are available as standard Shaders (without Shader Graph). This means that you can use them without creating a Shader Graph instance, and edit them in the Inspector. To use these, select a Material to view it in the Inspector and click on the **Shader** drop-down. Go to the **HDRP** section to see a list of every HDRP Shader that does not require a Shader Graph instance.
 
 <a name="Creation"></a>
 
@@ -38,6 +38,8 @@ To edit properties for Materials that use Shader Graphs, the Inspector window on
 1. Double-click on the Shader Graph Asset to open it. The window displays the Master Node and a list of the available inputs. See these in the **Surface Inputs** section of the screenshot below.
 2. To expose the rest of the properties, click on the gear in the top right of the Master Node. See these other properties in the **Surface Options** section of the screenshot below.
 3. Edit the values for the gear's properties in the same way as you would do in the Inspector window. The list of inputs on the Master Node, and the available properties in the gear's list, changes depending on what options you select.
+
+![](Images/CreatingAndEditingHDRPShaderGraphs1.png)
 
 ## Material properties
 
@@ -95,6 +97,8 @@ Concrete nodes that define a Texture (or a Texture array) define an unexposed pr
 ### Material Surface Option properties
 
 By default HDRP master nodes exposes a bunch of **Surface Options** properties, they allow you to control common settings from the Material instead of in the ShaderGraph and thus avoid having to duplicate the whole graph to change for example the **Sorting Priority** or the **Surface Type**. In the master node, these settings act as a default value in the Shader so when you create a material from the **Shader Graph** (**Right Click on the Shader Graph asset > Create > Material**) it will have the configuration of the master node.
+
+![](Images/ShaderGraphMaterialUI_Default.png)
 
 This system is great to avoid duplicating graphs but it have some problem related to the synchronization of properties. For example if you create a material from a Transparent **Shader Graph** and then decide to switch the **Surface Type** to Opaque in the master node settings, then the created material will still be Opaque. Once you created the material, all it's properties are saved and never synchronized back with the **Shader Graph**, even if you didn't changed anything on the material (mainly because there is no override system).
 

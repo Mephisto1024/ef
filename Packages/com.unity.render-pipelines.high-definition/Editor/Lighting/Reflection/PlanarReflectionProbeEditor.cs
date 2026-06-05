@@ -8,11 +8,13 @@ using Object = UnityEngine.Object;
 
 namespace UnityEditor.Rendering.HighDefinition
 {
-    [CustomEditor(typeof(PlanarReflectionProbe))]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
+    [CustomEditorForRenderPipeline(typeof(PlanarReflectionProbe), typeof(HDRenderPipelineAsset))]
     [CanEditMultipleObjects]
     sealed class PlanarReflectionProbeEditor : HDProbeEditor<PlanarReflectionProbeUISettingsProvider, SerializedPlanarReflectionProbe>
     {
+        public static Material GUITextureBlit2SRGBMaterial
+            => HDRenderPipelineGlobalSettings.instance?.renderPipelineEditorResources?.materials.GUITextureBlit2SRGB;
+
         const float k_PreviewHeight = 128;
 
         static Mesh k_QuadMesh;
@@ -25,19 +27,14 @@ namespace UnityEditor.Rendering.HighDefinition
         public float previewExposure = 0f;
         public float mipLevelPreview = 0f;
 
-        static Material s_PreviewMaterial;
+        static Material _previewMaterial;
         static Material previewMaterial
         {
             get
             {
-                if (s_PreviewMaterial == null && HDRenderPipeline.isReady)
-                {
-                    var guiTextureBlit2SRGBMaterial =
-                        GraphicsSettings.GetRenderPipelineSettings<HDRenderPipelineEditorMaterials>().GUITextureBlit2SRGB;
-                    s_PreviewMaterial = new Material(guiTextureBlit2SRGBMaterial);
-                }
-
-                return s_PreviewMaterial;
+                if (_previewMaterial == null && HDRenderPipeline.isReady)
+                    _previewMaterial = new Material(GUITextureBlit2SRGBMaterial);
+                return _previewMaterial;
             }
         }
 
@@ -147,7 +144,6 @@ namespace UnityEditor.Rendering.HighDefinition
             // Get the exposure texture used in this scene view
             if (!(RenderPipelineManager.currentPipeline is HDRenderPipeline hdrp))
                 return;
-
             var hdCamera = HDCamera.GetOrCreate(sceneView.camera);
             var exposureTex = hdrp.GetExposureTexture(hdCamera);
 
@@ -190,9 +186,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 }
 
                 // Setup the material to draw the quad with the exposure texture
-                var material = GraphicsSettings.GetRenderPipelineSettings<HDRenderPipelineEditorMaterials>()
-                        .GUITextureBlit2SRGB;
-
+                var material = GUITextureBlit2SRGBMaterial;
                 material.SetTexture("_Exposure", exposureTex);
                 //this fixes the UI so it doesn't blow up when the probe is pre-exposed
                 material.SetFloat("_ExposureBias", (float)Math.Log(1.0f / p.ProbeExposureValue(), 2.0));
@@ -298,7 +292,7 @@ namespace UnityEditor.Rendering.HighDefinition
             // Draw outline
             k_PreviewOutlineMaterial.SetColor("_Color", InfluenceVolumeUI.k_GizmoThemeColorBase);
             k_PreviewOutlineMaterial.SetPass(0);
-            Graphics.DrawMeshNow(k_QuadMesh, Matrix4x4.TRS(mirrorPosition, mirrorRotation, 2.1f * capturePointPreviewSize * Vector3.one));
+            Graphics.DrawMeshNow(k_QuadMesh, Matrix4x4.TRS(mirrorPosition, mirrorRotation, Vector3.one * capturePointPreviewSize * 2.1f));
 
             k_PreviewMaterial.SetTexture("_MainTex", probe.texture);
             k_PreviewMaterial.SetMatrix("_CaptureVPMatrix", vp);
@@ -307,7 +301,7 @@ namespace UnityEditor.Rendering.HighDefinition
             k_PreviewMaterial.SetVector("_CameraPositionWS", new Vector4(cameraPositionWS.x, cameraPositionWS.y, -cameraPositionWS.z, 0));
             k_PreviewMaterial.SetVector("_CapturePositionWS", new Vector4(capturePositionWS.x, capturePositionWS.y, -capturePositionWS.z, 0));
             k_PreviewMaterial.SetPass(0);
-            Graphics.DrawMeshNow(k_QuadMesh, Matrix4x4.TRS(mirrorPosition, mirrorRotation, 2 * capturePointPreviewSize * Vector3.one));
+            Graphics.DrawMeshNow(k_QuadMesh, Matrix4x4.TRS(mirrorPosition, mirrorRotation, Vector3.one * capturePointPreviewSize * 2));
         }
 
         static void InitIcons()
@@ -357,7 +351,6 @@ namespace UnityEditor.Rendering.HighDefinition
         ProbeSettingsOverride HDProbeUI.IProbeUISettingsProvider.displayedCustomSettings => new ProbeSettingsOverride
         {
             probe = ProbeSettingsFields.lightingLightLayer
-                | ProbeSettingsFields.importance
                 | ProbeSettingsFields.lightingMultiplier
                 | ProbeSettingsFields.lightingWeight
                 | ProbeSettingsFields.lightingFadeDistance,
@@ -368,5 +361,21 @@ namespace UnityEditor.Rendering.HighDefinition
         };
 
         Type HDProbeUI.IProbeUISettingsProvider.customTextureType => typeof(Texture2D);
+        static readonly HDProbeUI.ToolBar[] k_Toolbars =
+        {
+            HDProbeUI.ToolBar.InfluenceShape | HDProbeUI.ToolBar.Blend,
+            HDProbeUI.ToolBar.MirrorPosition | HDProbeUI.ToolBar.MirrorRotation,
+            HDProbeUI.ToolBar.ShowChromeGizmo
+        };
+        HDProbeUI.ToolBar[] HDProbeUI.IProbeUISettingsProvider.toolbars => k_Toolbars;
+
+        static Dictionary<KeyCode, HDProbeUI.ToolBar> k_ToolbarShortCutKey = new Dictionary<KeyCode, HDProbeUI.ToolBar>
+        {
+            { KeyCode.Alpha1, HDProbeUI.ToolBar.InfluenceShape },
+            { KeyCode.Alpha2, HDProbeUI.ToolBar.Blend },
+            { KeyCode.Alpha3, HDProbeUI.ToolBar.MirrorPosition },
+            { KeyCode.Alpha4, HDProbeUI.ToolBar.MirrorRotation }
+        };
+        Dictionary<KeyCode, HDProbeUI.ToolBar> HDProbeUI.IProbeUISettingsProvider.shortcuts => k_ToolbarShortCutKey;
     }
 }

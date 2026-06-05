@@ -47,7 +47,8 @@ namespace UnityEngine.Rendering.HighDefinition
         public static void ApplySettings(this Camera cam, CameraPositionSettings settings)
         {
             // Position
-            cam.transform.SetPositionAndRotation(settings.position, settings.rotation);
+            cam.transform.position = settings.position;
+            cam.transform.rotation = settings.rotation;
             cam.worldToCameraMatrix = settings.GetUsedWorldToCameraMatrix();
         }
     }

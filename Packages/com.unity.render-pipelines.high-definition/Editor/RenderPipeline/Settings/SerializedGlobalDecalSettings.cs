@@ -12,8 +12,6 @@ namespace UnityEditor.Rendering.HighDefinition
         public SerializedProperty atlasHeight;
         public SerializedProperty perChannelMask;
 
-        public SerializedScalableSetting transparentTextureResolution;
-
         public SerializedGlobalDecalSettings(SerializedProperty root)
         {
             this.root = root;
@@ -22,7 +20,6 @@ namespace UnityEditor.Rendering.HighDefinition
             atlasWidth = root.Find((GlobalDecalSettings s) => s.atlasWidth);
             atlasHeight = root.Find((GlobalDecalSettings s) => s.atlasHeight);
             perChannelMask = root.Find((GlobalDecalSettings s) => s.perChannelMask);
-            transparentTextureResolution = new SerializedScalableSetting(root.Find((GlobalDecalSettings s) => s.transparentTextureResolution));
         }
     }
 }

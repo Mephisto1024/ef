@@ -27,7 +27,7 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
     // Copy graph values to surfaceData, if defined
     $SurfaceDescription.BaseColor:                 surfaceData.baseColor =                surfaceDescription.BaseColor;
     $SurfaceDescription.SubsurfaceMask:            surfaceData.subsurfaceMask =           surfaceDescription.SubsurfaceMask;
-    $SurfaceDescription.TransmissionTint:          surfaceData.transmissionMask =         surfaceDescription.TransmissionTint;
+    $SurfaceDescription.TransmissionMask:          surfaceData.transmissionMask =         surfaceDescription.TransmissionMask;
     $SurfaceDescription.Thickness:                 surfaceData.thickness =                surfaceDescription.Thickness;
     $SurfaceDescription.DiffusionProfileHash:      surfaceData.diffusionProfileHash =     asuint(surfaceDescription.DiffusionProfileHash);
     $SurfaceDescription.IridescenceMask:           surfaceData.iridescenceMask =          surfaceDescription.IridescenceMask;
@@ -88,9 +88,6 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
     #ifdef _MATERIAL_FEATURE_TRANSMISSION
         surfaceData.materialFeatures |= MATERIALFEATUREFLAGS_STACK_LIT_TRANSMISSION;
     #endif
-
-    surfaceData.materialFeatures |= MATERIALFEATUREFLAGS_SSS_DIFFUSE_POWER;
-    $UseProfileLobes: surfaceData.materialFeatures |= MATERIALFEATUREFLAGS_SSS_DUAL_LOBE;
 
     #ifdef _MATERIAL_FEATURE_SPECULAR_COLOR
         // Reproduce the energy conservation done in legacy Unity. Not ideal but better for compatibility and users can unchek it
@@ -171,20 +168,12 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
     //$NormalTexturtextureFiltering: coatTextureFilteringVariance = DecodeVariance(surfaceDescription.CodedCoatNormalVarianceMeasure);
 
     #if defined(DEBUG_DISPLAY)
-    #if !defined(SHADER_STAGE_RAY_TRACING)
-        // Mipmap mode debugging isn't supported with ray tracing as it relies on derivatives
         if (_DebugMipMapMode != DEBUGMIPMAPMODE_NONE)
         {
-            #ifdef FRAG_INPUTS_USE_TEXCOORD0
-                surfaceData.baseColor = GET_TEXTURE_STREAMING_DEBUG(posInput.positionSS, fragInputs.texCoord0);
-            #else
-                surfaceData.baseColor = GET_TEXTURE_STREAMING_DEBUG_NO_UV(posInput.positionSS);
-            #endif
-            surfaceData.metallic = 0;
+            // TODO: need to update mip info
         }
-    #endif
 
-        // We need to call ApplyDebugToSurfaceData after filling the surfaceData and before filling builtinData
+        // We need to call ApplyDebugToSurfaceData after filling the surfarcedata and before filling builtinData
         // as it can modify attributes used for static lighting
         ApplyDebugToSurfaceData(fragInputs.tangentToWorld, surfaceData);
     #endif

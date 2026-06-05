@@ -103,14 +103,6 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         }
 
         [SerializeField]
-        bool m_TransparentPerPixelSorting;
-        public bool transparentPerPixelSorting
-        {
-            get => m_TransparentPerPixelSorting;
-            set => m_TransparentPerPixelSorting = value;
-        }
-
-        [SerializeField]
         bool m_SupportLodCrossFade;
         public bool supportLodCrossFade
         {

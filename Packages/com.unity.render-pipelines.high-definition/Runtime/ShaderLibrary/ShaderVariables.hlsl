@@ -6,7 +6,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Version.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition-config/Runtime/ShaderConfig.cs.hlsl"
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureXR.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/TextureXR.hlsl"
 // This must be included first before we declare any global constant buffer and will onyl affect ray tracing shaders
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariablesGlobal.hlsl"
 
@@ -51,8 +51,6 @@
 #define GENERIC_ALPHA_TEST(alphaValue, alphaCutoffValue) DoAlphaTest(alphaValue, alphaCutoffValue);
 #define RAY_TRACING_OPTIONAL_ALPHA_TEST_PASS
 #endif
-
-#define COMPUTE_THICKNESS_MAX_LAYER_COUNT 32
 
 // ----------------------------------------------------------------------------
 
@@ -104,12 +102,7 @@ CBUFFER_START(UnityPerDraw)
 
 CBUFFER_END
 
-static const uint unity_RendererUserValue = asuint(unity_RenderingLayer.y);
-
 #endif // DOTS_INSTANCING_ON
-
-// The renderer user values are packed in unity_RenderingLayer. So we need a dummy property to be able to use Shader.PropertyToID.
-uint unity_RendererUserValuesPropertyEntry;
 
 CBUFFER_START(UnityPerDrawRare)
     float4x4 glstate_matrix_transpose_modelview0;
@@ -167,20 +160,12 @@ SAMPLER(samplerunity_ProbeVolumeSH);
 TEXTURE2D(_ExposureTexture);
 TEXTURE2D(_PrevExposureTexture);
 
-TEXTURE2D_X(_RenderingLayerMaskTexture);
-
-TEXTURE2D_ARRAY(_ThicknessTexture);
-StructuredBuffer<uint> _ThicknessReindexMap;
-
-// Mipmap Streaming Debug
-TEXTURE2D(unity_MipmapStreaming_DebugTex);
-
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariablesXR.cs.hlsl"
 
 // In HDRP, all material samplers have the possibility of having a mip bias.
 // This mip bias is necessary for temporal upsamplers, since they render to a lower
 // resolution into a higher resolution target.
-#if defined(SHADEROPTIONS_GLOBAL_MIP_BIAS) && SHADEROPTIONS_GLOBAL_MIP_BIAS != 0 && defined(SUPPORT_GLOBAL_MIP_BIAS)
+#if defined(SHADEROPTIONS_GLOBAL_MIP_BIAS) && SHADEROPTIONS_GLOBAL_MIP_BIAS != 0
 
     //simple 2d textures bias manipulation
     #ifdef PLATFORM_SAMPLE_TEXTURE2D_BIAS
@@ -279,7 +264,7 @@ float3 LoadCameraColor(uint2 pixelCoords, uint lod)
 
 float3 SampleCameraColor(float2 uv, float lod)
 {
-    return SAMPLE_TEXTURE2D_X_LOD(_ColorPyramidTexture, s_trilinear_clamp_sampler, uv * _ColorPyramidUvScaleAndLimitCurrentFrame.xy, lod).rgb;
+    return SAMPLE_TEXTURE2D_X_LOD(_ColorPyramidTexture, s_trilinear_clamp_sampler, uv * _RTHandleScaleHistory.xy, lod).rgb;
 }
 
 float3 LoadCameraColor(uint2 pixelCoords)
@@ -305,38 +290,6 @@ float4 LoadCustomColor(uint2 pixelCoords)
 float LoadCustomDepth(uint2 pixelCoords)
 {
     return LOAD_TEXTURE2D_X_LOD(_CustomDepthTexture, pixelCoords, 0).r;
-}
-
-float2 LoadThickness(uint2 pixelCoords, int renderLayerIdx)
-{
-    if (_EnableComputeThickness)
-    {
-        uint remapedIdx = INDEX_TEXTURE2D_ARRAY_X(_ThicknessReindexMap[renderLayerIdx]);
-        if (remapedIdx == COMPUTE_THICKNESS_MAX_LAYER_COUNT)
-            return -1.0f;
-        else
-            return LOAD_TEXTURE2D_ARRAY_LOD(_ThicknessTexture, pixelCoords, remapedIdx, 0).xy;
-    }
-    else
-    {
-        return 1.0f;
-    }
-}
-
-float2 SampleThickness(float2 uv, int renderLayerIdx)
-{
-    if (_EnableComputeThickness)
-    {
-        uint remapedIdx = INDEX_TEXTURE2D_ARRAY_X(_ThicknessReindexMap[renderLayerIdx]);
-        if (remapedIdx == COMPUTE_THICKNESS_MAX_LAYER_COUNT)
-            return -1.0f;
-        else
-            return SAMPLE_TEXTURE2D_ARRAY_LOD(_ThicknessTexture, s_linear_clamp_sampler, uv * _RTHandleScale.xy, remapedIdx, 0).xy;
-    }
-    else
-    {
-        return 1.0f;
-    }
 }
 
 float SampleCustomDepth(float2 uv)
@@ -407,13 +360,13 @@ float4x4 ApplyCameraTranslationToInverseMatrix(float4x4 inverseModelMatrix)
 
 float4x4 RevertCameraTranslationFromInverseMatrix(float4x4 inverseModelMatrix)
 {
-    #if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0)
+#if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0)
     // To handle camera relative rendering we need to apply translation before converting to object space
     float4x4 translationMatrix = { { 1.0, 0.0, 0.0, -_WorldSpaceCameraPos.x },{ 0.0, 1.0, 0.0, -_WorldSpaceCameraPos.y },{ 0.0, 0.0, 1.0, -_WorldSpaceCameraPos.z },{ 0.0, 0.0, 0.0, 1.0 } };
     return mul(inverseModelMatrix, translationMatrix);
-    #else
+#else
     return inverseModelMatrix;
-    #endif
+#endif
 }
 
 float4x4 RevertCameraTranslationFromMatrix(float4x4 modelMatrix)
@@ -423,7 +376,6 @@ float4x4 RevertCameraTranslationFromMatrix(float4x4 modelMatrix)
 #endif
     return modelMatrix;
 }
-
 void ApplyCameraRelativeXR(inout float3 positionWS)
 {
 #if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0) && defined(USING_STEREO_MATRICES)
@@ -475,7 +427,29 @@ float GetIndirectSpecularMultiplier(uint renderingLayers)
 }
 
 // Functions to clamp UVs to use when RTHandle system is used.
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DynamicScalingClamping.hlsl"
+
+float2 ClampAndScaleUV(float2 UV, float2 texelSize, float numberOfTexels, float2 scale)
+{
+    float2 maxCoord = 1.0f - numberOfTexels * texelSize;
+    return min(UV, maxCoord) * scale;
+}
+
+float2 ClampAndScaleUV(float2 UV, float2 texelSize, float numberOfTexels)
+{
+    return ClampAndScaleUV(UV, texelSize, numberOfTexels, _RTHandleScale.xy);
+}
+
+// This is assuming half a texel offset in the clamp.
+float2 ClampAndScaleUVForBilinear(float2 UV, float2 texelSize)
+{
+    return ClampAndScaleUV(UV, texelSize, 0.5f);
+}
+
+// This is assuming full screen buffer and half a texel offset for the clamping.
+float2 ClampAndScaleUVForBilinear(float2 UV)
+{
+    return ClampAndScaleUV(UV, _ScreenSize.zw, 0.5f);
+}
 
 // This is assuming an upsampled texture used in post processing, with original screen size and a half a texel offset for the clamping.
 float2 ClampAndScaleUVForBilinearPostProcessTexture(float2 UV)
@@ -493,6 +467,11 @@ float2 ClampAndScaleUVForBilinearPostProcessTexture(float2 UV, float2 texelSize)
 float2 ClampAndScaleUVPostProcessTexture(float2 UV, float2 texelSize, float numberOfTexels)
 {
     return ClampAndScaleUV(UV, texelSize, numberOfTexels, _RTHandlePostProcessScale.xy);
+}
+
+float2 ClampAndScaleUVForPoint(float2 UV)
+{
+    return min(UV, 1.0f) * _RTHandleScale.xy;
 }
 
 float2 ClampAndScaleUVPostProcessTextureForPoint(float2 UV)
@@ -529,6 +508,12 @@ uint Get1DAddressFromPixelCoord(uint2 pixCoord, uint2 screenSize)
 // There is no UnityPerDraw cbuffer with BatchRendererGroup. Those matrices don't exist, so don't try to access them
 #ifndef DOTS_INSTANCING_ON
 
+void GetAbsoluteWorldRendererBounds(out float3 minBounds, out float3 maxBounds)
+{
+    minBounds = unity_RendererBounds_Min.xyz;
+    maxBounds = unity_RendererBounds_Max.xyz;
+}
+
 // Define Model Matrix Macro
 // Note: In order to be able to define our macro to forbid usage of unity_ObjectToWorld/unity_WorldToObject/unity_MatrixPreviousM/unity_MatrixPreviousMI
 // We need to declare inline function. Using uniform directly mean they are expand with the macro
@@ -541,12 +526,34 @@ float4x4 GetRawUnityPrevWorldToObject() { return unity_MatrixPreviousMI; }
 #define UNITY_MATRIX_I_M       ApplyCameraTranslationToInverseMatrix(GetRawUnityWorldToObject())
 #define UNITY_PREV_MATRIX_M    ApplyCameraTranslationToMatrix(GetRawUnityPrevObjectToWorld())
 #define UNITY_PREV_MATRIX_I_M  ApplyCameraTranslationToInverseMatrix(GetRawUnityPrevWorldToObject())
-#define UNITY_MATRIX_MV        mul(UNITY_MATRIX_V, UNITY_MATRIX_M)
-#define UNITY_MATRIX_T_MV      transpose(UNITY_MATRIX_MV)
-#define UNITY_MATRIX_IT_MV     transpose(mul(UNITY_MATRIX_I_M, UNITY_MATRIX_I_V))
-#define UNITY_MATRIX_MVP       mul(UNITY_MATRIX_VP, UNITY_MATRIX_M)
+
+#else
+
+// Not yet supported by BRG
+void GetAbsoluteWorldRendererBounds(out float3 minBounds, out float3 maxBounds)
+{
+    minBounds = 0;
+    maxBounds = 0;
+}
 
 #endif
+
+void GetRendererBounds(out float3 minBounds, out float3 maxBounds)
+{
+    GetAbsoluteWorldRendererBounds(minBounds, maxBounds);
+
+#if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0)
+    minBounds -= _WorldSpaceCameraPos.xyz;
+    maxBounds -= _WorldSpaceCameraPos.xyz;
+#endif
+}
+
+float3 GetRendererExtents()
+{
+    float3 minBounds, maxBounds;
+    GetRendererBounds(minBounds, maxBounds);
+    return (maxBounds - minBounds) * 0.5;
+}
 
 // This utility function is currently used to support an alpha blending friendly format
 // for virtual texturing + transparency support.
@@ -624,14 +631,12 @@ UNITY_DOTS_INSTANCING_START(BuiltinPropertyMetadata)
     UNITY_DOTS_INSTANCED_PROP_OVERRIDE_SUPPORTED(float3x4, unity_MatrixPreviousMI)
     UNITY_DOTS_INSTANCED_PROP_OVERRIDE_SUPPORTED(SH,       unity_SHCoefficients)
     UNITY_DOTS_INSTANCED_PROP_OVERRIDE_SUPPORTED(uint2,    unity_EntityId)
-    UNITY_DOTS_INSTANCED_PROP_OVERRIDE_SUPPORTED(uint,     unity_RendererUserValuesPropertyEntry)
 UNITY_DOTS_INSTANCING_END(BuiltinPropertyMetadata)
 
 #define unity_LODFade               LoadDOTSInstancedData_LODFade()
 #define unity_LightmapST            UNITY_ACCESS_DOTS_INSTANCED_PROP(float4,   unity_LightmapST)
 #define unity_LightmapIndex         UNITY_ACCESS_DOTS_INSTANCED_PROP(float4,   unity_LightmapIndex)
 #define unity_DynamicLightmapST     UNITY_ACCESS_DOTS_INSTANCED_PROP(float4,   unity_DynamicLightmapST)
-#define unity_RendererUserValue    (UNITY_ACCESS_DOTS_INSTANCED_PROP(uint,   unity_RendererUserValuesPropertyEntry))
 #define unity_SHAr                  LoadDOTSInstancedData_SHAr()
 #define unity_SHAg                  LoadDOTSInstancedData_SHAg()
 #define unity_SHAb                  LoadDOTSInstancedData_SHAb()
@@ -643,8 +648,6 @@ UNITY_DOTS_INSTANCING_END(BuiltinPropertyMetadata)
 #define unity_RenderingLayer        LoadDOTSInstancedData_RenderingLayer()
 #define unity_MotionVectorsParams   LoadDOTSInstancedData_MotionVectorsParams()
 #define unity_WorldTransformParams  LoadDOTSInstancedData_WorldTransformParams()
-#define unity_RendererBounds_Min    LoadDOTSInstancedData_RendererBounds_Min()
-#define unity_RendererBounds_Max    LoadDOTSInstancedData_RendererBounds_Max()
 
 // Not supported by BatchRendererGroup or Hybrid Renderer. Just define them as constants.
 // ------------------------------------------------------------------------------
@@ -657,38 +660,13 @@ static const float4 unity_ProbeVolumeMin = float4(0,0,0,0);
 int unity_SubmeshIndex;
 #define unity_SelectionID UNITY_ACCESS_DOTS_INSTANCED_SELECTION_VALUE(unity_EntityId, unity_SubmeshIndex, _SelectionID)
 #define UNITY_SETUP_DOTS_SH_COEFFS  SetupDOTSSHCoeffs(UNITY_DOTS_INSTANCED_METADATA_NAME(SH, unity_SHCoefficients))
-#define UNITY_SETUP_DOTS_RENDER_BOUNDS  SetupDOTSRendererBounds(UNITY_DOTS_MATRIX_M)
 
 #else
 
 #define unity_SelectionID _SelectionID
 #define UNITY_SETUP_DOTS_SH_COEFFS
-#define UNITY_SETUP_DOTS_RENDER_BOUNDS
 
 #endif
-
-void GetAbsoluteWorldRendererBounds(out float3 minBounds, out float3 maxBounds)
-{
-    minBounds = unity_RendererBounds_Min.xyz;
-    maxBounds = unity_RendererBounds_Max.xyz;
-}
-
-void GetRendererBounds(out float3 minBounds, out float3 maxBounds)
-{
-    GetAbsoluteWorldRendererBounds(minBounds, maxBounds);
-
-#if (SHADEROPTIONS_CAMERA_RELATIVE_RENDERING != 0)
-    minBounds -= _WorldSpaceCameraPos.xyz;
-    maxBounds -= _WorldSpaceCameraPos.xyz;
-#endif
-}
-
-float3 GetRendererExtents()
-{
-    float3 minBounds, maxBounds;
-    GetRendererBounds(minBounds, maxBounds);
-    return (maxBounds - minBounds) * 0.5;
-}
 
 // Define View/Projection matrix macro
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariablesMatrixDefsHDCamera.hlsl"

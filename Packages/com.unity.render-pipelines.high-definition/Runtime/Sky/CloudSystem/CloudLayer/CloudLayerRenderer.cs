@@ -34,14 +34,13 @@ namespace UnityEngine.Rendering.HighDefinition
 
         public override void Build()
         {
-            var shaders = GraphicsSettings.GetRenderPipelineSettings<HDRenderPipelineRuntimeShaders>();
+            var globalSettings = HDRenderPipelineGlobalSettings.instance;
+            m_CloudLayerMaterial = CoreUtils.CreateEngineMaterial(globalSettings.renderPipelineResources.shaders.cloudLayerPS);
 
-            m_CloudLayerMaterial = CoreUtils.CreateEngineMaterial(shaders.cloudLayerPS);
-
-            s_BakeCloudTextureCS = shaders.bakeCloudTextureCS;
+            s_BakeCloudTextureCS = globalSettings.renderPipelineResources.shaders.bakeCloudTextureCS;
             s_BakeCloudTextureKernel = s_BakeCloudTextureCS.FindKernel("BakeCloudTexture");
 
-            s_BakeCloudShadowsCS = shaders.bakeCloudShadowsCS;
+            s_BakeCloudShadowsCS = globalSettings.renderPipelineResources.shaders.bakeCloudShadowsCS;
             s_BakeCloudShadowsKernel = s_BakeCloudShadowsCS.FindKernel("BakeCloudShadows");
         }
 
@@ -95,10 +94,6 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             var hdCamera = builtinParams.hdCamera;
             var cmd = builtinParams.commandBuffer;
-#if UNITY_EDITOR
-            if (!hdCamera.camera.renderCloudsInSceneView)
-                return;
-#endif
             var cloudLayer = builtinParams.cloudSettings as CloudLayer;
             if (cloudLayer.opacity.value == 0.0f)
                 return;
@@ -108,7 +103,7 @@ namespace UnityEngine.Rendering.HighDefinition
             if (!hdCamera.animateMaterials)
                 cloudLayer.layerA.scrollFactor = cloudLayer.layerB.scrollFactor = 0.0f;
 
-            m_PrecomputedData.InitIfNeeded(cloudLayer, builtinParams.sunLight, hdCamera, builtinParams.commandBuffer);
+            m_PrecomputedData.InitIfNeeded(cloudLayer, builtinParams.sunLight, builtinParams.commandBuffer);
             m_CloudLayerMaterial.SetTexture(_CloudTexture, m_PrecomputedData.cloudTextureRT);
 
             // Parameters
@@ -140,8 +135,11 @@ namespace UnityEngine.Rendering.HighDefinition
             {
                 m_CloudLayerMaterial.SetVector(HDShaderIDs._SunDirection, -builtinParams.sunLight.transform.forward);
 
+                var lightComponent = builtinParams.sunLight.GetComponent<Light>();
                 var additionalLightData = builtinParams.sunLight.GetComponent<HDAdditionalLightData>();
-                lightColor = additionalLightData.EvaluateLightColor() * additionalLightData.lightDimmer;
+                lightColor = lightComponent.color.linear * lightComponent.intensity;
+                if (additionalLightData.useColorTemperature)
+                    lightColor *= Mathf.CorrelatedColorTemperatureToRGB(lightComponent.colorTemperature);
             }
 
             s_VectorArray[0] = cloudLayer.layerA.Color * lightColor; s_VectorArray[1] = cloudLayer.layerB.Color * lightColor;
@@ -313,12 +311,12 @@ namespace UnityEngine.Rendering.HighDefinition
                 cloudShadowsCache.Cache(cloudShadowsResolution, cloudShadowsResolution, cloudShadowsRT);
             }
 
-            public bool InitIfNeeded(CloudLayer cloudLayer, Light sunLight, HDCamera hdCamera, CommandBuffer cmd)
+            public bool InitIfNeeded(CloudLayer cloudLayer, Light sunLight, CommandBuffer cmd)
             {
                 if (initialized) return false;
 
                 Vector4 params1 = sunLight == null ? Vector3.zero : -sunLight.transform.forward;
-                params1.w = (cloudLayer.upperHemisphereOnly.value ? 1.0f : -1.0f) * hdCamera.planet.radius;
+                params1.w = (cloudLayer.upperHemisphereOnly.value ? 1.0f : 0.0f);
 
                 cmd.SetComputeVectorParam(s_BakeCloudTextureCS, HDShaderIDs._Params, params1);
                 cmd.SetComputeTextureParam(s_BakeCloudTextureCS, s_BakeCloudTextureKernel, _CloudTexture, cloudTextureRT);
@@ -359,7 +357,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
             public void BakeCloudShadows(CloudLayer cloudLayer, Light sunLight, HDCamera hdCamera, CommandBuffer cmd)
             {
-                InitIfNeeded(cloudLayer, sunLight, hdCamera, cmd);
+                InitIfNeeded(cloudLayer, sunLight, cmd);
                 Vector4 _Params = cloudLayer.shadowTint.value;
                 _Params.w = cloudLayer.shadowMultiplier.value * 8.0f;
 

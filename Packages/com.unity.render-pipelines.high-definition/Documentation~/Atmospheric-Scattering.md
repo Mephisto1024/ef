@@ -1,10 +1,10 @@
-# Understand atmospheric scattering
+# Atmospheric Scattering
 
 Atmospheric scattering occurs when particles suspended in the atmosphere diffuse (or scatter) a part of the light passing through them in all directions.
 
 Natural effects that cause atmospheric scattering include fog, clouds, or mist.
 
-The High Definition Render Pipeline (HDRP) simulates a [fog](fog.md) effect by overlaying a color onto objects, depending on their distance from the Camera. This is good for simulating fog or mist in outdoor environments. You can use it to hide the clipping of far away GameObjects, which is useful if you reduce a Camera’s far clip plane to enhance performance.
+The High Definition Render Pipeline (HDRP) simulates a [fog](Override-Fog.md) effect by overlaying a color onto objects, depending on their distance from the Camera. This is good for simulating fog or mist in outdoor environments. You can use it to hide the clipping of far away GameObjects, which is useful if you reduce a Camera’s far clip plane to enhance performance.
 
 HDRP implements an exponential fog, where density varies exponentially with distance from the Camera. All Material types (Lit or Unlit) react correctly to the fog. HDRP calculates fog density depending on the distance from the Camera, and the world space height.
 

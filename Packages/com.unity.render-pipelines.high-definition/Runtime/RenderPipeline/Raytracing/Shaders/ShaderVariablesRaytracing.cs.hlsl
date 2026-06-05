@@ -4,13 +4,6 @@
 
 #ifndef SHADERVARIABLESRAYTRACING_CS_HLSL
 #define SHADERVARIABLESRAYTRACING_CS_HLSL
-//
-// UnityEngine.Rendering.HighDefinition.HDLightClusterDefinitions:  static fields
-//
-#define CLUSTER_SIZE (int3(64, 32, 64))
-#define CLUSTER_CELL_COUNT (131072)
-#define CELL_META_DATA_SIZE (5)
-
 // Generated from UnityEngine.Rendering.HighDefinition.ShaderVariablesRaytracing
 // PackingRules = Exact
 GLOBAL_CBUFFER_START(ShaderVariablesRaytracing, b3)
@@ -31,15 +24,13 @@ GLOBAL_CBUFFER_START(ShaderVariablesRaytracing, b3)
     float _DirectionalShadowFallbackIntensity;
     float _RayTracingLodBias;
     int _RayTracingRayMissFallbackHierarchy;
-    int _RayTracingRayMissUseAmbientProbeAsSky;
     int _RayTracingLastBounceFallbackHierarchy;
     int _RayTracingClampingFlag;
     float _RayTracingAmbientProbeDimmer;
     int _RayTracingAPVRayMiss;
     float _RayTracingRayBias;
     float _RayTracingDistantRayBias;
-    int _RayTracingReflectionFrameIndex;
-    uint _RaytracingAPVLayerMask;
+    int _PaddingRT0;
 CBUFFER_END
 
 

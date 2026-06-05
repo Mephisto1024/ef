@@ -65,7 +65,7 @@ Shader "HDRP/Decal"
     HLSLINCLUDE
 
     #pragma target 4.5
-    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
     //#pragma enable_d3d11_debug_symbols
 
     //-------------------------------------------------------------------------------------
@@ -81,14 +81,6 @@ Shader "HDRP/Decal"
     #pragma shader_feature_local_fragment _MATERIAL_AFFECTS_MASKMAP
 
     #pragma multi_compile_instancing
-
-    //-------------------------------------------------------------------------------------
-    // Define
-    //-------------------------------------------------------------------------------------
-
-    // Enable the support of global mip bias in the shader.
-    // Only has effect if the global mip bias is enabled in shader config and DRS is enabled.
-    #define SUPPORT_GLOBAL_MIP_BIAS
 
     //-------------------------------------------------------------------------------------
     // Include
@@ -282,7 +274,7 @@ Shader "HDRP/Decal"
 
             HLSLPROGRAM
 
-            #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+            #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
             //enable GPU instancing support
             #pragma instancing_options renderinglayer

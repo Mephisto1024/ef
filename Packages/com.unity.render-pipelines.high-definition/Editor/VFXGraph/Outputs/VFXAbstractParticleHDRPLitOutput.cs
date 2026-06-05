@@ -69,8 +69,8 @@ namespace UnityEditor.VFX.HDRP
         protected LightmapRemapMode lightmapRemapMode = LightmapRemapMode.None;
 
         [VFXSetting(VFXSettingAttribute.VisibleFlags.InInspector), SerializeField, Tooltip("Enables the modification of the light map ranges.")]
-        protected bool lightmapRemapRanges = false;
 
+        protected bool lightmapRemapRanges = false;
         [VFXSetting(VFXSettingAttribute.VisibleFlags.InInspector), SerializeField, Tooltip("When enabled, the alpha of the particles can be remapped with the Alpha Remap curve.")]
         protected bool useAlphaRemap = false;
 
@@ -103,17 +103,6 @@ namespace UnityEditor.VFX.HDRP
             }
         }
 
-        protected sealed override bool hasAnyMap
-        {
-            get
-            {
-                return base.hasAnyMap
-                       || useMaskMap
-                       || useNormalMap
-                       || useEmissiveMap
-                       || materialType == MaterialType.SixWaySmokeLit;
-            }
-        }
 
         protected VFXAbstractParticleHDRPLitOutput(bool strip = false) : base(strip) { }
 
@@ -165,8 +154,8 @@ namespace UnityEditor.VFX.HDRP
         {
             get
             {
-                yield return new VFXPropertyWithValue(new VFXProperty(GetTextureType(), "positiveAxesLightmap", new TooltipAttribute("Specifies the lightmap for the positive axes, Right (R), Up (G), Back (B), and the opacity (A).")), (usesFlipbook ? null : VFXResources.defaultResources.sixWayPositiveTexture));
-                yield return new VFXPropertyWithValue(new VFXProperty(GetTextureType(), "negativeAxesLightmap", new TooltipAttribute("Specifies the lightmap for the Negative axes: Left (R), Bottom (G), Front (B), and the Emissive mask (A) for Single Channel emission mode.")), (usesFlipbook ? null : VFXResources.defaultResources.sixWayNegativeTexture));
+                yield return new VFXPropertyWithValue(new VFXProperty(GetTextureType(), "positiveAxesLightmap", new TooltipAttribute("Specifies the lightmap for the positive axes, Right (R), Up (G), Back (B), and the opacity (A).")));
+                yield return new VFXPropertyWithValue(new VFXProperty(GetTextureType(), "negativeAxesLightmap", new TooltipAttribute("Specifies the lightmap for the Negative axes: Left (R), Bottom (G), Front (B), and the Emissive mask (A) for Single Channel emission mode.")));
 
                 if (lightmapRemapRanges)
                 {
@@ -203,8 +192,11 @@ namespace UnityEditor.VFX.HDRP
             }
         }
 
-        protected override VFXOldShaderGraphHelpers.RPInfo currentRP => VFXOldShaderGraphHelpers.hdrpLitInfo;
-        public override bool isLitShader => true;
+        protected override RPInfo currentRP
+        {
+            get { return hdrpLitInfo; }
+        }
+        public override bool isLitShader { get => true; }
 
         protected override IEnumerable<VFXPropertyWithValue> inputProperties
         {
@@ -291,7 +283,8 @@ namespace UnityEditor.VFX.HDRP
                         if (useColorAbsorption)
                         {
                             var absorptionStrenghtExp = slotExpressions.First(o => o.name == "absorptionStrength").exp;
-                            var absorptionRangeExp = (VFXValue.Constant(1 - 1.0f / Mathf.PI) * absorptionStrenghtExp + VFXValue.Constant(1.0f / Mathf.PI));
+                            var absorptionRangeExp = (absorptionStrenghtExp + VFXValue.Constant(1.0f / Mathf.PI)) /
+                                                     VFXValue.Constant(1 - 1.0f / Mathf.PI);
                             yield return new VFXNamedExpression(absorptionRangeExp, "absorptionRange");
                         }
 
@@ -377,7 +370,7 @@ namespace UnityEditor.VFX.HDRP
                                 yield return "VFX_SIX_WAY_REMAP_RANGES";
                             if (useColorAbsorption)
                             {
-                                yield return "VFX_SIX_WAY_COLOR_ABSORPTION";
+                                yield return "VFX_SIX_WAY_ABSORPTION";
                             }
                             switch (lightmapRemapMode)
                             {
@@ -432,6 +425,7 @@ namespace UnityEditor.VFX.HDRP
 
                 if (materialType == MaterialType.SixWaySmokeLit)
                 {
+                    yield return nameof(shaderGraph);
                     yield return nameof(preserveSpecularLighting);
                     yield return nameof(enableSpecular);
                     yield return nameof(doubleSided);
@@ -444,7 +438,7 @@ namespace UnityEditor.VFX.HDRP
                     if (emissiveMode != EmissiveMode.SingleChannel)
                         yield return nameof(useEmissiveChannelScale);
                 }
-                if (materialType != MaterialType.SixWaySmokeLit || GetOrRefreshShaderGraphObject() != null)
+                else
                 {
                     yield return nameof(useColorAbsorption);
                     yield return nameof(emissiveMode);

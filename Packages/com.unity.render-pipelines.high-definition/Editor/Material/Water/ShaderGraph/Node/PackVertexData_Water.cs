@@ -10,29 +10,29 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     [SRPFilter(typeof(HDRenderPipeline))]
+    [Title("Utility", "High Definition Render Pipeline", "Water", "PackVertexData_Water (Preview)")]
     class PackVertexData_Water : AbstractMaterialNode, IGeneratesBodyCode
     {
         public PackVertexData_Water()
         {
-            name = "Pack Water Vertex Data (Legacy)";
+            name = "Pack Water Vertex Data (Preview)";
             UpdateNodeAfterDeserialization();
         }
 
         public override string documentationURL => Documentation.GetPageLink("PackVertexData_Water");
 
         // Inputs
-        const int kPositionOSInputSlotId = 0;
-        const string kPositionOSInputSlotName = "PositionOS";
+        const int kPositionWSInputSlotId = 0;
+        const string kPositionWSInputSlotName = "PositionWS";
 
-        // Inputs
-        const int kNormalOSInputSlotId = 1;
-        const string kNormalOSInputSlotName = "NormalOS";
-
-        const int kDisplacementInputSlotId = 2;
+        const int kDisplacementInputSlotId = 1;
         const string kDisplacementInputSlotName = "Displacement";
 
-        const int kLowFrequencyHeightInputSlotId = 3;
+        const int kLowFrequencyHeightInputSlotId = 2;
         const string kLowFrequencyHeightInputSlotName = "LowFrequencyHeight";
+
+        const int kSSSMaskInputSlotId = 3;
+        const string kSSSMaskInputSlotName = "SSSMask";
 
         // Outputs
         const int kPositionOSOutputSlotId = 4;
@@ -52,10 +52,10 @@ namespace UnityEditor.Rendering.HighDefinition
         public sealed override void UpdateNodeAfterDeserialization()
         {
             // Inputs
-            AddSlot(new Vector3MaterialSlot(kPositionOSInputSlotId, kPositionOSInputSlotName, kPositionOSInputSlotName, SlotType.Input, Vector3.zero, ShaderStageCapability.Vertex));
-            AddSlot(new Vector3MaterialSlot(kNormalOSInputSlotId, kNormalOSInputSlotName, kNormalOSInputSlotName, SlotType.Input, Vector3.zero, ShaderStageCapability.Vertex));
+            AddSlot(new Vector3MaterialSlot(kPositionWSInputSlotId, kPositionWSInputSlotName, kPositionWSInputSlotName, SlotType.Input, Vector3.zero, ShaderStageCapability.Vertex));
             AddSlot(new Vector3MaterialSlot(kDisplacementInputSlotId, kDisplacementInputSlotName, kDisplacementInputSlotName, SlotType.Input, Vector3.zero, ShaderStageCapability.Vertex));
             AddSlot(new Vector1MaterialSlot(kLowFrequencyHeightInputSlotId, kLowFrequencyHeightInputSlotName, kLowFrequencyHeightInputSlotName, SlotType.Input, 0, ShaderStageCapability.Vertex));
+            AddSlot(new Vector1MaterialSlot(kSSSMaskInputSlotId, kSSSMaskInputSlotName, kSSSMaskInputSlotName, SlotType.Input, 0, ShaderStageCapability.Vertex));
 
             // Outputs
             AddSlot(new Vector3MaterialSlot(kPositionOSOutputSlotId, kPositionOSOutputSlotName, kPositionOSOutputSlotName, SlotType.Output, Vector3.zero));
@@ -65,10 +65,10 @@ namespace UnityEditor.Rendering.HighDefinition
 
             RemoveSlotsNameNotMatching(new[]
             {
-                kPositionOSInputSlotId,
-                kNormalOSInputSlotId,
+                kPositionWSInputSlotId,
                 kDisplacementInputSlotId,
                 kLowFrequencyHeightInputSlotId,
+                kSSSMaskInputSlotId,
 
                 kPositionOSOutputSlotId,
                 kNormalOSOutputSlotId,
@@ -81,29 +81,35 @@ namespace UnityEditor.Rendering.HighDefinition
         {
             if (generationMode == GenerationMode.ForReals)
             {
-                string positionOS = GetSlotValue(kPositionOSInputSlotId, generationMode);
-                string normalOS = GetSlotValue(kNormalOSInputSlotId, generationMode);
+                sb.AppendLine("PackedWaterData packedWaterData;");
+                sb.AppendLine("ZERO_INITIALIZE(PackedWaterData, packedWaterData);");
+
+                string positionWS = GetSlotValue(kPositionWSInputSlotId, generationMode);
                 string displacement = GetSlotValue(kDisplacementInputSlotId, generationMode);
                 string lowFrequencyHeight = GetSlotValue(kLowFrequencyHeightInputSlotId, generationMode);
+                string sssMask = GetSlotValue(kSSSMaskInputSlotId, generationMode);
 
-                sb.AppendLine("$precision3 {0} = {1};",
-                    GetVariableNameForSlot(kPositionOSOutputSlotId),
-                    positionOS
+                sb.AppendLine("PackWaterVertexData({0}, {1}, {2}, {3}, packedWaterData);",
+                    positionWS,
+                    displacement,
+                    lowFrequencyHeight,
+                    sssMask
                 );
 
-                sb.AppendLine("$precision3 {0} = {1};",
-                    GetVariableNameForSlot(kNormalOSOutputSlotId),
-                    normalOS
+                sb.AppendLine("$precision3 {0} = packedWaterData.positionOS;",
+                    GetVariableNameForSlot(kPositionOSOutputSlotId)
                 );
 
-                sb.AppendLine("$precision4 {0} = float4({1}.xyz, 0.0);",
-                    GetVariableNameForSlot(kUV0OutputSlotId),
-                    displacement
+                sb.AppendLine("$precision3 {0} = packedWaterData.normalOS;",
+                    GetVariableNameForSlot(kNormalOSOutputSlotId)
                 );
 
-                sb.AppendLine("$precision4 {0} = float4({1}, 0.0, 0.0, 0.0);",
-                    GetVariableNameForSlot(kUV1OutputSlotId),
-                    lowFrequencyHeight
+                sb.AppendLine("$precision4 {0} = packedWaterData.uv0;",
+                    GetVariableNameForSlot(kUV0OutputSlotId)
+                );
+
+                sb.AppendLine("$precision4 {0} = packedWaterData.uv1;",
+                    GetVariableNameForSlot(kUV1OutputSlotId)
                 );
             }
             else
@@ -124,11 +130,6 @@ namespace UnityEditor.Rendering.HighDefinition
                     GetVariableNameForSlot(kUV1OutputSlotId)
                 );
             }
-        }
-
-        public override void ValidateNode()
-        {
-            owner.messageManager?.AddOrAppendError(owner, objectId, new ShaderMessage("This node is deprecated and will be released in a future version. Please refer to the Water Samples for the new version.", ShaderCompilerMessageSeverity.Warning));
         }
     }
 }

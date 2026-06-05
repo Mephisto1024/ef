@@ -1,13 +1,6 @@
 {
 	"FileContentKeywordValidation":
 	{
-		"IgnoreFilenames":
-		[
-			"Editor/HlslDerivatives/HlslTree.cs",
-			"Editor/HlslDerivatives/HlslGenerator.cs",
-			"Editor/HlslDerivatives/HlslParser.cs"
-		]	
-			
 		"Keywords":
 		[
 			{
@@ -53,7 +46,7 @@
 				[
 					"com\\.unity\\.render-pipelines\\.xboxone"
 				]
-			}		
+			}
 		]
 	}
 }

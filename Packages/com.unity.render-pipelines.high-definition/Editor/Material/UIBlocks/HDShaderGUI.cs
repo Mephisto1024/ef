@@ -27,7 +27,7 @@ namespace UnityEditor.Rendering.HighDefinition
         /// Sets up the keywords and passes for the material you pass in as a parameter.
         /// </summary>
         /// <param name="material">Target material.</param>
-        [Obsolete("SetupMaterialKeywordsAndPass has been renamed ValidateMaterial. #from(2022.1)")]
+        [Obsolete("SetupMaterialKeywordsAndPass has been renamed ValidateMaterial", false)]
         protected virtual void SetupMaterialKeywordsAndPass(Material material)
         {
             ValidateMaterial(material);
@@ -66,38 +66,26 @@ namespace UnityEditor.Rendering.HighDefinition
         /// <param name="background">Style for the background.</param>
         public override void OnMaterialPreviewGUI(MaterialEditor materialEditor, Rect r, GUIStyle background)
         {
-            using (ListPool<DiffusionProfileSettings>.Get(out var overrides))
+            List<DiffusionProfileSettings> overrides = new();
+            Material material = materialEditor.target as Material;
+            foreach (var nameID in HDMaterial.GetShaderDiffusionProfileProperties(material.shader))
             {
-                Material material = materialEditor.target as Material;
-                foreach (var nameID in HDMaterial.GetShaderDiffusionProfileProperties(material.shader))
-                {
-                    if (!material.HasProperty(nameID))
-                        continue;
+                if (!material.HasProperty(nameID))
+                    continue;
 
-                    var diffusionProfile = HDMaterial.GetDiffusionProfileAsset(material, nameID);
-                    if (diffusionProfile != null)
-                        overrides.Add(diffusionProfile);
-                    if (overrides.Count >= DiffusionProfileConstants.DIFFUSION_PROFILE_COUNT - 1)
-                        break;
-                }
-
-                EditorGraphicsSettings.TryGetRenderPipelineSettingsForPipeline<HDRPDefaultVolumeProfileSettings, HDRenderPipeline>(out var settings);
-                if (settings == null || settings.volumeProfile == null)
-                {
-                    EditorGUI.HelpBox(r, $"The current {nameof(VolumeProfile)} is null, please assign one on Graphics Settings > HDRP", MessageType.Error);
-                }
-                else
-                {
-                    var diffusionProfileList = VolumeUtils.GetOrCreateDiffusionProfileList(settings.volumeProfile);
-
-                    var profiles = diffusionProfileList.ToArray();
-                    diffusionProfileList.ReplaceWithArray(overrides.ToArray());
-
-                    materialEditor.DefaultPreviewGUI(r, background);
-
-                    diffusionProfileList.ReplaceWithArray(profiles);
-                }
+                var diffusionProfile = HDMaterial.GetDiffusionProfileAsset(material, nameID);
+                if (diffusionProfile != null)
+                    overrides.Add(diffusionProfile);
+                if (overrides.Count >= DiffusionProfileConstants.DIFFUSION_PROFILE_COUNT - 1)
+                    break;
             }
+
+            var profiles = HDRenderPipelineGlobalSettings.instance.diffusionProfileSettingsList;
+            HDRenderPipelineGlobalSettings.instance.diffusionProfileSettingsList = overrides.ToArray();
+
+            materialEditor.DefaultPreviewGUI(r, background);
+
+            HDRenderPipelineGlobalSettings.instance.diffusionProfileSettingsList = profiles;
         }
 
         /// <summary>

@@ -1,10 +1,111 @@
+using System;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
     internal class DLSSPass
     {
+        #region Render Graph Helper
+
+        public struct ViewResourceHandles
+        {
+            public TextureHandle source;
+            public TextureHandle output;
+            public TextureHandle depth;
+            public TextureHandle motionVectors;
+            public TextureHandle biasColorMask;
+            public void WriteResources(RenderGraphBuilder builder)
+            {
+                source = builder.WriteTexture(source);
+                output = builder.WriteTexture(output);
+                depth = builder.WriteTexture(depth);
+                motionVectors = builder.WriteTexture(motionVectors);
+
+                if (biasColorMask.IsValid())
+                    biasColorMask = builder.WriteTexture(biasColorMask);
+            }
+        }
+
+        public struct CameraResourcesHandles
+        {
+            internal ViewResourceHandles resources;
+            internal bool copyToViews;
+            internal ViewResourceHandles tmpView0;
+            internal ViewResourceHandles tmpView1;
+        }
+
+        public static ViewResources GetViewResources(in ViewResourceHandles handles)
+        {
+            var resources = new ViewResources
+            {
+                source = (Texture)handles.source,
+                output = (Texture)handles.output,
+                depth = (Texture)handles.depth,
+                motionVectors = (Texture)handles.motionVectors
+            };
+
+            resources.biasColorMask = (handles.biasColorMask.IsValid()) ? (Texture)handles.biasColorMask : (Texture)null;
+
+            return resources;
+        }
+
+        public static CameraResourcesHandles CreateCameraResources(HDCamera camera, RenderGraph renderGraph, RenderGraphBuilder builder, in ViewResourceHandles resources)
+        {
+            var camResources = new CameraResourcesHandles();
+            camResources.resources = resources;
+            camResources.copyToViews = camera.xr.enabled && camera.xr.singlePassEnabled && camera.xr.viewCount > 1;
+
+            if (camResources.copyToViews)
+            {
+                TextureHandle GetTmpViewXrTex(in TextureHandle handle)
+                {
+                    if (!handle.IsValid())
+                        return TextureHandle.nullHandle;
+
+                    var newTexDesc = renderGraph.GetTextureDesc(handle);
+                    newTexDesc.slices = 1;
+                    newTexDesc.dimension = TextureDimension.Tex2D;
+                    return renderGraph.CreateTexture(newTexDesc);
+                }
+
+                void CreateCopyNoXR(in ViewResourceHandles input, out ViewResourceHandles newResources)
+                {
+                    newResources.source = GetTmpViewXrTex(input.source);
+                    newResources.output = GetTmpViewXrTex(input.output);
+                    newResources.depth = GetTmpViewXrTex(input.depth);
+                    newResources.motionVectors = GetTmpViewXrTex(input.motionVectors);
+                    newResources.biasColorMask = GetTmpViewXrTex(input.biasColorMask);
+                    newResources.WriteResources(builder);
+                }
+
+                CreateCopyNoXR(resources, out camResources.tmpView0);
+                CreateCopyNoXR(resources, out camResources.tmpView1);
+            }
+
+            return camResources;
+        }
+
+        public static CameraResources GetCameraResources(in CameraResourcesHandles handles)
+        {
+            var camResources = new CameraResources
+            {
+                resources = GetViewResources(handles.resources),
+                copyToViews = handles.copyToViews
+            };
+
+            if (camResources.copyToViews)
+            {
+                camResources.tmpView0 = GetViewResources(handles.tmpView0);
+                camResources.tmpView1 = GetViewResources(handles.tmpView1);
+            }
+
+            return camResources;
+        }
+
+        #endregion
 
         #region public members, general engine code
         public struct Parameters
@@ -15,7 +116,24 @@ namespace UnityEngine.Rendering.HighDefinition
             public GlobalDynamicResolutionSettings drsSettings;
         }
 
-        public static bool SetupFeature()
+        public struct ViewResources
+        {
+            public Texture source;
+            public Texture output;
+            public Texture depth;
+            public Texture motionVectors;
+            public Texture biasColorMask;
+        }
+
+        public struct CameraResources
+        {
+            internal ViewResources resources;
+            internal bool copyToViews;
+            internal ViewResources tmpView0;
+            internal ViewResources tmpView1;
+        }
+
+        public static bool SetupFeature(HDRenderPipelineGlobalSettings pipelineSettings = null)
         {
 #if ENABLE_NVIDIA && ENABLE_NVIDIA_MODULE
             if (!NVIDIA.NVUnityPlugin.IsLoaded())
@@ -30,19 +148,31 @@ namespace UnityEngine.Rendering.HighDefinition
             if (!SystemInfo.graphicsDeviceVendor.ToLowerInvariant().Contains("nvidia"))
                 return false;
 
-            var device = NVIDIA.GraphicsDevice.CreateGraphicsDevice();
-            return device != null && device.IsFeatureAvailable(NVIDIA.GraphicsDeviceFeature.DLSS);
+            NVIDIA.GraphicsDevice device = null;
+            if (pipelineSettings != null && pipelineSettings.useDLSSCustomProjectId)
+            {
+                device = NVIDIA.GraphicsDevice.CreateGraphicsDevice(pipelineSettings.DLSSProjectId);
+            }
+            else
+            {
+                device = NVIDIA.GraphicsDevice.CreateGraphicsDevice();
+            }
+
+            if (device == null)
+                return false;
+
+            return device.IsFeatureAvailable(NVIDIA.GraphicsDeviceFeature.DLSS);
 #else
             return false;
 #endif
         }
 
-        public static DLSSPass Create()
+        public static DLSSPass Create(HDRenderPipelineGlobalSettings pipelineSettings = null)
         {
             DLSSPass dlssPass = null;
 
 #if ENABLE_NVIDIA && ENABLE_NVIDIA_MODULE
-            if (!SetupFeature())
+            if (!SetupFeature(pipelineSettings))
                 return null;
 
             dlssPass = new DLSSPass(NVIDIA.GraphicsDevice.device);
@@ -57,16 +187,16 @@ namespace UnityEngine.Rendering.HighDefinition
 #endif
         }
 
-        public void SetupDRSScaling(bool enableAutomaticSettings, Camera camera, in HDAdditionalCameraData hdCam,  XRPass xrPass, ref GlobalDynamicResolutionSettings dynamicResolutionSettings)
+        public void SetupDRSScaling(bool enableAutomaticSettings, Camera camera, XRPass xrPass, ref GlobalDynamicResolutionSettings dynamicResolutionSettings)
         {
 #if ENABLE_NVIDIA && ENABLE_NVIDIA_MODULE
-            InternalNVIDIASetupDRSScaling(enableAutomaticSettings, camera, hdCam, xrPass, ref dynamicResolutionSettings);
+            InternalNVIDIASetupDRSScaling(enableAutomaticSettings, camera, xrPass, ref dynamicResolutionSettings);
 #endif
         }
 
         public void Render(
             DLSSPass.Parameters parameters,
-            UpscalerResources.CameraResources resources,
+            DLSSPass.CameraResources resources,
             CommandBuffer cmdBuffer)
         {
 #if ENABLE_NVIDIA && ENABLE_NVIDIA_MODULE
@@ -78,11 +208,13 @@ namespace UnityEngine.Rendering.HighDefinition
 
         #region private members, nvidia specific code
 #if ENABLE_NVIDIA && ENABLE_NVIDIA_MODULE
-        private static uint s_ExpectedDeviceVersion = 0x06;
+        private static uint s_ExpectedDeviceVersion = 0x04;
 
-        private UpscalerCameras m_CameraStates = new UpscalerCameras();
+        private Dictionary<int, DLSSPass.CameraState> m_CameraStates = new Dictionary<int, DLSSPass.CameraState>();
+        private List<int> m_InvalidCameraKeys = new List<int>();
 
         private CommandBuffer m_CommandBuffer = new CommandBuffer();
+        private UInt64 m_FrameId = 0;
 
         private NVIDIA.GraphicsDevice m_Device = null;
 
@@ -91,21 +223,42 @@ namespace UnityEngine.Rendering.HighDefinition
             m_Device = device;
         }
 
+        //Amount of inactive frames dlss has rendered before we clean / destroy the plugin state.
+        private static UInt64 sMaximumFrameExpiration = 400;
+
+        private struct Resolution
+        {
+            public uint width;
+            public uint height;
+
+            public static bool operator==(Resolution a, Resolution b) =>
+                a.width == b.width && a.height == b.height;
+
+            public static bool operator!=(Resolution a, Resolution b) =>
+                !(a == b);
+            public override bool Equals(object obj)
+            {
+                if (obj is Resolution)
+                    return (Resolution)obj == this;
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return (int)(width ^ height);
+            }
+        }
+
         private struct DlssViewData
         {
             public NVIDIA.DLSSQuality  perfQuality;
-            public UpscalerResolution inputRes;
-            public UpscalerResolution outputRes;
+            public DLSSPass.Resolution inputRes;
+            public DLSSPass.Resolution outputRes;
             public float sharpness;
             public float jitterX;
             public float jitterY;
             public bool reset;
-            public uint presetQuality;
-            public uint presetBalanced;
-            public uint presetPerformance;
-            public uint presetUltraPerformance;
-            public uint presetDLAA;
-            public bool CanFitInput(in UpscalerResolution inputRect)
+            public bool CanFitInput(in DLSSPass.Resolution inputRect)
             {
                 return inputRes.width >= inputRect.width && inputRes.height > inputRect.height;
             }
@@ -116,7 +269,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public NVIDIA.DLSSQuality quality;
             public Rect viewport;
             public NVIDIA.OptimalDLSSSettingsData optimalSettings;
-            public bool CanFit(UpscalerResolution rect)
+            public bool CanFit(DLSSPass.Resolution rect)
             {
                 return rect.width >= optimalSettings.minWidth && rect.height >= optimalSettings.minHeight
                     && rect.width <= optimalSettings.maxWidth && rect.height <= optimalSettings.maxHeight;
@@ -140,7 +293,7 @@ namespace UnityEngine.Rendering.HighDefinition
             private DlssViewData m_Data = new DlssViewData();
             private bool m_UsingOptimalSettings = false;
             private bool m_UseAutomaticSettings = false;
-            private UpscalerResolution m_BackbufferRes;
+            private DLSSPass.Resolution m_BackbufferRes;
             private OptimalSettingsRequest m_OptimalSettingsRequest = new OptimalSettingsRequest();
 
             public NVIDIA.DLSSContext DLSSContext { get { return m_DlssContext; } }
@@ -181,22 +334,6 @@ namespace UnityEngine.Rendering.HighDefinition
                     && IsOptimalSettingsValid(m_OptimalSettingsRequest.optimalSettings);
             }
 
-            static NVIDIA.DLSSPreset Uint2Preset(uint preset)
-            {
-                if (preset >= (uint)NVIDIA.DLSSPreset.Preset_Default && preset <= (uint)NVIDIA.DLSSPreset.Preset_M)
-                    return (NVIDIA.DLSSPreset)preset;
-                Debug.LogWarningFormat("Unknown DLSS Preset value {0}, using default value.", preset);
-                return NVIDIA.DLSSPreset.Preset_Default;
-            }
-            static bool PresetChanged(in DlssViewData prev, in DlssViewData curr)
-            {
-                return  prev.presetQuality != curr.presetQuality ||
-                        prev.presetBalanced != curr.presetBalanced ||
-                        prev.presetPerformance != curr.presetPerformance ||
-                        prev.presetUltraPerformance != curr.presetUltraPerformance ||
-                        prev.presetDLAA != curr.presetDLAA;
-            }
-
             public void UpdateViewState(
                 in DlssViewData viewData,
                 CommandBuffer cmdBuffer)
@@ -211,9 +348,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     (viewData.inputRes != m_BackbufferRes && !m_OptimalSettingsRequest.CanFit(viewData.inputRes)) ||
                     viewData.perfQuality != m_Data.perfQuality ||
                     m_DlssContext == null ||
-                    shouldUseOptimalSettings != m_UsingOptimalSettings ||
-                    PresetChanged(viewData, m_Data)
-                )
+                    shouldUseOptimalSettings != m_UsingOptimalSettings)
                 {
                     isNew = true;
                     m_BackbufferRes = viewData.inputRes;
@@ -228,18 +363,12 @@ namespace UnityEngine.Rendering.HighDefinition
                     settings.SetFlag(NVIDIA.DLSSFeatureFlags.IsHDR, true);
                     settings.SetFlag(NVIDIA.DLSSFeatureFlags.MVLowRes, true);
                     settings.SetFlag(NVIDIA.DLSSFeatureFlags.DepthInverted, true);
+                    settings.SetFlag(NVIDIA.DLSSFeatureFlags.DoSharpening, true);
                     settings.inputRTWidth   = m_BackbufferRes.width;
                     settings.inputRTHeight  = m_BackbufferRes.height;
                     settings.outputRTWidth  = viewData.outputRes.width;
                     settings.outputRTHeight = viewData.outputRes.height;
                     settings.quality = viewData.perfQuality;
-
-                    settings.presetQualityMode = Uint2Preset(viewData.presetQuality);
-                    settings.presetBalancedMode = Uint2Preset(viewData.presetBalanced);
-                    settings.presetPerformanceMode = Uint2Preset(viewData.presetPerformance);
-                    settings.presetUltraPerformanceMode = Uint2Preset(viewData.presetUltraPerformance);
-                    settings.presetDlaaMode = Uint2Preset(viewData.presetDLAA);
-
                     m_UsingOptimalSettings = shouldUseOptimalSettings;
                     m_DlssContext = m_Device.CreateFeature(cmdBuffer, settings);
                 }
@@ -298,27 +427,37 @@ namespace UnityEngine.Rendering.HighDefinition
                 m_Data = new DlssViewData();
                 m_UsingOptimalSettings = false;
                 m_UseAutomaticSettings = false;
-                m_BackbufferRes = new UpscalerResolution();
+                m_BackbufferRes = new DLSSPass.Resolution();
                 m_OptimalSettingsRequest = new OptimalSettingsRequest();
             }
         }
 
-        private class DLSSCamera
+        private class CameraState
         {
+            WeakReference<Camera> m_CamReference = new WeakReference<Camera>(null);
             List<ViewState> m_Views = null;
             NVIDIA.GraphicsDevice m_Device = null;
             PerformDynamicRes m_ScaleDelegate = null;
-            public PerformDynamicRes ScaleDelegate { get { return m_ScaleDelegate; } }
-            public List<ViewState> ViewStates { get { return m_Views; } }
 
-            public DLSSCamera()
+            public PerformDynamicRes ScaleDelegate { get { return m_ScaleDelegate; } }
+
+            public List<ViewState> ViewStates { get { return m_Views; } }
+            public UInt64 LastFrameId { set; get; }
+
+            public CameraState()
             {
                 m_ScaleDelegate = ScaleFn;
             }
 
-            public void Init(NVIDIA.GraphicsDevice device)
+            public void Init(NVIDIA.GraphicsDevice device, Camera camera)
             {
+                m_CamReference.SetTarget(camera);
                 m_Device = device;
+            }
+
+            public bool IsAlive()
+            {
+                return m_CamReference.TryGetTarget(out _);
             }
 
             public void ClearAutomaticSettings()
@@ -349,7 +488,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 HDCamera camera,
                 float preExposure,
                 in DlssViewData viewData,
-                in UpscalerResources.CameraResources camResources,
+                in CameraResources camResources,
                 CommandBuffer cmdBuffer)
             {
                 int cameraViewCount = 1;
@@ -374,7 +513,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     }
                 }
 
-                void RunPass(ViewState viewState, CommandBuffer cmdBuffer, in DlssViewData viewData, in UpscalerResources.ViewResources viewResources)
+                void RunPass(ViewState viewState, CommandBuffer cmdBuffer, in DlssViewData viewData, in ViewResources viewResources)
                 {
                     viewState.UpdateViewState(viewData, cmdBuffer);
                     viewState.SubmitDlssCommands(
@@ -393,7 +532,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     for (int viewId = 0; viewId < m_Views.Count; ++viewId)
                     {
                         ViewState viewState = m_Views[viewId];
-                        UpscalerResources.ViewResources tmpResources = viewId == 0 ? camResources.tmpView0 : camResources.tmpView1;
+                        ViewResources tmpResources = viewId == 0 ? camResources.tmpView0 : camResources.tmpView1;
 
                         cmdBuffer.CopyTexture(camResources.resources.source, viewId, tmpResources.source, 0);
                         cmdBuffer.CopyTexture(camResources.resources.depth, viewId, tmpResources.depth, 0);
@@ -406,7 +545,7 @@ namespace UnityEngine.Rendering.HighDefinition
                     for (int viewId = 0; viewId < m_Views.Count; ++viewId)
                     {
                         ViewState viewState = m_Views[viewId];
-                        UpscalerResources.ViewResources tmpResources = viewId == 0 ? camResources.tmpView0 : camResources.tmpView1;
+                        ViewResources tmpResources = viewId == 0 ? camResources.tmpView0 : camResources.tmpView1;
                         RunPass(viewState, cmdBuffer, viewData, tmpResources);
                         cmdBuffer.CopyTexture(tmpResources.output, 0, camResources.resources.output, viewId);
                     }
@@ -430,51 +569,68 @@ namespace UnityEngine.Rendering.HighDefinition
 
                 ListPool<ViewState>.Release(m_Views);
                 m_Views = null;
+                m_CamReference.SetTarget(null);
                 m_Device = null;
+            }
+        }
+
+        private bool HasCameraStateExpired(CameraState cameraState)
+        {
+            return (m_FrameId - cameraState.LastFrameId) >= sMaximumFrameExpiration;
+        }
+
+        private void ProcessInvalidCameras()
+        {
+            foreach (KeyValuePair<int, CameraState> kv in m_CameraStates)
+            {
+                if (kv.Value.IsAlive() && !HasCameraStateExpired(kv.Value))
+                    continue;
+
+                m_InvalidCameraKeys.Add(kv.Key);
             }
         }
 
         private void CleanupCameraStates()
         {
-            Dictionary<int, UpscalerCameras.State> cameras = m_CameraStates.cameras;
+            if (m_InvalidCameraKeys.Count == 0)
+                return;
+
             m_CommandBuffer.Clear();
-            foreach (var kv in cameras)
+            foreach (var invalidKey in m_InvalidCameraKeys)
             {
-                var cameraState = kv.Value;
-                if (!m_CameraStates.HasCameraStateExpired(cameraState) || cameraState.data == null)
+                if (!m_CameraStates.TryGetValue(invalidKey, out var cameraState))
                     continue;
 
-                var dlssCamera = cameraState.data as DLSSCamera;
-                dlssCamera.Cleanup(m_CommandBuffer);
-                GenericPool<DLSSCamera>.Release(dlssCamera);
-                cameraState.data = null;
+                cameraState.Cleanup(m_CommandBuffer);
+                m_CameraStates.Remove(invalidKey);
+                GenericPool<DLSSPass.CameraState>.Release(cameraState);
             }
             Graphics.ExecuteCommandBuffer(m_CommandBuffer);
-            m_CameraStates.CleanupCameraStates();
+            m_InvalidCameraKeys.Clear();
         }
 
-        private void InternalNVIDIASetupDRSScaling(bool enableAutomaticSettings, Camera camera, in HDAdditionalCameraData hdCam, XRPass xrPass, ref GlobalDynamicResolutionSettings dynamicResolutionSettings)
+        private void InternalNVIDIASetupDRSScaling(bool enableAutomaticSettings, Camera camera, XRPass xrPass, ref GlobalDynamicResolutionSettings dynamicResolutionSettings)
         {
             if (m_Device == null)
                 return;
 
-            UpscalerCameras.State cameraState = m_CameraStates.GetState(camera);
-            if (cameraState == null)
+            int cameraKey = camera.GetInstanceID();
+            CameraState cameraState = null;
+            if (!m_CameraStates.TryGetValue(cameraKey, out cameraState))
                 return;
 
-            var dlssCamera = cameraState.data as DLSSCamera;
-            if (dlssCamera.ViewStates == null || dlssCamera.ViewStates.Count == 0)
+            if (cameraState.ViewStates == null || cameraState.ViewStates.Count == 0)
                 return;
 
-            if (dlssCamera.ViewStates[0].DLSSContext == null)
+            if (cameraState.ViewStates[0].DLSSContext == null)
                 return;
 
-            var usedQuality = dlssCamera.ViewStates[0].DLSSContext.initData.quality;
+            var usedQuality = cameraState.ViewStates[0].DLSSContext.initData.quality;
             Rect finalViewport = xrPass != null && xrPass.enabled ? xrPass.GetViewport() : new Rect(camera.pixelRect.x, camera.pixelRect.y, camera.pixelWidth, camera.pixelHeight);
             NVIDIA.OptimalDLSSSettingsData optimalSettings = new NVIDIA.OptimalDLSSSettingsData();
             m_Device.GetOptimalSettings((uint)finalViewport.width, (uint)finalViewport.height, usedQuality, out optimalSettings);
 
-            foreach (var view in dlssCamera.ViewStates)
+            foreach (var view in cameraState.ViewStates)
             {
                 if (view == null)
                     continue;
@@ -487,14 +643,14 @@ namespace UnityEngine.Rendering.HighDefinition
                 if (IsOptimalSettingsValid(optimalSettings) && enableAutomaticSettings)
                 {
                     dynamicResolutionSettings.maxPercentage = Mathf.Min((float)optimalSettings.maxWidth / finalViewport.width, (float)optimalSettings.maxHeight / finalViewport.height) * 100.0f;
-                    dynamicResolutionSettings.minPercentage = Mathf.Max((float)optimalSettings.minWidth / finalViewport.width, (float)optimalSettings.minHeight / finalViewport.height) * 100.0f;
-                    DynamicResolutionHandler.SetSystemDynamicResScaler(dlssCamera.ScaleDelegate, DynamicResScalePolicyType.ReturnsPercentage);
+                    dynamicResolutionSettings.minPercentage = Mathf.Max((float)optimalSettings.minWidth / finalViewport.width, (float)optimalSettings.minHeight / finalViewport.height) * 100.0f;                    
+                    DynamicResolutionHandler.SetSystemDynamicResScaler(cameraState.ScaleDelegate, DynamicResScalePolicyType.ReturnsPercentage);
                     DynamicResolutionHandler.SetActiveDynamicScalerSlot(DynamicResScalerSlot.System);
                 }
             }
             else
             {
-                dlssCamera.ClearAutomaticSettings();
+                cameraState.ClearAutomaticSettings();
             }
         }
 
@@ -503,42 +659,39 @@ namespace UnityEngine.Rendering.HighDefinition
             if (m_Device == null)
                 return;
 
-            m_CameraStates.ProcessExpiredCameras();
+            ProcessInvalidCameras();
 
-            UpscalerCameras.State cameraState = m_CameraStates.GetState(hdCamera.camera);
-            var dlssCamera = cameraState != null ? cameraState.data as DLSSCamera : (DLSSCamera)null;
-
+            var cameraKey = hdCamera.camera.GetInstanceID();
+            CameraState cameraState = null;
+            m_CameraStates.TryGetValue(cameraKey, out cameraState);
             bool dlssActive = hdCamera.IsDLSSEnabled();
 
             if (cameraState == null && dlssActive)
             {
-                dlssCamera = GenericPool<DLSSCamera>.Get();
-                dlssCamera.Init(m_Device);
-                cameraState = m_CameraStates.CreateState(hdCamera.camera);
-                cameraState.data = dlssCamera;
+                cameraState = GenericPool<DLSSPass.CameraState>.Get();
+                cameraState.Init(m_Device, hdCamera.camera);
+                m_CameraStates.Add(cameraKey, cameraState);
             }
             else if (cameraState != null && !dlssActive)
             {
-                m_CameraStates.InvalidateState(cameraState);
+                m_InvalidCameraKeys.Add(cameraKey);
             }
 
             if (cameraState != null)
-                m_CameraStates.TagUsed(cameraState);
+                cameraState.LastFrameId = m_FrameId;
 
             CleanupCameraStates();
-            m_CameraStates.NextFrame();
+            ++m_FrameId;
         }
 
-        private void InternalNVIDIARender(in DLSSPass.Parameters parameters, UpscalerResources.CameraResources resources, CommandBuffer cmdBuffer)
+        private void InternalNVIDIARender(in DLSSPass.Parameters parameters, DLSSPass.CameraResources resources, CommandBuffer cmdBuffer)
         {
-            if (m_Device == null || m_CameraStates.cameras.Count == 0)
+            if (m_Device == null || m_CameraStates.Count == 0)
                 return;
 
-            UpscalerCameras.State cameraState = m_CameraStates.GetState(parameters.hdCamera.camera);
-            if (cameraState == null)
+            if (!m_CameraStates.TryGetValue(parameters.hdCamera.camera.GetInstanceID(), out var cameraState))
                 return;
 
-            DLSSCamera dlssCamera = cameraState.data as DLSSCamera;
             var dlssViewData = new DlssViewData();
 
             dlssViewData.perfQuality =
@@ -547,23 +700,17 @@ namespace UnityEngine.Rendering.HighDefinition
                     ? parameters.hdCamera.deepLearningSuperSamplingQuality
                     : parameters.drsSettings.DLSSPerfQualitySetting);
 
-            // presets are per-project, not per camera.
-            dlssViewData.presetQuality          = parameters.drsSettings.DLSSRenderPresetForQuality;
-            dlssViewData.presetBalanced         = parameters.drsSettings.DLSSRenderPresetForBalanced;
-            dlssViewData.presetPerformance      = parameters.drsSettings.DLSSRenderPresetForPerformance;
-            dlssViewData.presetUltraPerformance = parameters.drsSettings.DLSSRenderPresetForUltraPerformance;
-            dlssViewData.presetDLAA             = parameters.drsSettings.DLSSRenderPresetForDLAA;
+            dlssViewData.sharpness = parameters.hdCamera.deepLearningSuperSamplingUseCustomAttributes
+                ? parameters.hdCamera.deepLearningSuperSamplingSharpening
+                : parameters.drsSettings.DLSSSharpness;
 
-            dlssViewData.inputRes  = new UpscalerResolution() { width = (uint)parameters.hdCamera.actualWidth, height = (uint)parameters.hdCamera.actualHeight };
-            dlssViewData.outputRes = new UpscalerResolution() {
-                width  = (uint)parameters.hdCamera.finalViewport.width,
-                height = (uint)parameters.hdCamera.finalViewport.height
-            };
-            
+            dlssViewData.inputRes  = new Resolution() { width = (uint)parameters.hdCamera.actualWidth, height = (uint)parameters.hdCamera.actualHeight };
+            dlssViewData.outputRes = new Resolution() { width = (uint)DynamicResolutionHandler.instance.finalViewport.x, height = (uint)DynamicResolutionHandler.instance.finalViewport.y };
+
             dlssViewData.jitterX = -parameters.hdCamera.taaJitter.x;
             dlssViewData.jitterY = -parameters.hdCamera.taaJitter.y;
             dlssViewData.reset = parameters.resetHistory;
-            dlssCamera.SubmitCommands(parameters.hdCamera, parameters.preExposure, dlssViewData, resources, cmdBuffer);
+            cameraState.SubmitCommands(parameters.hdCamera, parameters.preExposure, dlssViewData, resources, cmdBuffer);
         }
 
 #endif

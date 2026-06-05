@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -34,13 +34,14 @@ namespace UnityEngine.Rendering.HighDefinition
         {
         }
 
-        public void InitData(HDRenderPipeline renderPipeline)
+        public void InitData(HDRenderPipelineRuntimeResources renderPipelineResources)
         {
-            m_DebugLightVolumeMaterial = CoreUtils.CreateEngineMaterial(renderPipeline.runtimeShaders.debugLightVolumePS);
-            m_DebugLightVolumeCompute = renderPipeline.runtimeShaders.debugLightVolumeCS;
+            m_DebugLightVolumeMaterial = CoreUtils.CreateEngineMaterial(renderPipelineResources.shaders.debugLightVolumePS);
+            m_DebugLightVolumeCompute = renderPipelineResources.shaders.debugLightVolumeCS;
             m_DebugLightVolumeGradientKernel = m_DebugLightVolumeCompute.FindKernel("LightVolumeGradient");
             m_DebugLightVolumeColorsKernel = m_DebugLightVolumeCompute.FindKernel("LightVolumeColors");
-            m_ColorGradientTexture = renderPipeline.runtimeTextures.colorGradient;
+            m_ColorGradientTexture = renderPipelineResources.textures.colorGradient;
+
             m_Blit = Blitter.GetBlitMaterial(TextureDimension.Tex2D);
         }
 
@@ -74,7 +75,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         public void RenderLightVolumes(RenderGraph renderGraph, LightingDebugSettings lightingDebugSettings, TextureHandle destination, TextureHandle depthBuffer, CullingResults cullResults, HDCamera hdCamera)
         {
-            using (var builder = renderGraph.AddUnsafePass<RenderLightVolumesPassData>("LightVolumes", out var passData))
+            using (var builder = renderGraph.AddRenderPass<RenderLightVolumesPassData>("LightVolumes", out var passData))
             {
                 bool lightOverlapEnabled = CoreUtils.IsLightOverlapDebugEnabled(hdCamera.camera);
                 bool useColorAndEdge = lightingDebugSettings.lightVolumeDebugByCategory == LightVolumeDebug.ColorAndEdge || lightOverlapEnabled;
@@ -89,20 +90,17 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.colorGradientTexture = m_ColorGradientTexture;
                 passData.lightOverlapEnabled = lightOverlapEnabled;
                 passData.lightCountBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R32_SFloat, clearBuffer = true, clearColor = Color.black, name = "LightVolumeCount" });
+                { colorFormat = GraphicsFormat.R32_SFloat, clearBuffer = true, clearColor = Color.black, name = "LightVolumeCount" });
                 passData.colorAccumulationBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, clearBuffer = true, clearColor = Color.black, name = "LightVolumeColorAccumulation" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, clearBuffer = true, clearColor = Color.black, name = "LightVolumeColorAccumulation" });
                 passData.debugLightVolumesTexture = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, clearBuffer = true, clearColor = Color.black, enableRandomWrite = true, name = "LightVolumeDebugLightVolumesTexture" });
-                passData.depthBuffer = depthBuffer;
-                builder.SetRenderAttachmentDepth(depthBuffer, AccessFlags.ReadWrite);
-                passData.destination = destination;
-                builder.UseTexture(passData.destination, AccessFlags.Write);
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, clearBuffer = true, clearColor = Color.black, enableRandomWrite = true, name = "LightVolumeDebugLightVolumesTexture" });
+                passData.depthBuffer = builder.UseDepthBuffer(depthBuffer, DepthAccess.ReadWrite);
+                passData.destination = builder.WriteTexture(destination);
 
                 builder.SetRenderFunc(
-                    (RenderLightVolumesPassData data, UnsafeGraphContext ctx) =>
+                    (RenderLightVolumesPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         var mpb = ctx.renderGraphPool.GetTempMaterialPropertyBlock();
                         RenderTargetIdentifier[] mrt = ctx.renderGraphPool.GetTempArray<RenderTargetIdentifier>(2);
                         mrt[0] = data.lightCountBuffer;
@@ -111,18 +109,18 @@ namespace UnityEngine.Rendering.HighDefinition
                         if (data.lightOverlapEnabled)
                         {
                             // We only need the accumulation buffer, not the color (we only display the outline of the light shape in this mode).
-                            CoreUtils.SetRenderTarget(natCmd, mrt[0], depthBuffer);
+                            CoreUtils.SetRenderTarget(ctx.cmd, mrt[0], depthBuffer);
 
                             // The cull result doesn't contains overlapping lights so we use a custom list
                             foreach (var overlappingHDLight in HDAdditionalLightData.s_overlappingHDLights)
                             {
-                                RenderLightVolume(natCmd, data.debugLightVolumeMaterial, overlappingHDLight, overlappingHDLight.legacyLight, mpb);
+                                RenderLightVolume(ctx.cmd, data.debugLightVolumeMaterial, overlappingHDLight, overlappingHDLight.legacyLight, mpb);
                             }
                         }
                         else
                         {
                             // Set the render target array
-                            CoreUtils.SetRenderTarget(natCmd, mrt, depthBuffer);
+                            CoreUtils.SetRenderTarget(ctx.cmd, mrt, depthBuffer);
 
                             // First of all let's do the regions for the light sources (we only support Punctual and Area)
                             int numLights = data.cullResults.visibleLights.Length;
@@ -131,9 +129,10 @@ namespace UnityEngine.Rendering.HighDefinition
                                 // Let's build the light's bounding sphere matrix
                                 Light currentLegacyLight = data.cullResults.visibleLights[lightIdx].light;
                                 if (currentLegacyLight == null) continue;
-                                if (!currentLegacyLight.TryGetComponent<HDAdditionalLightData>(out var currentHDRLight)) continue;
+                                HDAdditionalLightData currentHDRLight = currentLegacyLight.GetComponent<HDAdditionalLightData>();
+                                if (currentHDRLight == null) continue;
 
-                                RenderLightVolume(natCmd, data.debugLightVolumeMaterial, currentHDRLight, currentLegacyLight, mpb);
+                                RenderLightVolume(ctx.cmd, data.debugLightVolumeMaterial, currentHDRLight, currentLegacyLight, mpb);
                             }
 
                             // When we enable the light overlap mode we hide probes as they can't be baked in shadow masks
@@ -166,18 +165,18 @@ namespace UnityEngine.Rendering.HighDefinition
                                     m_MaterialProperty.SetColor(_ColorShaderID, new Color(1.0f, 1.0f, 0.0f, 1.0f));
                                     m_MaterialProperty.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
                                     Matrix4x4 positionMat = Matrix4x4.Translate(currentLegacyProbe.transform.position);
-                                    natCmd.DrawMesh(targetMesh, positionMat, data.debugLightVolumeMaterial, 0, 0, m_MaterialProperty);
+                                    ctx.cmd.DrawMesh(targetMesh, positionMat, data.debugLightVolumeMaterial, 0, 0, m_MaterialProperty);
                                 }
                             }
                         }
 
                         // Set the input params for the compute
-                        natCmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _DebugLightCountBufferShaderID, data.lightCountBuffer);
-                        natCmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _DebugColorAccumulationBufferShaderID, data.colorAccumulationBuffer);
-                        natCmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _DebugLightVolumesTextureShaderID, data.debugLightVolumesTexture);
-                        natCmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _ColorGradientTextureShaderID, data.colorGradientTexture);
-                        natCmd.SetComputeIntParam(data.debugLightVolumeCS, _MaxDebugLightCountShaderID, data.maxDebugLightCount);
-                        natCmd.SetComputeFloatParam(data.debugLightVolumeCS, _BorderRadiusShaderID, data.borderRadius);
+                        ctx.cmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _DebugLightCountBufferShaderID, data.lightCountBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _DebugColorAccumulationBufferShaderID, data.colorAccumulationBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _DebugLightVolumesTextureShaderID, data.debugLightVolumesTexture);
+                        ctx.cmd.SetComputeTextureParam(data.debugLightVolumeCS, data.debugLightVolumeKernel, _ColorGradientTextureShaderID, data.colorGradientTexture);
+                        ctx.cmd.SetComputeIntParam(data.debugLightVolumeCS, _MaxDebugLightCountShaderID, data.maxDebugLightCount);
+                        ctx.cmd.SetComputeFloatParam(data.debugLightVolumeCS, _BorderRadiusShaderID, data.borderRadius);
 
                         // Texture dimensions
                         int texWidth = data.hdCamera.actualWidth;
@@ -187,12 +186,12 @@ namespace UnityEngine.Rendering.HighDefinition
                         int lightVolumesTileSize = 8;
                         int numTilesX = (texWidth + (lightVolumesTileSize - 1)) / lightVolumesTileSize;
                         int numTilesY = (texHeight + (lightVolumesTileSize - 1)) / lightVolumesTileSize;
-                        natCmd.DispatchCompute(data.debugLightVolumeCS, data.debugLightVolumeKernel, numTilesX, numTilesY, data.hdCamera.viewCount);
+                        ctx.cmd.DispatchCompute(data.debugLightVolumeCS, data.debugLightVolumeKernel, numTilesX, numTilesY, data.hdCamera.viewCount);
 
                         // Blit this into the camera target
-                        CoreUtils.SetRenderTarget(natCmd, destination);
+                        CoreUtils.SetRenderTarget(ctx.cmd, destination);
                         mpb.SetTexture(HDShaderIDs._BlitTexture, data.debugLightVolumesTexture);
-                        natCmd.DrawProcedural(Matrix4x4.identity, data.debugLightVolumeMaterial, 1, MeshTopology.Triangles, 3, 1, mpb);
+                        ctx.cmd.DrawProcedural(Matrix4x4.identity, data.debugLightVolumeMaterial, 1, MeshTopology.Triangles, 3, 1, mpb);
                     });
             }
         }
@@ -206,46 +205,57 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             Matrix4x4 positionMat = Matrix4x4.Translate(currentLegacyLight.transform.position);
 
-            switch (currentLegacyLight.type)
+            switch (currentHDRLight.ComputeLightType(currentLegacyLight))
             {
-                case LightType.Point:
+                case HDLightType.Point:
                     mpb.SetColor(_ColorShaderID, new Color(0.0f, 0.5f, 0.0f, 1.0f));
                     mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
                     mpb.SetVector(_RangeShaderID, new Vector3(currentLegacyLight.range, currentLegacyLight.range, currentLegacyLight.range));
                     cmd.DrawMesh(DebugShapes.instance.RequestSphereMesh(), positionMat, debugLightVolumeMaterial, 0, 0, mpb);
                     break;
-                case LightType.Spot:
-                    float bottomRadius = Mathf.Tan(currentLegacyLight.spotAngle * Mathf.PI / 360.0f) * currentLegacyLight.range;
-                    mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.5f, 0.0f, 1.0f));
-                    mpb.SetVector(_RangeShaderID, new Vector3(bottomRadius, bottomRadius, currentLegacyLight.range));
-                    mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
-                    cmd.DrawMesh(DebugShapes.instance.RequestConeMesh(), currentLegacyLight.gameObject.transform.localToWorldMatrix, debugLightVolumeMaterial, 0, 0, mpb);
+                case HDLightType.Spot:
+                    switch (currentHDRLight.spotLightShape)
+                    {
+                        case SpotLightShape.Cone:
+                            float bottomRadius = Mathf.Tan(currentLegacyLight.spotAngle * Mathf.PI / 360.0f) * currentLegacyLight.range;
+                            mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.5f, 0.0f, 1.0f));
+                            mpb.SetVector(_RangeShaderID, new Vector3(bottomRadius, bottomRadius, currentLegacyLight.range));
+                            mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
+                            cmd.DrawMesh(DebugShapes.instance.RequestConeMesh(), currentLegacyLight.gameObject.transform.localToWorldMatrix, debugLightVolumeMaterial, 0, 0, mpb);
+                            break;
+                        case SpotLightShape.Box:
+                            mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.5f, 0.0f, 1.0f));
+                            mpb.SetVector(_RangeShaderID, new Vector3(currentHDRLight.shapeWidth, currentHDRLight.shapeHeight, currentLegacyLight.range));
+                            mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, currentLegacyLight.range / 2.0f));
+                            cmd.DrawMesh(DebugShapes.instance.RequestBoxMesh(), currentLegacyLight.gameObject.transform.localToWorldMatrix, debugLightVolumeMaterial, 0, 0, mpb);
+                            break;
+                        case SpotLightShape.Pyramid:
+                            float bottomWidth = Mathf.Tan(currentLegacyLight.spotAngle * Mathf.PI / 360.0f) * currentLegacyLight.range;
+                            mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.5f, 0.0f, 1.0f));
+                            mpb.SetVector(_RangeShaderID, new Vector3(currentHDRLight.aspectRatio * bottomWidth * 2, bottomWidth * 2, currentLegacyLight.range));
+                            mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
+                            cmd.DrawMesh(DebugShapes.instance.RequestPyramidMesh(), currentLegacyLight.gameObject.transform.localToWorldMatrix, debugLightVolumeMaterial, 0, 0, mpb);
+                            break;
+                    }
                     break;
-                case LightType.Box:
-                    mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.5f, 0.0f, 1.0f));
-                    mpb.SetVector(_RangeShaderID, new Vector3(currentLegacyLight.areaSize.x, currentLegacyLight.areaSize.y, currentLegacyLight.range));
-                    mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, currentLegacyLight.range / 2.0f));
-                    cmd.DrawMesh(DebugShapes.instance.RequestBoxMesh(), currentLegacyLight.gameObject.transform.localToWorldMatrix, debugLightVolumeMaterial, 0, 0, mpb);
-                    break;
-                case LightType.Pyramid:
-                    float bottomX = Mathf.Tan(currentLegacyLight.spotAngle * Mathf.PI / 360.0f) * currentLegacyLight.range;
-                    float bottomY = Mathf.Tan(currentLegacyLight.innerSpotAngle * Mathf.PI / 360.0f) * currentLegacyLight.range;
-                    mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.5f, 0.0f, 1.0f));
-                    mpb.SetVector(_RangeShaderID, new Vector3(bottomY * 2, bottomX * 2, currentLegacyLight.range));
-                    mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
-                    cmd.DrawMesh(DebugShapes.instance.RequestPyramidMesh(), currentLegacyLight.gameObject.transform.localToWorldMatrix, debugLightVolumeMaterial, 0, 0, mpb);
-                    break;
-                case LightType.Rectangle:
-                    mpb.SetColor(_ColorShaderID, new Color(0.0f, 1.0f, 1.0f, 1.0f));
-                    mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
-                    mpb.SetVector(_RangeShaderID, new Vector3(currentLegacyLight.range, currentLegacyLight.range, currentLegacyLight.range));
-                    cmd.DrawMesh(DebugShapes.instance.RequestSphereMesh(), positionMat, debugLightVolumeMaterial, 0, 0, mpb);
-                    break;
-                case LightType.Tube:
-                    mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.0f, 0.5f, 1.0f));
-                    mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
-                    mpb.SetVector(_RangeShaderID, new Vector3(currentLegacyLight.range, currentLegacyLight.range, currentLegacyLight.range));
-                    cmd.DrawMesh(DebugShapes.instance.RequestSphereMesh(), positionMat, debugLightVolumeMaterial, 0, 0, mpb);
+                case HDLightType.Area:
+                    switch (currentHDRLight.areaLightShape)
+                    {
+                        case AreaLightShape.Rectangle:
+                            mpb.SetColor(_ColorShaderID, new Color(0.0f, 1.0f, 1.0f, 1.0f));
+                            mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
+                            mpb.SetVector(_RangeShaderID, new Vector3(currentLegacyLight.range, currentLegacyLight.range, currentLegacyLight.range));
+                            cmd.DrawMesh(DebugShapes.instance.RequestSphereMesh(), positionMat, debugLightVolumeMaterial, 0, 0, mpb);
+                            break;
+                        case AreaLightShape.Tube:
+                            mpb.SetColor(_ColorShaderID, new Color(1.0f, 0.0f, 0.5f, 1.0f));
+                            mpb.SetVector(_OffsetShaderID, new Vector3(0, 0, 0));
+                            mpb.SetVector(_RangeShaderID, new Vector3(currentLegacyLight.range, currentLegacyLight.range, currentLegacyLight.range));
+                            cmd.DrawMesh(DebugShapes.instance.RequestSphereMesh(), positionMat, debugLightVolumeMaterial, 0, 0, mpb);
+                            break;
+                        default:
+                            break;
+                    }
                     break;
             }
         }

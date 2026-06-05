@@ -8,16 +8,24 @@ using UnityEditor.SceneManagement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 
 namespace UnityEditor.Rendering.HighDefinition
 {
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
+    [ScriptableRenderPipelineExtension(typeof(HDRenderPipelineAsset))]
     class HDLightingWindowEnvironmentSectionEditor : LightingWindowEnvironmentSection
     {
         class Styles
         {
-            public static readonly GUIStyle inspectorTitle = "IN Title";
+            public static GUIStyle headerStyle;
+            static Styles()
+            {
+                headerStyle = new GUIStyle(EditorStyles.foldoutHeader);
+                headerStyle.fontStyle = FontStyle.Bold;
+                headerStyle.fontSize = 12;
+                headerStyle.margin = new RectOffset(17, 0, 0, 0);
+                headerStyle.padding = new RectOffset(16, 1, 0, 0);
+                headerStyle.fixedHeight = 21;
+            }
         }
 
         class SerializedStaticLightingSky
@@ -26,8 +34,6 @@ namespace UnityEditor.Rendering.HighDefinition
             public SerializedProperty skyUniqueID;
             public SerializedProperty cloudUniqueID;
             public SerializedProperty volumetricCloudsToggle;
-            public SerializedProperty numberOfBounces;
-
             public VolumeProfile volumeProfile
             {
                 get => (serializedObject.targetObject as StaticLightingSky).profile;
@@ -40,7 +46,6 @@ namespace UnityEditor.Rendering.HighDefinition
                 skyUniqueID = serializedObject.FindProperty("m_StaticLightingSkyUniqueID");
                 cloudUniqueID = serializedObject.FindProperty("m_StaticLightingCloudsUniqueID");
                 volumetricCloudsToggle = serializedObject.FindProperty("m_StaticLightingVolumetricClouds");
-                numberOfBounces = serializedObject.FindProperty("bounces");
             }
 
             public void Apply() => serializedObject.ApplyModifiedProperties();
@@ -73,8 +78,6 @@ namespace UnityEditor.Rendering.HighDefinition
             }
         }
 
-        static MethodInfo k_FoldoutTitlebar;
-
         public override void OnEnable()
         {
             m_SerializedActiveSceneLightingSky = new SerializedStaticLightingSky(GetStaticLightingSkyForScene(EditorSceneManager.GetActiveScene()));
@@ -91,19 +94,20 @@ namespace UnityEditor.Rendering.HighDefinition
         void OnActiveSceneChange(Scene current, Scene next)
             => m_SerializedActiveSceneLightingSky = new SerializedStaticLightingSky(GetStaticLightingSkyForScene(next));
 
-        static internal StaticLightingSky GetStaticLightingSkyForScene(Scene scene)
+        StaticLightingSky GetStaticLightingSkyForScene(Scene scene)
         {
             StaticLightingSky result = null;
             foreach (var go in scene.GetRootGameObjects())
             {
-                if (go.TryGetComponent<StaticLightingSky>(out result))
+                result = go.GetComponent<StaticLightingSky>();
+                if (result != null)
                     break;
             }
 
             //Perhaps it is an old scene. Search everywhere
             if (result == null)
             {
-                var candidates = GameObject.FindObjectsByType<StaticLightingSky>(FindObjectsSortMode.InstanceID).Where(sls => sls.gameObject.scene == scene);
+                var candidates = GameObject.FindObjectsOfType<StaticLightingSky>().Where(sls => sls.gameObject.scene == scene);
                 if (candidates.Count() > 0)
                     result = candidates.First();
             }
@@ -145,20 +149,35 @@ namespace UnityEditor.Rendering.HighDefinition
 
         void DrawGUI()
         {
-            if (k_FoldoutTitlebar == null)
-            {
-                var flags = BindingFlags.NonPublic | BindingFlags.Static;
-                Type[] args = new Type[] { typeof(Rect), typeof(GUIContent), typeof(bool), typeof(bool) };
-                k_FoldoutTitlebar = typeof(EditorGUI).GetMethod("FoldoutTitlebar", flags, null, args, null);
-            }
+            Rect mainSeparator = EditorGUILayout.GetControlRect(GUILayout.Height(1));
+            mainSeparator.xMin -= 3;
+            mainSeparator.xMax += 4;
+            EditorGUI.DrawRect(mainSeparator, EditorGUIUtility.isProSkin
+                ? new Color32(26, 26, 26, 255)
+                : new Color32(127, 127, 127, 255));
 
-            var labelRect = GUILayoutUtility.GetRect(GUIContent.none, Styles.inspectorTitle, GUILayout.ExpandWidth(true));
-            var label = EditorGUIUtility.TrTextContent("Environment (HDRP)", "Sky lighting environment for active Scene");
+            Rect line = EditorGUILayout.GetControlRect();
+            line.xMin -= 3;
+            line.xMax += 4;
+            line.y -= 2;
+            line.yMax += 4;
 
-            toggleValue = (bool)k_FoldoutTitlebar.Invoke(null, new object[] { labelRect, label, toggleValue, true });
+            toggleValue = EditorGUI.Foldout(line, toggleValue, EditorGUIUtility.TrTextContent("Environment (HDRP)", "Sky lighting environment for active Scene"), Styles.headerStyle);
+
+            EditorGUI.DrawRect(line, EditorGUIUtility.isProSkin
+                ? new Color(1f, 1f, 1f, 0.03f)
+                : new Color(1f, 1f, 1f, 0.2f));
 
             if (m_ToggleValue)
             {
+                Rect separator = EditorGUILayout.GetControlRect(GUILayout.Height(1));
+                separator.xMin -= 3;
+                separator.xMax += 4;
+                separator.y -= 1;
+                EditorGUI.DrawRect(separator, EditorGUIUtility.isProSkin
+                    ? new Color32(48, 48, 48, 255)
+                    : new Color32(186, 186, 186, 255));
+
                 ++EditorGUI.indentLevel;
 
                 //cannot use SerializeProperty due to logic in the property
@@ -186,12 +205,6 @@ namespace UnityEditor.Rendering.HighDefinition
                 {
                     EditorGUILayout.PropertyField(m_SerializedActiveSceneLightingSky.volumetricCloudsToggle, EditorGUIUtility.TrTextContent("Static Lighting Volumetric Clouds", "Specify if volumetric clouds should be used for static ambient in the referenced profile for active scene."));
                 }
-
-                EditorGUILayout.Space();
-
-                EditorGUILayout.LabelField("Reflection Probes");
-                using (new EditorGUI.IndentLevelScope())
-                    EditorGUILayout.PropertyField(m_SerializedActiveSceneLightingSky.numberOfBounces);
 
                 --EditorGUI.indentLevel;
             }

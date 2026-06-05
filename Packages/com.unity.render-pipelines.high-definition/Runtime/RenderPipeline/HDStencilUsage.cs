@@ -23,13 +23,12 @@ namespace UnityEngine.Rendering.HighDefinition
         // --- Stencil  is cleared after opaque rendering has finished ---
 
         // --- Following bits are used exclusively for what happens after opaque ---
-        WaterExclusion = (1 << 0),    // Prevents water surface from being rendered.
         ExcludeFromTUAndAA = (1 << 1),    // Disable Temporal Upscaling and Antialiasing for certain objects
-        DistortionVectors = (1 << 2), // Distortion pass - reset after distortion pass, shared with SMAA
-        SMAA = (1 << 2),              // Subpixel Morphological Antialiasing
+        DistortionVectors = (1 << 2),    // Distortion pass - reset after distortion pass, shared with SMAA
+        SMAA = (1 << 2),    // Subpixel Morphological Antialiasing
         // Reserved TraceReflectionRay = (1 << 3) for transparent SSR or RTR
-        Refractive = (1 << 4),        // Indicates there's a refractive object
-        WaterSurface = (1 << 5),      // Reserved for water surface usage (If update the value of 'STENCILUSAGE_WATER_SURFACE' in LensFlareCommon.hlsl)
+        WaterSurface = (1 << 4), // Reserved for water surface usage
+        AfterOpaqueReservedBits = 0x38,        // Reserved for future usage
 
         // --- Following are user bits, we don't touch them inside HDRP and is up to the user to handle them ---
         UserBit0 = (1 << 6),

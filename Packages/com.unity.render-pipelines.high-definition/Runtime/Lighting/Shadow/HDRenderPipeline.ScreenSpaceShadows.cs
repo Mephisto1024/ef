@@ -1,6 +1,6 @@
 using System;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -31,8 +31,6 @@ namespace UnityEngine.Rendering.HighDefinition
         // Punctual shadow kernels
         int m_RaytracingPointShadowSample;
         int m_RaytracingSpotShadowSample;
-        int m_RaytracingProjectorPyramidShadowSample;
-        int m_RaytracingProjectorBoxShadowSample;
 
         // Area shadow kernels
         int m_AreaRaytracingShadowPrepassKernel;
@@ -189,9 +187,9 @@ namespace UnityEngine.Rendering.HighDefinition
             // Fetch the shaders
             if (m_RayTracingSupported)
             {
-                m_ScreenSpaceShadowsCS = rayTracingResources.shadowRayTracingCS;
-                m_ScreenSpaceShadowsFilterCS = rayTracingResources.shadowFilterCS;
-                m_ScreenSpaceShadowsRT = rayTracingResources.shadowRayTracingRT;
+                m_ScreenSpaceShadowsCS = m_GlobalSettings.renderPipelineRayTracingResources.shadowRaytracingCS;
+                m_ScreenSpaceShadowsFilterCS = m_GlobalSettings.renderPipelineRayTracingResources.shadowFilterCS;
+                m_ScreenSpaceShadowsRT = m_GlobalSettings.renderPipelineRayTracingResources.shadowRaytracingRT;
 
                 // Directional shadow kernels
                 m_ClearShadowTexture = m_ScreenSpaceShadowsCS.FindKernel("ClearShadowTexture");
@@ -201,9 +199,6 @@ namespace UnityEngine.Rendering.HighDefinition
                 m_RaytracingDirectionalShadowSample = m_ScreenSpaceShadowsCS.FindKernel("RaytracingDirectionalShadowSample");
                 m_RaytracingPointShadowSample = m_ScreenSpaceShadowsCS.FindKernel("RaytracingPointShadowSample");
                 m_RaytracingSpotShadowSample = m_ScreenSpaceShadowsCS.FindKernel("RaytracingSpotShadowSample");
-                m_RaytracingProjectorPyramidShadowSample = m_ScreenSpaceShadowsCS.FindKernel("RaytracingProjectorPyramidShadowSample");
-                m_RaytracingProjectorBoxShadowSample = m_ScreenSpaceShadowsCS.FindKernel("RaytracingProjectorBoxShadowSample");
-
 
                 // Area shadow kernels
                 m_AreaRaytracingShadowPrepassKernel = m_ScreenSpaceShadowsCS.FindKernel("RaytracingAreaShadowPrepass");
@@ -223,41 +218,23 @@ namespace UnityEngine.Rendering.HighDefinition
             // Directional shadow material
             s_ScreenSpaceShadowsMat = CoreUtils.CreateEngineMaterial(screenSpaceShadowsShader);
 
-            switch (m_Asset.currentPlatformRenderPipelineSettings.hdShadowInitParams.punctualShadowFilteringQuality)
+            switch (m_Asset.currentPlatformRenderPipelineSettings.hdShadowInitParams.shadowFilteringQuality)
             {
                 case HDShadowFilteringQuality.Low:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("PUNCTUAL_SHADOW_LOW");
+                    s_ScreenSpaceShadowsMat.EnableKeyword("SHADOW_LOW");
                     break;
                 case HDShadowFilteringQuality.Medium:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("PUNCTUAL_SHADOW_MEDIUM");
+                    s_ScreenSpaceShadowsMat.EnableKeyword("SHADOW_MEDIUM");
                     break;
                 case HDShadowFilteringQuality.High:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("PUNCTUAL_SHADOW_HIGH");
+                    s_ScreenSpaceShadowsMat.EnableKeyword("SHADOW_HIGH");
                     break;
                 default:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("PUNCTUAL_SHADOW_MEDIUM");
+                    s_ScreenSpaceShadowsMat.EnableKeyword("SHADOW_MEDIUM");
                     break;
             }
 
-            switch (m_Asset.currentPlatformRenderPipelineSettings.hdShadowInitParams.directionalShadowFilteringQuality)
-            {
-                case HDShadowFilteringQuality.Low:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("DIRECTIONAL_SHADOW_LOW");
-                    break;
-                case HDShadowFilteringQuality.Medium:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("DIRECTIONAL_SHADOW_MEDIUM");
-                    break;
-                case HDShadowFilteringQuality.High:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("DIRECTIONAL_SHADOW_HIGH");
-                    break;
-                default:
-                    s_ScreenSpaceShadowsMat.EnableKeyword("DIRECTIONAL_SHADOW_MEDIUM");
-                    break;
-            }
-
-            var areaShadowFilteringQuality = (ShaderConfig.s_AreaLights == 0) ? HDAreaShadowFilteringQuality.Medium
-                 : m_Asset.currentPlatformRenderPipelineSettings.hdShadowInitParams.areaShadowFilteringQuality;
-            switch (areaShadowFilteringQuality)
+            switch (m_Asset.currentPlatformRenderPipelineSettings.hdShadowInitParams.areaShadowFilteringQuality)
             {
                 case HDAreaShadowFilteringQuality.Medium:
                     s_ScreenSpaceShadowsMat.EnableKeyword("AREA_SHADOW_MEDIUM");
@@ -282,7 +259,7 @@ namespace UnityEngine.Rendering.HighDefinition
             GraphicsFormat graphicsFormat = (GraphicsFormat)m_Asset.currentPlatformRenderPipelineSettings.hdShadowInitParams.screenSpaceShadowBufferFormat;
             return renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
             {
-                format = graphicsFormat,
+                colorFormat = graphicsFormat,
                 slices = numShadowTextures * TextureXR.slices,
                 dimension = TextureDimension.Tex2DArray,
                 filterMode = FilterMode.Point,
@@ -318,7 +295,7 @@ namespace UnityEngine.Rendering.HighDefinition
             if (!rayTracingSupported || (m_ScreenSpaceShadowChannelSlot <= m_CurrentDebugDisplaySettings.data.screenSpaceShadowIndex))
                 return m_RenderGraph.defaultResources.blackTextureXR;
 
-            using (var builder = renderGraph.AddUnsafePass<ScreenSpaceShadowDebugPassData>("Screen Space Shadows Debug", out var passData, ProfilingSampler.Get(HDProfileId.ScreenSpaceShadowsDebug)))
+            using (var builder = renderGraph.AddRenderPass<ScreenSpaceShadowDebugPassData>("Screen Space Shadows Debug", out var passData, ProfilingSampler.Get(HDProfileId.ScreenSpaceShadowsDebug)))
             {
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -331,28 +308,25 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.debugKernel = m_WriteShadowTextureDebugKernel;
 
                 // TODO: move the debug kernel outside of the ray tracing resources
-                passData.shadowFilter = rayTracingResources.shadowFilterCS;
+                passData.shadowFilter = m_GlobalSettings.renderPipelineRayTracingResources.shadowFilterCS;
 
-                passData.screenSpaceShadowArray = screenSpaceShadowArray;
-                builder.UseTexture(passData.screenSpaceShadowArray, AccessFlags.Read);
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "EvaluateShadowDebug" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                passData.screenSpaceShadowArray = builder.ReadTexture(screenSpaceShadowArray);
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "EvaluateShadowDebug" }));
 
                 builder.SetRenderFunc(
-                    (ScreenSpaceShadowDebugPassData data, UnsafeGraphContext ctx) =>
+                    (ScreenSpaceShadowDebugPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Evaluate the dispatch parameters
                         int shadowTileSize = 8;
                         int numTilesX = (data.texWidth + (shadowTileSize - 1)) / shadowTileSize;
                         int numTilesY = (data.texHeight + (shadowTileSize - 1)) / shadowTileSize;
 
                         // If the screen space shadows we are asked to deliver is available output it to the intermediate texture
-                        natCmd.SetComputeIntParam(data.shadowFilter, HDShaderIDs._DenoisingHistorySlot, data.targetShadow);
-                        natCmd.SetComputeTextureParam(data.shadowFilter, data.debugKernel, HDShaderIDs._ScreenSpaceShadowsTextureRW, data.screenSpaceShadowArray);
-                        natCmd.SetComputeTextureParam(data.shadowFilter, data.debugKernel, HDShaderIDs._DenoiseOutputTextureRW, data.outputBuffer);
-                        natCmd.DispatchCompute(data.shadowFilter, data.debugKernel, numTilesX, numTilesY, data.viewCount);
+                        ctx.cmd.SetComputeIntParam(data.shadowFilter, HDShaderIDs._DenoisingHistorySlot, data.targetShadow);
+                        ctx.cmd.SetComputeTextureParam(data.shadowFilter, data.debugKernel, HDShaderIDs._ScreenSpaceShadowsTextureRW, data.screenSpaceShadowArray);
+                        ctx.cmd.SetComputeTextureParam(data.shadowFilter, data.debugKernel, HDShaderIDs._DenoiseOutputTextureRW, data.outputBuffer);
+                        ctx.cmd.DispatchCompute(data.shadowFilter, data.debugKernel, numTilesX, numTilesY, data.viewCount);
                     });
                 return passData.outputBuffer;
             }
@@ -384,7 +358,7 @@ namespace UnityEngine.Rendering.HighDefinition
         void WriteScreenSpaceShadow(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle shadowTexture, TextureHandle screenSpaceShadowArray, int shadowIndex, ScreenSpaceShadowType shadowType)
         {
             // Write the result texture to the screen space shadow buffer
-            using (var builder = renderGraph.AddUnsafePass<WriteScreenSpaceShadowPassData>("Write Screen Space Shadows", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingWriteShadow)))
+            using (var builder = renderGraph.AddRenderPass<WriteScreenSpaceShadowPassData>("Write Screen Space Shadows", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingWriteShadow)))
             {
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -423,32 +397,29 @@ namespace UnityEngine.Rendering.HighDefinition
                 // Other parameters
                 passData.screenSpaceShadowCS = m_ScreenSpaceShadowsCS;
 
-                passData.inputShadowBuffer = shadowTexture;
-                builder.UseTexture(passData.inputShadowBuffer, AccessFlags.Read);
-                passData.outputShadowArrayBuffer = screenSpaceShadowArray;
-                builder.UseTexture(passData.outputShadowArrayBuffer, AccessFlags.ReadWrite);
+                passData.inputShadowBuffer = builder.ReadTexture(shadowTexture);
+                passData.outputShadowArrayBuffer = builder.ReadWriteTexture(screenSpaceShadowArray);
 
                 builder.SetRenderFunc(
-                    (WriteScreenSpaceShadowPassData data, UnsafeGraphContext ctx) =>
+                    (WriteScreenSpaceShadowPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Evaluate the dispatch parameters
                         int shadowTileSize = 8;
                         int numTilesX = (data.texWidth + (shadowTileSize - 1)) / shadowTileSize;
                         int numTilesY = (data.texHeight + (shadowTileSize - 1)) / shadowTileSize;
 
                         // Bind the input data
-                        natCmd.SetComputeIntParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingShadowSlot, data.shadowSlot / 4);
-                        natCmd.SetComputeVectorParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingChannelMask, data.shadowChannelMask);
-                        natCmd.SetComputeVectorParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingChannelMask0, data.shadowChannelMask0);
-                        natCmd.SetComputeVectorParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingChannelMask1, data.shadowChannelMask1);
-                        natCmd.SetComputeTextureParam(data.screenSpaceShadowCS, data.shadowKernel, HDShaderIDs._RaytracedShadowIntegration, data.inputShadowBuffer);
+                        ctx.cmd.SetComputeIntParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingShadowSlot, data.shadowSlot / 4);
+                        ctx.cmd.SetComputeVectorParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingChannelMask, data.shadowChannelMask);
+                        ctx.cmd.SetComputeVectorParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingChannelMask0, data.shadowChannelMask0);
+                        ctx.cmd.SetComputeVectorParam(data.screenSpaceShadowCS, HDShaderIDs._RaytracingChannelMask1, data.shadowChannelMask1);
+                        ctx.cmd.SetComputeTextureParam(data.screenSpaceShadowCS, data.shadowKernel, HDShaderIDs._RaytracedShadowIntegration, data.inputShadowBuffer);
 
                         // Bind the output texture
-                        natCmd.SetComputeTextureParam(data.screenSpaceShadowCS, data.shadowKernel, HDShaderIDs._ScreenSpaceShadowsTextureRW, data.outputShadowArrayBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.screenSpaceShadowCS, data.shadowKernel, HDShaderIDs._ScreenSpaceShadowsTextureRW, data.outputShadowArrayBuffer);
 
                         //Do our copy
-                        natCmd.DispatchCompute(data.screenSpaceShadowCS, data.shadowKernel, numTilesX, numTilesY, data.viewCount);
+                        ctx.cmd.DispatchCompute(data.screenSpaceShadowCS, data.shadowKernel, numTilesX, numTilesY, data.viewCount);
                     });
             }
         }
@@ -478,8 +449,6 @@ namespace UnityEngine.Rendering.HighDefinition
                     break;
                     case GPULightType.Point:
                     case GPULightType.Spot:
-                    case GPULightType.ProjectorPyramid:
-                    case GPULightType.ProjectorBox:
                     {
                         RenderPunctualScreenSpaceShadow(renderGraph, hdCamera, currentLight, currentAdditionalLightData, m_CurrentScreenSpaceShadowData[lightIdx].lightDataIndex,
                             prepassOutput, depthBuffer, normalBuffer, motionVectorsBuffer, historyValidityBuffer, rayCountTexture, screenSpaceShadowArray);

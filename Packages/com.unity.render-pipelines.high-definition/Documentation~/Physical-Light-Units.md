@@ -1,8 +1,8 @@
-# Understand physical light units
+# Physical light units
 
 HDRP uses Physical Light Units (PLU) for its lighting. These units are based on real-life light measurements, like those you see on light bulb packaging or a photographic light meter. Note that for lights to behave properly when using PLU, you need to respect HDRP unit convention (1 Unity unit equals 1 meter).
 
-![A room with lights.](Images/HDRPTemplate-Banner1.png)
+![](Images/HDRPTemplate-Banner1.png)
 
 ## Units
 
@@ -30,7 +30,7 @@ The unit of [illuminance](Glossary.md#Illuminance). A light source that emits 1 
 
 #### Nits (candela per square meter):
 
-The unit of luminance. Describes the surface power of a visible light source. When you use this unit, the overall power of a light source depends the size of the light source, meaning the illumination level of a Scene changes depending on the size of the light source.  Highlights that a light source produces conserve their intensity regardless of the size of the surface.
+The unit of luminance. Describes the surface power of a visible light source. When you use this unit, the overall power of a light source depends the size of the light source, meaning the the illumination level of a Scene changes depending on the size of the light source.  Highlights that a light source produces conserve their intensity regardless of the size of the surface.
 
 A light source that emits 1 candela of [luminous intensity](Glossary.md#LuminousIntensity) onto an area of 1 square meter has a luminance of 1 candela per square meter.
 
@@ -88,4 +88,4 @@ For more examples of indoor light levels see Archtoolbox’s web page on [Recomm
 
 The following cheat sheet contains the color temperature values and light intensities of common real-world [Light](Light-Component.md) sources. It also contains [Exposure](Override-Exposure.md) values for different illumination scenarios.
 
-![Unity Lighting & Exposure Cheat Sheet. A visual guide showing typical lighting values across color temperature, directional light intensities, local light intensities, and exposure value. Color temperature (Kelvin): Ranges from 1,900 K (candle) to 15,000 K (blue sky), with intermediate examples like incandescent (3,000 K), fluorescent (4,000 K), sunlight at noon (5,500 K), cloudy (6,500 K), and shade (8,000 K). Directional light intensities (Lux): Ranges from 0.001 lx (dark night) to 130,000 lx (sun with PBS sky), with intermediate examples for moonlight (0.5 lx), low sun (5,000 lx), cloudy (20,000 lx), and noon sun (100,000 lx). Local light intensities (Lumen): From 12 lm (candlelight) to 10,000 lm (exterior light), with examples like decorative lights (300 lm) and interior lights (1,000 lm). Exposure value (EV): From -2 EV (moonless) to 14 EV (sunlit), with stages like moonlit (1 EV), interior (4 EV), low sun (7 EV), and cloudy (10 EV).](Images/LightCheatSheet.png)
+![](Images/LightCheatSheet.png)

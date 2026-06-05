@@ -49,16 +49,17 @@ namespace UnityEngine.Rendering.HighDefinition
         readonly int cookieAtlasLastValidMip;
         readonly GraphicsFormat cookieFormat;
 
-        public LightCookieManager(HDRenderPipelineAsset hdAsset, HDRenderPipeline renderPipeline, int maxCacheSize)
+        public LightCookieManager(HDRenderPipelineAsset hdAsset, int maxCacheSize)
         {
             // Keep track of the render pipeline asset
             m_RenderPipelineAsset = hdAsset;
+            var hdResources = HDRenderPipelineGlobalSettings.instance.renderPipelineResources;
 
             // Create the texture cookie cache that we shall be using for the area lights
             GlobalLightLoopSettings gLightLoopSettings = hdAsset.currentPlatformRenderPipelineSettings.lightLoopSettings;
 
             // Also make sure to create the engine material that is used for the filtering
-            m_MaterialFilterAreaLights = CoreUtils.CreateEngineMaterial(renderPipeline.runtimeShaders.filterAreaLightCookiesPS);
+            m_MaterialFilterAreaLights = CoreUtils.CreateEngineMaterial(hdResources.shaders.filterAreaLightCookiesPS);
 
             int cookieAtlasSize = (int)gLightLoopSettings.cookieAtlasSize;
             cookieFormat = (GraphicsFormat)gLightLoopSettings.cookieFormat;
@@ -156,7 +157,7 @@ namespace UnityEngine.Rendering.HighDefinition
             int sourceHeight = m_CookieAtlas.AtlasTexture.rt.height;
             int viewportWidth = finalWidth;// source.width;
             int viewportHeight = finalHeight;// source.height;
-            int mipMapCount = CoreUtils.GetMipCount(Mathf.Max(source.width, source.height));
+            int mipMapCount = 1 + Mathf.FloorToInt(Mathf.Log(Mathf.Max(source.width, source.height), 2));
 
             ReserveTempTextureIfNeeded(cmd, mipMapCount);
 

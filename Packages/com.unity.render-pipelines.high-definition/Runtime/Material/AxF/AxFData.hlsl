@@ -32,7 +32,7 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Sampling/SampleUVMapping.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/BuiltinUtilities.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/MaterialUtilities.hlsl"
-#if !defined(SHADER_STAGE_RAY_TRACING) || defined (PATH_TRACING_CLUSTERED_DECALS)
+#ifndef SHADER_STAGE_RAY_TRACING
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Decal/DecalUtilities.hlsl"
 #endif
 
@@ -535,7 +535,7 @@ void SetFlakesSurfaceData(TextureUVMapping uvMapping, inout SurfaceData surfaceD
 #endif
 }
 
-#if !defined(SHADER_STAGE_RAY_TRACING) || defined (PATH_TRACING_CLUSTERED_DECALS)
+#ifndef SHADER_STAGE_RAY_TRACING
 
 void ApplyDecalToSurfaceData(DecalSurfaceData decalSurfaceData, float3 vtxNormal, inout SurfaceData surfaceData
 #ifdef DECAL_SURFACE_GRADIENT
@@ -589,7 +589,7 @@ void ApplyDecalToSurfaceData(DecalSurfaceData decalSurfaceData, float3 vtxNormal
 #endif
 }
 
-#endif //...#if !defined(SHADER_STAGE_RAY_TRACING) || defined (PATH_TRACING_CLUSTERED_DECALS)
+#endif //...#ifndef SHADER_STAGE_RAY_TRACING
 
 
 void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs posInput, out SurfaceData surfaceData, out BuiltinData builtinData RAY_TRACING_OPTIONAL_PARAMETERS)
@@ -616,14 +616,7 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
     surfaceData.viewWS = V;
 
     float3 normalTS = float3(0.0, 0.0, 0.0);
-
-    float alpha = 1.0f;
-#ifdef DEBUG_DISPLAY
-    if (_DebugMipMapMode == DEBUGMIPMAPMODE_NONE)
-#endif
-    {
-        alpha = AXF_SAMPLE_SMP_TEXTURE2D(_SVBRDF_AlphaMap, sampler_SVBRDF_AlphaMap, uvMapping).x;
-    }
+    float alpha = AXF_SAMPLE_SMP_TEXTURE2D(_SVBRDF_AlphaMap, sampler_SVBRDF_AlphaMap, uvMapping).x;
 
 #ifdef _ALPHATEST_ON
     float alphaCutoff = _AlphaCutoff;
@@ -780,16 +773,14 @@ void GetSurfaceAndBuiltinData(FragInputs input, float3 V, inout PositionInputs p
 #endif
 #endif
 
-#if defined(DEBUG_DISPLAY)
-#if !defined(SHADER_STAGE_RAY_TRACING)
-    // Mipmap mode debugging isn't supported with ray tracing as it relies on derivatives
+#if defined(DEBUG_DISPLAY) && !defined(SHADER_STAGE_RAY_TRACING)
     if (_DebugMipMapMode != DEBUGMIPMAPMODE_NONE)
     {
-        surfaceData.diffuseColor = GET_TEXTURE_STREAMING_DEBUG(posInput.positionSS, input.texCoord0);
+        // Not debug streaming information with AxF (this should never be stream)
+        surfaceData.diffuseColor = float3(0.0, 0.0, 0.0);
     }
-#endif
 
-    // We need to call ApplyDebugToSurfaceData after filling the surfaceData and before filling builtinData
+    // We need to call ApplyDebugToSurfaceData after filling the surfarcedata and before filling builtinData
     // as it can modify attribute use for static lighting
     ApplyDebugToSurfaceData(input.tangentToWorld, surfaceData);
 #endif

@@ -1,7 +1,7 @@
 using Unity.Collections;
 using System.Collections.Generic;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -53,10 +53,10 @@ namespace UnityEngine.Rendering.HighDefinition
         // Given that the requests are guaranteed to be executed in order we use a queue to store it
         Queue<AsyncGPUReadbackRequest> m_RayCountReadbacks = new Queue<AsyncGPUReadbackRequest>();
 
-        public void Init(HDRPRayTracingResources rayTracingResources)
+        public void Init(HDRenderPipelineRayTracingResources rayTracingResources)
         {
             // Keep track of the compute shader we are going to use
-            m_RayCountCS = rayTracingResources.countTracedRaysCS;
+            m_RayCountCS = rayTracingResources.countTracedRays;
 
             // We only require 3 buffers (this supports a maximal size of 8192x8192)
             m_ReducedRayCountBufferOutput = new ComputeBuffer((int)RayCountValues.Count + 1, sizeof(uint));
@@ -91,7 +91,7 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             return renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
             {
-                format = GraphicsFormat.R16_UInt,
+                colorFormat = GraphicsFormat.R16_UInt,
                 slices = TextureXR.slices * (int)RayCountValues.Count,
                 dimension = TextureDimension.Tex2DArray,
                 clearBuffer = true,
@@ -106,8 +106,8 @@ namespace UnityEngine.Rendering.HighDefinition
             public TextureHandle depthBuffer;
             public TextureHandle rayCountTexture;
 
-            public BufferHandle reducedRayCountBuffer0;
-            public BufferHandle reducedRayCountBuffer1;
+            public ComputeBufferHandle reducedRayCountBuffer0;
+            public ComputeBufferHandle reducedRayCountBuffer1;
 
             public ComputeBuffer reducedRayCountBufferOutput;
 
@@ -120,17 +120,14 @@ namespace UnityEngine.Rendering.HighDefinition
             public Queue<AsyncGPUReadbackRequest> rayCountReadbacks;
         }
 
-        void PrepareEvaluateRayCountPassData(in IUnsafeRenderGraphBuilder builder, EvaluateRayCountPassData data, HDCamera hdCamera, TextureHandle colorBuffer, TextureHandle depthBuffer, TextureHandle rayCountTexture)
+        void PrepareEvaluateRayCountPassData(in RenderGraphBuilder builder, EvaluateRayCountPassData data, HDCamera hdCamera, TextureHandle colorBuffer, TextureHandle depthBuffer, TextureHandle rayCountTexture)
         {
-            data.colorBuffer = colorBuffer;
-            builder.SetRenderAttachment(colorBuffer, 0);
-            data.depthBuffer = depthBuffer;
-            builder.SetRenderAttachmentDepth(depthBuffer, AccessFlags.ReadWrite);
-            data.rayCountTexture = rayCountTexture;
-            builder.UseTexture(data.rayCountTexture, AccessFlags.Read);
+            data.colorBuffer = builder.UseColorBuffer(colorBuffer, 0);
+            data.depthBuffer = builder.UseDepthBuffer(depthBuffer, DepthAccess.ReadWrite);
+            data.rayCountTexture = builder.ReadTexture(rayCountTexture);
 
-            data.reducedRayCountBuffer0 = builder.CreateTransientBuffer(new BufferDesc((int)RayCountValues.Count * 256 * 256, sizeof(uint)));
-            data.reducedRayCountBuffer1 = builder.CreateTransientBuffer(new BufferDesc((int)RayCountValues.Count * 32 * 32, sizeof(uint)));
+            data.reducedRayCountBuffer0 = builder.CreateTransientComputeBuffer(new ComputeBufferDesc((int)RayCountValues.Count * 256 * 256, sizeof(uint)));
+            data.reducedRayCountBuffer1 = builder.CreateTransientComputeBuffer(new ComputeBufferDesc((int)RayCountValues.Count * 32 * 32, sizeof(uint)));
             data.reducedRayCountBufferOutput = m_ReducedRayCountBufferOutput;
 
             data.rayCountCS = m_RayCountCS;
@@ -146,12 +143,12 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             if (m_IsActive)
             {
-                using (var builder = renderGraph.AddUnsafePass<EvaluateRayCountPassData>("RenderRayCountOverlay", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingDebugOverlay)))
+                using (var builder = renderGraph.AddRenderPass<EvaluateRayCountPassData>("RenderRayCountOverlay", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingDebugOverlay)))
                 {
                     PrepareEvaluateRayCountPassData(builder, passData, hdCamera, colorBuffer, depthBuffer, rayCountTexture);
 
                     builder.SetRenderFunc(
-                        (EvaluateRayCountPassData data, UnsafeGraphContext ctx) =>
+                        (EvaluateRayCountPassData data, RenderGraphContext ctx) =>
                         {
                             // Get the size of the viewport to process
                             int currentWidth = data.width;

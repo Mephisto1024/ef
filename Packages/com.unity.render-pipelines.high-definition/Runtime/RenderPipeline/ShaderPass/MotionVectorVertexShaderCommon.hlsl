@@ -107,7 +107,7 @@ void MotionVectorPositionZBias(VaryingsToPS input)
 #endif
 }
 
-VaryingsType MotionVectorVS_Internal(VaryingsType varyingsType, AttributesMesh inputMesh, AttributesPass inputPass
+PackedVaryingsType MotionVectorVS(VaryingsType varyingsType, AttributesMesh inputMesh, AttributesPass inputPass
 #ifdef HAVE_VFX_MODIFICATION
     , AttributesElement inputElement
 #endif
@@ -277,20 +277,7 @@ VaryingsType MotionVectorVS_Internal(VaryingsType varyingsType, AttributesMesh i
 #endif
     }
 
-    return varyingsType;
-}
-
-PackedVaryingsType MotionVectorVS(VaryingsType varyingsType, AttributesMesh inputMesh, AttributesPass inputPass
-#ifdef HAVE_VFX_MODIFICATION
-    , AttributesElement inputElement
-#endif
-)
-{
-    return PackVaryingsType(MotionVectorVS_Internal(varyingsType, inputMesh, inputPass
-#ifdef HAVE_VFX_MODIFICATION
-    , inputElement
-#endif
-    ));
+    return PackVaryingsType(varyingsType);
 }
 
 #if defined(TESSELLATION_ON)

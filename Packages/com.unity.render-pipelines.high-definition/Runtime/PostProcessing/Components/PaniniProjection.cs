@@ -5,9 +5,8 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// A volume component that holds settings for the Panini Projection effect.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Post-processing/Panini Projection")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Post-Processing-Panini-Projection")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Post-processing/Panini Projection", typeof(HDRenderPipeline))]
+    [HDRPHelpURLAttribute("Post-Processing-Panini-Projection")]
     public sealed class PaniniProjection : VolumeComponent, IPostProcessComponent
     {
         /// <summary>

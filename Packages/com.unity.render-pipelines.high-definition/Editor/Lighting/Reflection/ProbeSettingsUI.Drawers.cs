@@ -13,7 +13,6 @@ namespace UnityEditor.Rendering.HighDefinition
         )
         {
             const ProbeSettingsFields lighting = ProbeSettingsFields.lightingLightLayer
-                | ProbeSettingsFields.importance
                 | ProbeSettingsFields.lightingMultiplier
                 | ProbeSettingsFields.lightingWeight
                 | ProbeSettingsFields.lightingFadeDistance;
@@ -35,13 +34,10 @@ namespace UnityEditor.Rendering.HighDefinition
             {
                 using (new EditorGUI.DisabledScope(!hd.currentPlatformRenderPipelineSettings.supportLightLayers))
                 {
-                    PropertyFieldWithoutToggle(ProbeSettingsFields.lightingLightLayer, serialized.lightingLightLayer, EditorGUIUtility.TrTextContent("Rendering Layer Mask", "This Reflection Probe only affects Renderers with a matching Rendering Layer Mask.\nThis is only available when Light Layers are enabled."), displayedFields.probe,
+                    PropertyFieldWithoutToggle(ProbeSettingsFields.lightingLightLayer, serialized.lightingLightLayer, EditorGUIUtility.TrTextContent("Light Layer", "Specifies the Light Layer the Reflection Probe uses to capture its view of the Scene. The Probe only uses Lights on the Light Layer you specify."), displayedFields.probe,
                         (property, label) => EditorGUILayout.PropertyField(property, label)
                     );
                 }
-                PropertyFieldWithoutToggle(ProbeSettingsFields.importance, serialized.importance, EditorGUIUtility.TrTextContent("Importance", "When reflection probes overlap, Unity uses Importance to determine which probe should take priority."), displayedFields.probe);
-                if (serialized.importance.intValue < 0 || serialized.importance.intValue > 32767)
-                    serialized.importance.intValue = Mathf.Clamp(serialized.importance.intValue, 0, 32767);
                 PropertyFieldWithoutToggle(ProbeSettingsFields.lightingMultiplier, serialized.lightingMultiplier, EditorGUIUtility.TrTextContent("Multiplier", "Sets the multiplier value that reflective Materials apply to the results from the Reflection Probe."), displayedFields.probe);
                 PropertyFieldWithoutToggle(ProbeSettingsFields.lightingWeight, serialized.lightingWeight, EditorGUIUtility.TrTextContent("Weight", "Sets the weight of this Reflection Probe. When multiple Probes both affect the same area of a reflective Material, the Material uses the Weight of each Probe to determine their contribution to the reflective effect."), displayedFields.probe);
                 PropertyFieldWithoutToggle(ProbeSettingsFields.lightingFadeDistance, serialized.lightingFadeDistance, EditorGUIUtility.TrTextContent("Fade Distance", "Sets the distance from the camera at which reflections smoothly fadeout before HDRP cuts them completely."), displayedFields.probe);
@@ -72,6 +68,7 @@ namespace UnityEditor.Rendering.HighDefinition
                     (p, l) =>
                     {
                         EditorGUILayout.PropertyField(p, l);
+                        HDProbeUI.Drawer_ToolBarButton(HDProbeUI.ToolBar.CapturePosition, owner, GUILayout.Width(28f), GUILayout.MinHeight(22f));
                     }
                 );
                 PropertyFieldWithoutToggle(ProbeSettingsFields.proxyCaptureRotationProxySpace, serialized.proxyCaptureRotationProxySpace, EditorGUIUtility.TrTextContent("Capture Rotation", "Sets the rotation of the capture point relative to the Transform Rotation."), displayedFields.probe);
@@ -79,6 +76,7 @@ namespace UnityEditor.Rendering.HighDefinition
                     (p, l) =>
                     {
                         EditorGUILayout.PropertyField(p, l);
+                        HDProbeUI.Drawer_ToolBarButton(HDProbeUI.ToolBar.MirrorPosition, owner, GUILayout.Width(28f), GUILayout.MinHeight(22f));
                     }
                 );
             }

@@ -7,10 +7,10 @@
 #define DWORD_PER_TILE 16 // See dwordsPerTile in LightLoop.cs, we have roomm for 31 lights and a number of light value all store on 16 bit (ushort)
 
 // Depending if we are in ray tracing or not we need to use a different set of environement data
-#if defined(WORLD_ENVIRONMENT_DATA) || defined(SHADER_STAGE_RAY_TRACING)
-#define PLANAR_CAPTURE_VP _PlanarCaptureVPWL
-#define PLANAR_SCALE_OFFSET _PlanarScaleOffsetWL
-#define CUBE_SCALE_OFFSET _CubeScaleOffsetWL
+#if defined(RAY_TRACING_ENVIRONMENT_DATA) || defined(SHADER_STAGE_RAY_TRACING)
+#define PLANAR_CAPTURE_VP _PlanarCaptureVPRT
+#define PLANAR_SCALE_OFFSET _PlanarScaleOffsetRT
+#define CUBE_SCALE_OFFSET _CubeScaleOffsetRT
 #else
 #define PLANAR_CAPTURE_VP _PlanarCaptureVP
 #define PLANAR_SCALE_OFFSET _PlanarScaleOffset
@@ -37,6 +37,7 @@ struct LightLoopContext
     uint contactShadow;         // a bit mask of 24 bits that tell if the pixel is in a contact shadow or not
     real contactShadowFade;     // combined fade factor of all contact shadows
     SHADOW_TYPE shadowValue;    // Stores the value of the cascade shadow map
+    real splineVisibility;      // Stores the value of the cascade shadow map (unbiased for splines)
 };
 
 // LightLoopOutput is the output of the LightLoop fuction call.
@@ -128,25 +129,6 @@ EnvLightData InitDefaultRefractionEnvLightData(int envIndex)
 bool IsEnvIndexCubemap(int index)   { return index >= 0; }
 bool IsEnvIndexTexture2D(int index) { return index < 0; }
 
-float EdgeSampleFade(float2 positionNDC, float2 samplePositionNDC, float amplitude = 100.0f)
-{
-    float2 ndc = samplePositionNDC;
-    float2 rcoords = abs(saturate(ndc.xy) * 2.0 - 1.0);
-
-    // When the object normal is not aligned with the reflection plane, the reflected ray might deviate too much and go out
-    // of the reflection frustum. So we apply blending when the reflection sample coords are on the edges of the texture
-    // These "edges" depend on the screen space coordinates of the pixel, because it is expected that a pixel on the
-    // edge of the screen will sample on the edge of the texture
-
-    // Blending factors taking the above into account
-    bool2 blend = (positionNDC < ndc.xy) ^ (ndc.xy < 0.5);
-    float2 alphas = saturate(amplitude * abs(ndc.xy - positionNDC));
-    alphas = float2(Smoothstep01(alphas.x), Smoothstep01(alphas.y));
-
-    float2 weights = lerp(1.0, saturate(2.0 - 2.0 * rcoords), blend * alphas);
-    return weights.x * weights.y;
-}
-
 // Note: index is whatever the lighting architecture want, it can contain information like in which texture to sample (in case we have a compressed BC6H texture and an uncompressed for real time reflection ?)
 // EnvIndex can also be use to fetch in another array of struct (to  atlas information etc...).
 // Cubemap      : texCoord = direction vector
@@ -175,10 +157,28 @@ float4 SampleEnv(LightLoopContext lightLoopContext, int index, float3 texCoord, 
             float2 atlasCoords = GetReflectionAtlasCoordsPlanar(PLANAR_SCALE_OFFSET[index], ndc.xy, lod);
 
             color.a = all(abs(samplePosCS.xyz) < samplePosCS.w) ? 1.0 : 0.0;
+
             if (color.a > 0.0)
             {
                 color.rgb = SAMPLE_TEXTURE2D_ARRAY_LOD(_ReflectionAtlas, s_trilinear_clamp_sampler, atlasCoords, sliceIdx, lod).rgb;
-                color.a *= EdgeSampleFade(positionNDC, ndc.xy);
+
+                // Controls the blending on the edges of the screen
+                const float amplitude = 100.0;
+
+                float2 rcoords = abs(saturate(ndc.xy) * 2.0 - 1.0);
+
+                // When the object normal is not aligned with the reflection plane, the reflected ray might deviate too much and go out
+                // of the reflection frustum. So we apply blending when the reflection sample coords are on the edges of the texture
+                // These "edges" depend on the screen space coordinates of the pixel, because it is expected that a pixel on the
+                // edge of the screen will sample on the edge of the texture
+
+                // Blending factors taking the above into account
+                bool2 blend = (positionNDC < ndc.xy) ^ (ndc.xy < 0.5);
+                float2 alphas = saturate(amplitude * abs(ndc.xy - positionNDC));
+                alphas = float2(Smoothstep01(alphas.x), Smoothstep01(alphas.y));
+
+                float2 weights = lerp(1.0, saturate(2.0 - 2.0 * rcoords), blend * alphas);
+                color.a *= weights.x * weights.y;
             }
         }
         else if (cacheType == ENVCACHETYPE_CUBEMAP)
@@ -317,23 +317,9 @@ uint FetchIndex(uint lightStart, uint lightOffset)
 
 #elif defined(USE_BIG_TILE_LIGHTLIST)
 
-// The "big tile" list contains the number of objects contained within the tile followed by the
-// list of object indices. Note that while objects are already sorted by type, we don't know the
-// number of each type of objects (e.g. lights), so we should remember to break out of the loop.
-// Each light indices are encoded into 16 bits.
-void GetBigTileLightCountAndStart(uint tileIndex, out uint lightCount, out uint start)
-{
-    start = tileIndex;
-    lightCount = g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE * tileIndex / 2] & 0xFFFF;
-    // On Metal for unknow reasons it seems we have bad value sometimes causing freeze / crash. This min here prevent it.
-    lightCount = min(lightCount, MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE);
-}
-
 uint FetchIndex(uint lightStart, uint lightOffset)
 {
-    const uint lightOffsetPlusOne = lightOffset + 1; // Add +1 as first slot is reserved to store number of light
-    // Light index are store on 16bit
-    return (g_vBigTileLightList[MAX_NR_BIG_TILE_LIGHTS_PLUS_ONE * lightStart / 2 + (lightOffsetPlusOne >> 1)] >> ((lightOffsetPlusOne & 1) * 16)) & 0xffff;
+    return g_vBigTileLightList[lightStart + lightOffset];
 }
 
 #else

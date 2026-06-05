@@ -18,20 +18,16 @@ namespace UnityEditor.VFX.HDRP
             NormalBased
         }
 
-        [SerializeField, VFXSetting(VFXSettingAttribute.VisibleFlags.Default), Tooltip("How the distortion is handled")]
+        [SerializeField, VFXSetting(VFXSettingAttribute.VisibleFlags.All), Tooltip("How the distortion is handled")]
         protected DistortionMode distortionMode = DistortionMode.ScreenSpace;
 
-        [SerializeField, VFXSetting(VFXSettingAttribute.VisibleFlags.Default), Tooltip("Whether Distortion scales with the distance")]
+        [SerializeField, VFXSetting(VFXSettingAttribute.VisibleFlags.All), Tooltip("Whether Distortion scales with the distance")]
         protected bool scaleByDistance = true;
 
-        public sealed override bool CanBeCompiled()
+        public override sealed bool CanBeCompiled()
         {
             return (VFXLibrary.currentSRPBinder is VFXHDRPBinder) && base.CanBeCompiled();
         }
-
-        public sealed override bool supportsUV => true;
-
-        protected sealed override bool hasAnyMap => true;
 
         protected override IEnumerable<string> filteredOutSettings
         {
@@ -40,7 +36,6 @@ namespace UnityEditor.VFX.HDRP
                 foreach (var setting in base.filteredOutSettings)
                     yield return setting;
 
-                yield return "useBaseColorMap";
                 yield return "colorMapping";
                 yield return "blendMode";
                 yield return "castShadows";
@@ -152,33 +147,6 @@ namespace UnityEditor.VFX.HDRP
 
                 if (scaleByDistance)
                     yield return "DISTORTION_SCALE_BY_DISTANCE";
-            }
-        }
-
-        public override IEnumerable<VFXAttributeInfo> attributes
-        {
-            get
-            {
-                yield return new VFXAttributeInfo(VFXAttribute.Position, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.Alpha, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.Alive, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.AxisX, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.AxisY, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.AxisZ, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.AngleX, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.AngleY, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.AngleZ, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.PivotX, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.PivotY, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.PivotZ, VFXAttributeMode.Read);
-
-                yield return new VFXAttributeInfo(VFXAttribute.Size, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.ScaleX, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.ScaleY, VFXAttributeMode.Read);
-                yield return new VFXAttributeInfo(VFXAttribute.ScaleZ, VFXAttributeMode.Read);
-
-                foreach (var attribute in flipbookAttributes)
-                    yield return attribute;
             }
         }
 

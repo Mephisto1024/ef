@@ -6,10 +6,8 @@ namespace UnityEngine.Rendering.HighDefinition
     /// Recursive Rendering Volume Component.
     /// This component setups recursive rendering.
     /// </summary>
-    [Serializable, VolumeComponentMenu("Ray Tracing/Recursive Rendering")]
-    [SupportedOnRenderPipeline(typeof(HDRenderPipelineAsset))]
-    [HDRPHelpURL("Ray-Tracing-Recursive-Rendering")]
-    [DisplayInfo(name = "Recursive Rendering")]
+    [Serializable, VolumeComponentMenuForRenderPipeline("Ray Tracing/Recursive Rendering (Preview)", typeof(HDRenderPipeline))]
+    [HDRPHelpURLAttribute("Ray-Tracing-Recursive-Rendering")]
     public sealed class RecursiveRendering : VolumeComponent
     {
         /// <summary>
@@ -61,5 +59,13 @@ namespace UnityEngine.Rendering.HighDefinition
         [Tooltip("Controls the dimmer applied to the ambient and legacy light probes.")]
         [AdditionalProperty]
         public ClampedFloatParameter ambientProbeDimmer = new ClampedFloatParameter(1.0f, 0.0f, 1.0f);
+
+        /// <summary>
+        /// Default constructor for the recursive rendering volume component.
+        /// </summary>
+        public RecursiveRendering()
+        {
+            displayName = "Recursive Rendering (Preview)";
+        }
     }
 }

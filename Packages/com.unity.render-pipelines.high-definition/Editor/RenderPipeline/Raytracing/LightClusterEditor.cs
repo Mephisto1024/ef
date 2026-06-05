@@ -10,15 +10,13 @@ namespace UnityEditor.Rendering.HighDefinition
     {
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.RayTracing);
-
             HDRenderPipelineAsset currentAsset = HDRenderPipeline.currentAsset;
             bool notSupported = currentAsset != null && !currentAsset.currentPlatformRenderPipelineSettings.supportRayTracing;
             if (notSupported)
             {
                 EditorGUILayout.Space();
                 HDEditorUtils.QualitySettingsHelpBox(HDRenderPipelineUI.Styles.rayTracingUnsupportedMessage,
-                    MessageType.Warning, HDRenderPipelineUI.ExpandableGroup.Rendering,
+                    MessageType.Warning, HDRenderPipelineUI.Expandable.Rendering,
                     "m_RenderPipelineSettings.supportRayTracing");
             }
             using var disableScope = new EditorGUI.DisabledScope(notSupported);

@@ -1,6 +1,6 @@
 using System;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -26,7 +26,7 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             return renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
             {
-                format = GraphicsFormat.R8_SNorm,
+                colorFormat = GraphicsFormat.R8_SNorm,
                 dimension = TextureXR.dimension,
                 enableRandomWrite = true,
                 useMipMap = true,
@@ -86,8 +86,6 @@ namespace UnityEngine.Rendering.HighDefinition
             public TextureHandle debugBuffer;
             public TextureHandle rayCountTexture;
             public TextureHandle outputBuffer;
-
-            public bool enableDecals;
         }
 
         TextureHandle RaytracingRecursiveRender(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle colorBuffer, TextureHandle depthPyramid, TextureHandle flagMask, TextureHandle rayCountTexture)
@@ -102,10 +100,10 @@ namespace UnityEngine.Rendering.HighDefinition
             if (!validEffect)
                 return colorBuffer;
 
-            RecursiveRenderingPassData passData;
-
-            using (var builder = renderGraph.AddUnsafePass<RecursiveRenderingPassData>("Recursive Rendering Evaluation", out passData, ProfilingSampler.Get(HDProfileId.RayTracingRecursiveRendering)))
+            using (var builder = renderGraph.AddRenderPass<RecursiveRenderingPassData>("Recursive Rendering Evaluation", out var passData, ProfilingSampler.Get(HDProfileId.RayTracingRecursiveRendering)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Camera parameters
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -122,39 +120,31 @@ namespace UnityEngine.Rendering.HighDefinition
                 // Other data
                 passData.accelerationStructure = RequestAccelerationStructure(hdCamera);
                 passData.lightCluster = RequestLightCluster();
-                passData.recursiveRenderingRT = rayTracingResources.forwardRayTracing;
+                passData.recursiveRenderingRT = m_GlobalSettings.renderPipelineRayTracingResources.forwardRaytracing;
                 passData.skyTexture = m_SkyManager.GetSkyReflection(hdCamera);
                 passData.shaderVariablesRayTracingCB = m_ShaderVariablesRayTracingCB;
                 passData.ditheredTextureSet = GetBlueNoiseManager().DitheredTextureSet8SPP();
 
-                passData.depthStencilBuffer = depthPyramid;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.flagMask = flagMask;
-                builder.UseTexture(passData.flagMask, AccessFlags.Read);
-                passData.rayCountTexture = rayCountTexture;
-                builder.UseTexture(passData.rayCountTexture, AccessFlags.ReadWrite);
-                passData.outputBuffer = colorBuffer;
-                builder.UseTexture(passData.outputBuffer, AccessFlags.ReadWrite);
+                passData.depthStencilBuffer = builder.ReadTexture(depthPyramid);
+                passData.flagMask = builder.ReadTexture(flagMask);
+                passData.rayCountTexture = builder.ReadWriteTexture(rayCountTexture);
+                passData.outputBuffer = builder.ReadWriteTexture(colorBuffer);
                 // Right now the debug buffer is written to independently of what is happening. This must be changed
                 // TODO RENDERGRAPH
-                passData.debugBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Recursive Rendering Debug Texture" });
-                builder.UseTexture(passData.debugBuffer, AccessFlags.Write);
-
-                passData.enableDecals = hdCamera.frameSettings.IsEnabled(FrameSettingsField.Decals);
+                passData.debugBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Recursive Rendering Debug Texture" }));
 
                 builder.SetRenderFunc(
-                    (RecursiveRenderingPassData data, UnsafeGraphContext ctx) =>
+                    (RecursiveRenderingPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Define the shader pass to use for the reflection pass
-                        natCmd.SetRayTracingShaderPass(data.recursiveRenderingRT, "ForwardDXR");
+                        ctx.cmd.SetRayTracingShaderPass(data.recursiveRenderingRT, "ForwardDXR");
 
                         // Set the acceleration structure for the pass
-                        natCmd.SetRayTracingAccelerationStructure(data.recursiveRenderingRT, HDShaderIDs._RaytracingAccelerationStructureName, data.accelerationStructure);
+                        ctx.cmd.SetRayTracingAccelerationStructure(data.recursiveRenderingRT, HDShaderIDs._RaytracingAccelerationStructureName, data.accelerationStructure);
 
                         // Inject the ray-tracing sampling data
-                        BlueNoise.BindDitheredTextureSet(natCmd, data.ditheredTextureSet);
+                        BlueNoise.BindDitheredTextureSet(ctx.cmd, data.ditheredTextureSet);
 
                         // Update Global Constant Buffer.
                         data.shaderVariablesRayTracingCB._RaytracingRayMaxLength = data.rayLength;
@@ -167,38 +157,33 @@ namespace UnityEngine.Rendering.HighDefinition
                         data.shaderVariablesRayTracingCB._RayTracingRayMissFallbackHierarchy = data.rayMissFallbackHiearchy;
                         data.shaderVariablesRayTracingCB._RayTracingLastBounceFallbackHierarchy = data.lastBounceFallbackHiearchy;
                         data.shaderVariablesRayTracingCB._RayTracingAmbientProbeDimmer = data.ambientProbeDimmer;
-                        ConstantBuffer.PushGlobal(natCmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
+                        ConstantBuffer.PushGlobal(ctx.cmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
 
                         // Fecth the temporary buffers we shall be using
-                        natCmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._RaytracingFlagMask, data.flagMask);
-                        natCmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                        natCmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._CameraColorTextureRW, data.outputBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._RaytracingFlagMask, data.flagMask);
+                        ctx.cmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._CameraColorTextureRW, data.outputBuffer);
 
                         // Set ray count texture
-                        natCmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._RayCountTexture, data.rayCountTexture);
+                        ctx.cmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._RayCountTexture, data.rayCountTexture);
 
                         // LightLoop data
-                        data.lightCluster.BindLightClusterData(natCmd);
+                        data.lightCluster.BindLightClusterData(ctx.cmd);
 
                         // Set the data for the ray miss
-                        natCmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._SkyTexture, data.skyTexture);
+                        ctx.cmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._SkyTexture, data.skyTexture);
 
                         // If this is the right debug mode and we have at least one light, write the first shadow to the de-noised texture
-                        natCmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._RaytracingPrimaryDebug, data.debugBuffer);
-
-                        if (data.enableDecals)
-                        {
-                            DecalSystem.instance.SetAtlas(natCmd);
-                        }
+                        ctx.cmd.SetRayTracingTextureParam(data.recursiveRenderingRT, HDShaderIDs._RaytracingPrimaryDebug, data.debugBuffer);
 
                         // Run the computation
-                        natCmd.DispatchRays(data.recursiveRenderingRT, m_RayGenShaderName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount, null);
+                        ctx.cmd.DispatchRays(data.recursiveRenderingRT, m_RayGenShaderName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount);
                     });
+
+                PushFullScreenDebugTexture(m_RenderGraph, passData.debugBuffer, FullScreenDebugMode.RecursiveRayTracing);
+
+                return passData.outputBuffer;
             }
-
-            PushFullScreenDebugTexture(m_RenderGraph, passData.debugBuffer, FullScreenDebugMode.RecursiveRayTracing);
-
-            return passData.outputBuffer;
         }
     }
 }

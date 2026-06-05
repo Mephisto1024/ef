@@ -1,5 +1,11 @@
-using UnityEngine;
+using System;
+using System.Collections.Generic;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
+using UnityEditor.ShaderGraph;
+using UnityEngine.UIElements;
+using UnityEditor.UIElements;
+using UnityEngine;
 
 // We share the name of the properties in the UI to avoid duplication
 using static UnityEditor.Rendering.HighDefinition.SurfaceOptionUIBlock.Styles;
@@ -23,15 +29,13 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
         protected override void CreatePropertyGUI()
         {
             // Lit specific properties:
-            AddProperty(materialIDText, () => litData.materialTypeMask, (newValue) => litData.materialTypeMask = newValue);
+            AddProperty(materialIDText, () => litData.materialType, (newValue) => litData.materialType = newValue);
             AddProperty(rayTracingText, () => litData.rayTracing, (newValue) => litData.rayTracing = newValue);
 
             base.CreatePropertyGUI();
 
-            if (litData.HasMaterialType(~HDLitData.MaterialTypeMask.ColoredTranslucent))
-                AddProperty(Styles.enableClearCoat, () => litData.clearCoat, (newValue) => litData.clearCoat = newValue);
-
-            if (litData.HasMaterialType(HDLitData.MaterialTypeMask.SubsurfaceScattering))
+            AddProperty(Styles.enableClearCoat, () => litData.clearCoat, (newValue) => litData.clearCoat = newValue);
+            if (litData.materialType == HDLitData.MaterialType.SubsurfaceScattering)
             {
                 AddProperty(transmissionEnableText, () => litData.sssTransmission, (newValue) => litData.sssTransmission = newValue);
             }
@@ -40,13 +44,13 @@ namespace UnityEditor.Rendering.HighDefinition.ShaderGraph
                 AddProperty(refractionModelText, () => litData.refractionModel, (newValue) => litData.refractionModel = newValue);
                 if (litData.refractionModel != ScreenSpaceRefraction.RefractionModel.None)
                 {
-                    if (systemData.blendingMode != BlendingMode.Alpha)
+                    if (systemData.blendMode != BlendMode.Alpha)
                         AddHelpBox(RefractionUIBlock.Styles.refractionBlendModeWarning, MessageType.Warning);
                     if (systemData.renderQueueType == HDRenderQueue.RenderQueueType.PreRefraction)
                         AddHelpBox(RefractionUIBlock.Styles.refractionRenderingPassWarning, MessageType.Warning);
                 }
             }
-            if (litData.HasMaterialType(HDLitData.MaterialTypeMask.SpecularColor))
+            if (litData.materialType == HDLitData.MaterialType.SpecularColor)
             {
                 AddProperty(energyConservingSpecularColorText, () => litData.energyConservingSpecular, (newValue) => litData.energyConservingSpecular = newValue);
             }

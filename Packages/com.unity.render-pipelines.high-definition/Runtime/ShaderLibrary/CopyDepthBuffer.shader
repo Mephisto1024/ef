@@ -27,7 +27,7 @@ Shader "Hidden/HDRP/CopyDepthBuffer"
             HLSLPROGRAM
             #pragma target 4.5
             #pragma editor_sync_compilation
-            #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+            #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
             #pragma fragment Frag
             #pragma vertex Vert
             //#pragma enable_d3d11_debug_symbols
@@ -71,7 +71,8 @@ Shader "Hidden/HDRP/CopyDepthBuffer"
             float Frag(Varyings input) : SV_Depth
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                return SAMPLE_TEXTURE2D_X_LOD(_InputDepthTexture, s_point_clamp_sampler, input.texcoord.xy, 0).x;
+                uint2 coord = uint2(input.texcoord.xy * _ScreenSize.xy);
+                return LOAD_TEXTURE2D_X(_InputDepthTexture, coord).x;
             }
 
             ENDHLSL

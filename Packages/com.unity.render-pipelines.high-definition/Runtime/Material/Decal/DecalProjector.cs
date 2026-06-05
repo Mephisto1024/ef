@@ -21,13 +21,12 @@ namespace UnityEngine.Rendering.HighDefinition
     /// <summary>
     /// Decal Projector component.
     /// </summary>
-    [HDRPHelpURLAttribute("understand-decals")]
+    [HDRPHelpURLAttribute("Decal-Projector")]
     [ExecuteAlways]
 #if UNITY_EDITOR
     [CanEditMultipleObjects]
 #endif
     [AddComponentMenu("Rendering/HDRP Decal Projector")]
-    [Icon("Packages/com.unity.render-pipelines.core/Editor/Icons/Processed/DecalProjector Icon.asset")]
     public partial class DecalProjector : MonoBehaviour
     {
         [SerializeField]
@@ -182,31 +181,11 @@ namespace UnityEngine.Rendering.HighDefinition
         }
 
         [SerializeField]
-        private IntScalableSettingValue m_TransparentTextureResolution = new IntScalableSettingValue
-        {
-            @override = 256,
-            useOverride = true,
-        };
-
-        /// <summary>
-        /// Resolution that is used when the projector affects transparency and a shader graph is being used
-        /// </summary>
-        public IntScalableSettingValue TransparentTextureResolution
-        {
-            get => m_TransparentTextureResolution;
-            set
-            {
-                m_TransparentTextureResolution = value;
-                OnValidate();
-            }
-        }
-
-        [SerializeField]
-        RenderingLayerMask m_DecalLayerMask = (RenderingLayerMask) (uint) UnityEngine.RenderingLayerMask.defaultRenderingLayerMask;
+        DecalLayerEnum m_DecalLayerMask = DecalLayerEnum.DecalLayerDefault;
         /// <summary>
         /// The layer of the decal.
         /// </summary>
-        public RenderingLayerMask decalLayerMask
+        public DecalLayerEnum decalLayerMask
         {
             get => m_DecalLayerMask;
             set => m_DecalLayerMask = value;
@@ -328,7 +307,7 @@ namespace UnityEngine.Rendering.HighDefinition
             public int layerMask;
             public ulong sceneLayerMask;
             public float fadeFactor;
-            public RenderingLayerMask decalLayerMask;
+            public DecalLayerEnum decalLayerMask;
         }
 
         internal CachedDecalData GetCachedDecalData()
@@ -351,14 +330,13 @@ namespace UnityEngine.Rendering.HighDefinition
 
         void InitMaterial()
         {
-#if UNITY_EDITOR
-            if (m_Material == null && GraphicsSettings.TryGetRenderPipelineSettings<HDRenderPipelineEditorMaterials>(out var defaultMaterials))
-                m_Material = defaultMaterials.defaultDecalMaterial;
-#endif
-
             if (m_Material == null)
             {
-                Debug.LogWarning($"{name} has a null {typeof(Material)} on the {nameof(material)} property.");
+#if UNITY_EDITOR
+                m_Material = HDRenderPipelineGlobalSettings.instance != null ? HDRenderPipelineGlobalSettings.instance.GetDefaultDecalMaterial() : null;
+#else
+                m_Material = null;
+#endif
             }
         }
 
@@ -531,6 +509,11 @@ namespace UnityEngine.Rendering.HighDefinition
                     if (m_Material != null)
                     {
                         m_Handle = DecalSystem.instance.AddDecal(this);
+
+                        if (!DecalSystem.IsHDRenderPipelineDecal(m_Material.shader)) // non HDRP/decal shaders such as shader graph decal do not affect transparency
+                        {
+                            m_AffectsTransparency = false;
+                        }
                     }
 
                     // notify the editor that material has changed so it can update the shader foldout
@@ -568,15 +551,6 @@ namespace UnityEngine.Rendering.HighDefinition
 #endif
 
             return true;
-        }
-
-        /// <summary>
-        /// If called it will force an update of the shader graph textures in the transparent decal atlas
-        /// if the DecalProjector has Affects Transparent enabled
-        /// </summary>
-        public void UpdateTransparentShaderGraphTextures()
-        {
-            DecalSystem.instance.UpdateTransparentShaderGraphTextures(m_Handle, this);
         }
     }
 }

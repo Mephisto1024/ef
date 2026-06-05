@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine.Rendering.LookDev;
 
 namespace UnityEngine.Rendering.HighDefinition
@@ -21,20 +20,8 @@ namespace UnityEngine.Rendering.HighDefinition
 #if UNITY_EDITOR
         bool UpdateVolumeProfile(Volume volume, out VisualEnvironment visualEnvironment, out HDRISky sky, ref int volumeProfileHash)
         {
-            var lookDevVolumeSettings = GraphicsSettings.GetRenderPipelineSettings<LookDevVolumeProfileSettings>();
-            if (lookDevVolumeSettings.volumeProfile == null)
-            {
-                lookDevVolumeSettings.volumeProfile = VolumeUtils.CopyVolumeProfileFromResourcesToAssets(GraphicsSettings
-                    .GetRenderPipelineSettings<HDRenderPipelineEditorAssets>().lookDevVolumeProfile);
-
-                // Invalidate the volume profile hash
-                volumeProfileHash = -1;
-
-                Debug.Log($"[Look Dev] Created default Volume Profile at: {AssetDatabase.GetAssetPath(lookDevVolumeSettings.volumeProfile)}");
-            }
-
-            var lookDevVolumeProfile = lookDevVolumeSettings.volumeProfile;
-            int newHashCode = lookDevVolumeProfile != null ? lookDevVolumeProfile.GetHashCode() : -1;
+            var lookDevVolumeProfile = m_GlobalSettings.GetOrAssignLookDevVolumeProfile();
+            int newHashCode = lookDevVolumeProfile.GetHashCode();
             if (newHashCode != volumeProfileHash)
             {
                 VolumeProfile oldProfile = volume.sharedProfile;
@@ -115,7 +102,7 @@ namespace UnityEngine.Rendering.HighDefinition
 #if UNITY_EDITOR
             HDAdditionalLightData.InitDefaultHDAdditionalLightData(additionalLightData);
 #endif
-            light.intensity = 0f;
+            additionalLightData.intensity = 0f;
             additionalLightData.SetShadowResolution(2048);
 
             GameObject volumeGO = SRI.AddGameObject(persistent: true);
@@ -243,12 +230,12 @@ namespace UnityEngine.Rendering.HighDefinition
             var oldClearMode = data.additionalCameraData.clearColorMode;
             data.additionalCameraData.backgroundColorHDR = Color.white;
             data.additionalCameraData.clearColorMode = HDAdditionalCameraData.ClearColorMode.Color;
-            SRI.sunLight.intensity = 1f;
+            data.additionalLightData.intensity = 1f;
             debugDisplaySettings.SetShadowDebugMode(ShadowMapDebugMode.SingleShadow);
             SRI.camera.targetTexture = output;
             SRI.camera.Render();
             debugDisplaySettings.SetShadowDebugMode(ShadowMapDebugMode.None);
-            SRI.sunLight.intensity = 0f;
+            data.additionalLightData.intensity = 0f;
             data.additionalCameraData.backgroundColorHDR = oldBackgroundColor;
             data.additionalCameraData.clearColorMode = oldClearMode;
         }

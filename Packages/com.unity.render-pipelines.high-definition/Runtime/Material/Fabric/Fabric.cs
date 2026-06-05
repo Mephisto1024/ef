@@ -62,13 +62,13 @@ namespace UnityEngine.Rendering.HighDefinition
             public uint diffusionProfileHash;
             [SurfaceDataAttributes("Subsurface Mask")]
             public float subsurfaceMask;
+            [SurfaceDataAttributes("Transmission Mask")]
+            public float transmissionMask;
 
             // Transmission
             // + Diffusion Profile
             [SurfaceDataAttributes("Thickness")]
             public float thickness;
-            [SurfaceDataAttributes("Transmission Mask")]
-            public Vector3 transmissionMask;
 
             // Anisotropic
             [SurfaceDataAttributes("Tangent", true)]
@@ -129,7 +129,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         public Fabric() { }
 
-        public override void Build(HDRenderPipeline _)
+        public override void Build(HDRenderPipelineAsset hdAsset, HDRenderPipelineRuntimeResources defaultResources)
         {
             PreIntegratedFGD.instance.Build(PreIntegratedFGD.FGDIndex.FGD_CharlieAndFabricLambert);
             //LTCAreaLight.instance.Build();

@@ -94,7 +94,7 @@ void RunFXAA(TEXTURE2D_X_PARAM(_InputTexture, _InputTextureSampler), inout CTYPE
         float3 rgb = ((lumaB < lumaMin) || (lumaB > lumaMax)) ? rgbA : rgbB;
 
 #if FXAA_HDR_MAPUNMAP
-        outColor.xyz = FastTonemapInvert(rgb) * paperWhite;
+        outColor.xyz = FastTonemapInvert(rgb) * paperWhite;;
 #else
         outColor.xyz = rgb;
 #endif

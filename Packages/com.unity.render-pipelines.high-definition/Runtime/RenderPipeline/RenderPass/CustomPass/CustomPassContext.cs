@@ -67,19 +67,7 @@ namespace UnityEngine.Rendering.HighDefinition
         /// </summary>
         public readonly MaterialPropertyBlock propertyBlock;
 
-        /// <summary>
-        /// Shading rate image buffer for variable shading rate.
-        /// </summary>
-        public readonly RTHandle shadingRateBuffer;
-
-        internal readonly RTHandle sssBuffer;
-        internal readonly RTHandle diffuseLightingBuffer;
-
         internal readonly CustomPassInjectionPoint injectionPoint;
-		// This represent the state of HDRP globals at the point of recording the custom passes.
-		// Using GetShaderVariablesGlobals() from HDRP inside the execute of the custom pass would give invalid result
-		// because the execute of custom passes is called during the render graph execution, after the recording of all passes.
-        internal readonly ShaderVariablesGlobal currentGlobalState;
 
         internal CustomPassContext(
             ScriptableRenderContext renderContext, CommandBuffer cmd,
@@ -87,10 +75,9 @@ namespace UnityEngine.Rendering.HighDefinition
             CullingResults cameraCullingResults,
             RTHandle cameraColorBuffer, RTHandle cameraDepthBuffer,
             RTHandle cameraNormalBuffer, RTHandle cameraMotionVectorsBuffer,
-            RTHandle sssBuffer, RTHandle diffuseLightingBuffer, Lazy<RTHandle> customColorBuffer,
+            Lazy<RTHandle> customColorBuffer,
             Lazy<RTHandle> customDepthBuffer, MaterialPropertyBlock propertyBlock,
-            RTHandle shadingRateBuffer,
-            CustomPassInjectionPoint injectionPoint, ShaderVariablesGlobal currentGlobalState)
+            CustomPassInjectionPoint injectionPoint)
         {
             this.renderContext = renderContext;
             this.cmd = cmd;
@@ -104,11 +91,7 @@ namespace UnityEngine.Rendering.HighDefinition
             this.cameraMotionVectorsBuffer = cameraMotionVectorsBuffer;
             this.customDepthBuffer = customDepthBuffer;
             this.propertyBlock = propertyBlock;
-            this.shadingRateBuffer = shadingRateBuffer;
-            this.sssBuffer = sssBuffer;
-            this.diffuseLightingBuffer = diffuseLightingBuffer;
             this.injectionPoint = injectionPoint;
-            this.currentGlobalState = currentGlobalState;
         }
     }
 }

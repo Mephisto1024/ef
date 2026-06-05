@@ -28,7 +28,6 @@ namespace UnityEditor.Experimental.Rendering.HighDefinition
         SerializedDataParameter m_Denoising;
         SerializedDataParameter m_UseAOV;
         SerializedDataParameter m_Temporal;
-        SerializedDataParameter m_VolumetricFogDenoising;
 
 #if UNITY_64 && !ENABLE_UNITY_DENOISING_PLUGIN && UNITY_EDITOR_WIN
         // This is used to prevent users from spamming the denoising package install button
@@ -52,88 +51,80 @@ namespace UnityEditor.Experimental.Rendering.HighDefinition
             m_Denoising = Unpack(o.Find(x => x.denoising));
             m_UseAOV = Unpack(o.Find(x => x.useAOVs));
             m_Temporal = Unpack(o.Find(x => x.temporal));
-            m_VolumetricFogDenoising = Unpack(o.Find(x => x.separateVolumetrics));
 #endif
         }
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.RayTracing);
-
             HDRenderPipelineAsset currentAsset = HDRenderPipeline.currentAsset;
-            bool notSupported = currentAsset != null && !currentAsset.currentPlatformRenderPipelineSettings.supportRayTracing;
-            if (notSupported)
+            if (!currentAsset?.currentPlatformRenderPipelineSettings.supportRayTracing ?? false)
             {
                 EditorGUILayout.Space();
-                HDEditorUtils.QualitySettingsHelpBox(HDRenderPipelineUI.Styles.rayTracingUnsupportedMessage,
-                    MessageType.Warning, HDRenderPipelineUI.ExpandableGroup.Rendering,
-                    "m_RenderPipelineSettings.supportRayTracing");
+                EditorGUILayout.HelpBox("The current HDRP Asset does not support Ray Tracing.", MessageType.Error, wide: true);
+                return;
             }
-            using var disableScope = new EditorGUI.DisabledScope(notSupported);
 
-            PropertyField(m_Enable, EditorGUIUtility.TrTextContent("State"));
-
-            if (m_Enable.overrideState.boolValue && m_Enable.value.boolValue)
+            // If ray tracing is supported display the content of the volume component
+            if (HDRenderPipeline.assetSupportsRayTracing)
             {
-                using (new IndentLevelScope())
+                PropertyField(m_Enable, EditorGUIUtility.TrTextContent("State"));
+
+                if (m_Enable.overrideState.boolValue && m_Enable.value.boolValue)
                 {
-                    if (RenderPipelineManager.currentPipeline is not HDRenderPipeline { rayTracingSupported: true })
-                        HDRenderPipelineUI.DisplayRayTracingSupportBox();
-
-                    PropertyField(m_LayerMask);
-                    PropertyField(m_MaxSamples);
-                    PropertyField(m_MinDepth);
-                    PropertyField(m_MaxDepth);
-                    PropertyField(m_MaxIntensity);
-                    PropertyField(m_SkyImportanceSampling);
-                    PropertyField(m_SeedMode);
-                    var seedMode = m_SeedMode.value.GetEnumValue<SeedMode>();
-                    if(seedMode == SeedMode.Custom)
+                    using (new IndentLevelScope())
                     {
-                        EditorGUILayout.HelpBox("You have selected the Custom Seed Mode. Please ensure to update the customSeed parameter on the Path Tracing override through a custom script.", MessageType.Info, wide: true);
-                    }
+                        if (RenderPipelineManager.currentPipeline is not HDRenderPipeline { rayTracingSupported: true })
+                            HDRenderPipelineUI.DisplayRayTracingSupportBox();
+
+                        PropertyField(m_LayerMask);
+                        PropertyField(m_MaxSamples);
+                        PropertyField(m_MinDepth);
+                        PropertyField(m_MaxDepth);
+                        PropertyField(m_MaxIntensity);
+                        PropertyField(m_SkyImportanceSampling);
+                    	PropertyField(m_SeedMode);
 #if UNITY_64 && ENABLE_UNITY_DENOISING_PLUGIN && UNITY_EDITOR_WIN
-                    PropertyField(m_Denoising);
-                    var denoiserType = m_Denoising.value.GetEnumValue<DenoiserType>();
-                    bool supported = Denoiser.IsDenoiserTypeSupported(denoiserType);
+                        PropertyField(m_Denoising);
+                        var denoiserType = m_Denoising.value.GetEnumValue<DenoiserType>();
+                        bool supported = Denoiser.IsDenoiserTypeSupported(denoiserType);
 
-                    if (m_Denoising.value.intValue != (int) DenoiserType.None)
-                    {
-                        using (new IndentLevelScope())
+                        if (m_Denoising.value.intValue != (int) DenoiserType.None)
                         {
-                            if (supported)
+                            using (new IndentLevelScope())
                             {
-                                PropertyField(m_UseAOV);
-                                if (m_Denoising.value.intValue == (int)DenoiserType.Optix)
+                                if (supported)
                                 {
-                                    PropertyField(m_Temporal);
+                                    PropertyField(m_UseAOV);
+                                    if (m_Denoising.value.intValue == (int)DenoiserType.Optix)
+                                    {
+                                        PropertyField(m_Temporal);
+                                    }
                                 }
-                                PropertyField(m_VolumetricFogDenoising);
-                            }
-                            else
-                            {
-                                EditorGUILayout.HelpBox($"The denoiser selected is not supported by this hardware configuration.", MessageType.Error, wide: true);
+                                else
+                                {
+                                    EditorGUILayout.HelpBox($"The denoiser selected is not supported by this hardware configuration.", MessageType.Error, wide: true);
+                                }
                             }
                         }
-                    }
 #elif UNITY_64 && UNITY_EDITOR_WIN
-                    if (s_DisplayDenoisingButtonInstall)
-                    {
-                        CoreEditorUtils.DrawFixMeBox("Path Tracing Denoising is not active in this project. To activate it, install the Unity Denoising package.", MessageType.Info, () =>
+                        if (s_DisplayDenoisingButtonInstall)
                         {
-                            PackageManager.Client.Add("com.unity.rendering.denoising");
-                            s_DisplayDenoisingButtonInstall = false;
-                        });
-                    }
-                    else
-                    {
-                        EditorGUILayout.HelpBox("Installing the denoising package. Please wait...", MessageType.Info, wide: true);
-                    }
+                            CoreEditorUtils.DrawFixMeBox("Path Tracing Denoising is not active in this project. To activate it, install the Unity Denoising package.", MessageType.Info, () =>
+                            {
+                                PackageManager.Client.Add("com.unity.rendering.denoising");
+                                s_DisplayDenoisingButtonInstall = false;
+                            });
+                        }
+                        else
+                        {
+                            EditorGUILayout.HelpBox("Installing the denoising package. Please wait...", MessageType.Info, wide: true);
+                        }
 #endif
-                }
+                    }
 
-                // Make sure MaxDepth is always greater or equal than MinDepth
-                m_MaxDepth.value.intValue = Math.Max(m_MinDepth.value.intValue, m_MaxDepth.value.intValue);
+                    // Make sure MaxDepth is always greater or equal than MinDepth
+                    m_MaxDepth.value.intValue = Math.Max(m_MinDepth.value.intValue, m_MaxDepth.value.intValue);
+                }
             }
         }
     }

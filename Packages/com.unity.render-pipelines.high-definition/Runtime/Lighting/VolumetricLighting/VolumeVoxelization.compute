@@ -3,11 +3,9 @@
 //--------------------------------------------------------------------------------------------------
 
 // #pragma enable_d3d11_debug_symbols
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma kernel VolumeVoxelization
-
-#pragma multi_compile _ SUPPORT_WATER_ABSORPTION
 
 #define GROUP_SIZE_1D     8
 
@@ -16,14 +14,12 @@
 //--------------------------------------------------------------------------------------------------
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/VolumeRendering.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Core/Utilities/GeometryUtils.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/VolumetricLighting/HDRenderPipeline.VolumetricLighting.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/LightLoop/LightLoopDef.hlsl"
-#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Water/Shaders/UnderWaterUtilities.hlsl"
 
 //--------------------------------------------------------------------------------------------------
 // Inputs & outputs
@@ -53,20 +49,6 @@ void FillVolumetricDensityBuffer(uint2 voxelCoord2D, JitteredRay ray)
     float t0 = DecodeLogarithmicDepthGeneralized(0, _VBufferDistanceDecodingParams);
     float de = _VBufferRcpSliceCount; // Log-encoded distance between slices
 
-    #ifdef SUPPORT_WATER_ABSORPTION
-    float waterDistance = FLT_MIN;
-    float2 positionSS = voxelCoord2D * _VBufferViewportSize.zw * _ScreenSize.xy;
-    bool underWater = ray.originWS.y < _UnderWaterUpHeight.w || IsUnderWater(positionSS);
-    if (underWater && (GetStencilValue(LOAD_TEXTURE2D_X(_StencilTexture, positionSS)) & STENCILUSAGE_WATER_SURFACE) != 0)
-    {
-        waterDistance = LinearEyeDepth(LOAD_TEXTURE2D_X(_RefractiveDepthBuffer, positionSS).r, _ZBufferParams);
-        waterDistance = waterDistance * rcp(dot(ray.centerDirWS, GetViewForwardDir()));
-    }
-    else
-        waterDistance = underWater ? FLT_MAX : 0.0f;
-    #endif
-
-
     for (uint slice = 0; slice < _VBufferSliceCount; slice++)
     {
         uint3 voxelCoord = uint3(voxelCoord2D, slice + _VBufferSliceCount * unity_StereoEyeIndex);
@@ -86,14 +68,6 @@ void FillVolumetricDensityBuffer(uint2 voxelCoord2D, JitteredRay ray)
         // Start by sampling the height fog.
         float3 voxelScattering = _HeightFogBaseScattering.xyz * heightMultiplier;
         float  voxelExtinction = _HeightFogBaseExtinction * heightMultiplier;
-
-        #if SUPPORT_WATER_ABSORPTION
-        if (t < waterDistance)
-        {
-            voxelScattering = _UnderWaterScatteringExtinction.xyz;
-            voxelExtinction = _UnderWaterScatteringExtinction.w * (1 - ray.centerDirWS.y);
-        }
-        #endif
 
         _VBufferDensity[voxelCoord] = float4(voxelScattering, voxelExtinction);
 

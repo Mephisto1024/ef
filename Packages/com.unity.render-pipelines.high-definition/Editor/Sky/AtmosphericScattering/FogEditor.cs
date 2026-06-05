@@ -23,7 +23,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
         protected SerializedDataParameter m_EnableVolumetricFog;
         protected SerializedDataParameter m_Anisotropy;
-        protected SerializedDataParameter m_MultipleScatteringIntensity;
         protected SerializedDataParameter m_DepthExtent;
         protected SerializedDataParameter m_GlobalLightProbeDimmer;
         protected SerializedDataParameter m_SliceDistributionUniformity;
@@ -40,6 +39,7 @@ namespace UnityEditor.Rendering.HighDefinition
         static GUIContent s_MeanFreePathLabel = new GUIContent("Fog Attenuation Distance", "Controls the density at the base level (per color channel). Distance at which fog reduces background light intensity by 63%. Units: m.");
         static GUIContent s_BaseHeightLabel = new GUIContent("Base Height", "Reference height (e.g. sea level). Sets the height of the boundary between the constant and exponential fog.");
         static GUIContent s_MaximumHeightLabel = new GUIContent("Maximum Height", "Max height of the fog layer. Controls the rate of height-based density falloff. Units: m.");
+        static GUIContent s_AnisotropyLabel = new GUIContent("Anisotropy", "Controls the angular distribution of scattered light. 0 is isotropic, 1 is forward scattering, and -1 is backward scattering.");
         static GUIContent s_GlobalLightProbeDimmerLabel = new GUIContent("GI Dimmer", "Controls the intensity reduction of the global illumination contribution to volumetric fog. This is either APV (if enabled and present) or the global light probe that the sky produces.");
         static GUIContent s_EnableVolumetricFog = new GUIContent("Volumetric Fog", "When enabled, activates volumetric fog.");
         static GUIContent s_DepthExtentLabel = new GUIContent("Volumetric Fog Distance", "Sets the distance (in meters) from the Camera's Near Clipping Plane to the back of the Camera's volumetric lighting buffer. The lower the distance is, the higher the fog quality is.");
@@ -63,9 +63,7 @@ namespace UnityEditor.Rendering.HighDefinition
             m_BaseHeight = Unpack(o.Find(x => x.baseHeight));
             m_MaximumHeight = Unpack(o.Find(x => x.maximumHeight));
             m_Anisotropy = Unpack(o.Find(x => x.anisotropy));
-            m_MultipleScatteringIntensity = Unpack(o.Find(x => x.multipleScatteringIntensity));
             m_GlobalLightProbeDimmer = Unpack(o.Find(x => x.globalLightProbeDimmer));
-
             m_EnableVolumetricFog = Unpack(o.Find(x => x.enableVolumetricFog));
             m_DepthExtent = Unpack(o.Find(x => x.depthExtent));
             m_SliceDistributionUniformity = Unpack(o.Find(x => x.sliceDistributionUniformity));
@@ -82,8 +80,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.AtmosphericScattering);
-
             PropertyField(m_Enabled, s_Enabled);
 
             PropertyField(m_MeanFreePath, s_MeanFreePathLabel);
@@ -124,8 +120,6 @@ namespace UnityEditor.Rendering.HighDefinition
             {
                 PropertyField(m_EnableVolumetricFog, s_EnableVolumetricFog);
 
-                HDEditorUtils.EnsureFrameSetting(FrameSettingsField.Volumetrics);
-
                 using (new IndentLevelScope())
                 {
                     PropertyField(m_Albedo, s_AlbedoLabel);
@@ -159,8 +153,7 @@ namespace UnityEditor.Rendering.HighDefinition
                     }
 
                     PropertyField(m_DirectionalLightsOnly);
-
-                    PropertyField(m_Anisotropy);
+                    PropertyField(m_Anisotropy, s_AnisotropyLabel);
                     if (m_Anisotropy.value.floatValue != 0.0f)
                     {
                         if (BeginAdditionalPropertiesScope())
@@ -172,10 +165,8 @@ namespace UnityEditor.Rendering.HighDefinition
                         }
                         EndAdditionalPropertiesScope();
                     }
-
                 }
             }
-            PropertyField(m_MultipleScatteringIntensity);
         }
 
         public override QualitySettingsBlob SaveCustomQualitySettingsAsObject(QualitySettingsBlob settings = null)

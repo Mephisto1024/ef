@@ -5,7 +5,12 @@
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/ScreenSpaceLighting/ScreenSpaceGlobalIllumination.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Lighting/ScreenSpaceLighting/ScreenSpaceReflection.cs.hlsl"
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/AmbientProbe.hlsl"
+// We need to define this before including ProbeVolume.hlsl as that file expects this function to be defined.
+// AmbientProbe Data is fetch directly from a compute buffer to remain on GPU and is preconvolved with clamped cosinus
+real3 EvaluateAmbientProbe(real3 normalWS)
+{
+    return SampleSH9(_AmbientProbeData, normalWS);
+}
 
 real3 EvaluateLightProbe(real3 normalWS)
 {
@@ -21,21 +26,6 @@ real3 EvaluateLightProbe(real3 normalWS)
     return SampleSH9(SHCoefficients, normalWS);
 }
 
-real3 EvaluateLightProbeL1(real3 normalWS)
-{
-    real4 SHCoefficients[3];
-    SHCoefficients[0] = unity_SHAr;
-    SHCoefficients[1] = unity_SHAg;
-    SHCoefficients[2] = unity_SHAb;
-
-    return SampleSH4_L1(SHCoefficients, normalWS);
-}
-
-real3 EvaluateLightProbeL0()
-{
-    return real3(unity_SHAr.w, unity_SHAg.w, unity_SHAb.w);
-}
-
 #if defined(PROBE_VOLUMES_L1) || defined(PROBE_VOLUMES_L2)
 #include "Packages/com.unity.render-pipelines.core/Runtime/Lighting/ProbeVolume/ProbeVolume.hlsl"
 #endif
@@ -49,10 +39,19 @@ float4x4 GetProbeVolumeWorldToObject()
 
 void EvaluateLightmap(float3 positionRWS, float3 normalWS, float3 backNormalWS, float2 uvStaticLightmap, float2 uvDynamicLightmap, inout float3 bakeDiffuseLighting, inout float3 backBakeDiffuseLighting)
 {
-#if defined(UNITY_DOTS_INSTANCING_ENABLED) && !defined(USE_LEGACY_LIGHTMAPS)
-// ^ GPU-driven rendering is enabled, and we haven't opted-out from lightmap
-// texture arrays. This minimizes batch breakages, but texture arrays aren't
-// supported in a performant way on all GPUs.
+#ifdef UNITY_LIGHTMAP_FULL_HDR
+    bool useRGBMLightmap = false;
+    float4 decodeInstructions = float4(0.0, 0.0, 0.0, 0.0); // Never used but needed for the interface since it supports gamma lightmaps
+#else
+    bool useRGBMLightmap = true;
+#if defined(UNITY_LIGHTMAP_RGBM_ENCODING)
+    float4 decodeInstructions = float4(34.493242, 2.2, 0.0, 0.0); // range^2.2 = 5^2.2, gamma = 2.2
+#else
+    float4 decodeInstructions = float4(2.0, 2.2, 0.0, 0.0); // range = 2.0^2.2 = 4.59
+#endif
+#endif
+
+#if defined(UNITY_DOTS_INSTANCING_ENABLED)
 #define LIGHTMAP_NAME unity_Lightmaps
 #define LIGHTMAP_INDIRECTION_NAME unity_LightmapsInd
 #define SHADOWMASK_NAME unity_ShadowMasks
@@ -61,9 +60,6 @@ void EvaluateLightmap(float3 positionRWS, float3 normalWS, float3 backNormalWS, 
 #define LIGHTMAP_SAMPLE_EXTRA_ARGS uvStaticLightmap, unity_LightmapIndex.x
 #define SHADOWMASK_SAMPLE_EXTRA_ARGS uv, unity_LightmapIndex.x
 #else
-// ^ Lightmaps are not bound as texture arrays, but as individual textures. The
-// batch is broken every time lightmaps are changed, but this is well-supported
-// on all GPUs.
 #define LIGHTMAP_NAME unity_Lightmap
 #define LIGHTMAP_INDIRECTION_NAME unity_LightmapInd
 #define SHADOWMASK_NAME unity_ShadowMask
@@ -81,9 +77,9 @@ void EvaluateLightmap(float3 positionRWS, float3 normalWS, float3 backNormalWS, 
     #ifdef DIRLIGHTMAP_COMBINED
         SampleDirectionalLightmap(TEXTURE2D_LIGHTMAP_ARGS(LIGHTMAP_NAME, LIGHTMAP_SAMPLER_NAME),
             TEXTURE2D_LIGHTMAP_ARGS(LIGHTMAP_INDIRECTION_NAME, LIGHTMAP_SAMPLER_NAME),
-            LIGHTMAP_SAMPLE_EXTRA_ARGS, unity_LightmapST, normalWS, backNormalWS, true, bakeDiffuseLighting, backBakeDiffuseLighting);
+            LIGHTMAP_SAMPLE_EXTRA_ARGS, unity_LightmapST, normalWS, backNormalWS, useRGBMLightmap, decodeInstructions, bakeDiffuseLighting, backBakeDiffuseLighting);
     #else
-        float3 illuminance = SampleSingleLightmap(TEXTURE2D_LIGHTMAP_ARGS(LIGHTMAP_NAME, LIGHTMAP_SAMPLER_NAME), LIGHTMAP_SAMPLE_EXTRA_ARGS, unity_LightmapST, true);
+        float3 illuminance = SampleSingleLightmap(TEXTURE2D_LIGHTMAP_ARGS(LIGHTMAP_NAME, LIGHTMAP_SAMPLER_NAME), LIGHTMAP_SAMPLE_EXTRA_ARGS, unity_LightmapST, useRGBMLightmap, decodeInstructions);
         bakeDiffuseLighting += illuminance;
         backBakeDiffuseLighting += illuminance;
     #endif
@@ -95,9 +91,9 @@ void EvaluateLightmap(float3 positionRWS, float3 normalWS, float3 backNormalWS, 
     #ifdef DIRLIGHTMAP_COMBINED
         SampleDirectionalLightmap(TEXTURE2D_ARGS(unity_DynamicLightmap, samplerunity_DynamicLightmap),
             TEXTURE2D_ARGS(unity_DynamicDirectionality, samplerunity_DynamicLightmap),
-            uvDynamicLightmap, unity_DynamicLightmapST, normalWS, backNormalWS, false, bakeDiffuseLighting, backBakeDiffuseLighting);
+            uvDynamicLightmap, unity_DynamicLightmapST, normalWS, backNormalWS, false, decodeInstructions, bakeDiffuseLighting, backBakeDiffuseLighting);
     #else
-        float3 illuminance = SampleSingleLightmap(TEXTURE2D_ARGS(unity_DynamicLightmap, samplerunity_DynamicLightmap), uvDynamicLightmap, unity_DynamicLightmapST, false);
+        float3 illuminance = SampleSingleLightmap(TEXTURE2D_ARGS(unity_DynamicLightmap, samplerunity_DynamicLightmap), uvDynamicLightmap, unity_DynamicLightmapST, false, decodeInstructions);
         bakeDiffuseLighting += illuminance;
         backBakeDiffuseLighting += illuminance;
     #endif
@@ -149,7 +145,7 @@ void SampleBakedGI(
     // We prevent to read GI only if we are not raytrace pass that are used to fill the RTGI/Mixed buffer need to be executed normaly
 #if !defined(_SURFACE_TYPE_TRANSPARENT) && (SHADERPASS != SHADERPASS_RAYTRACING_INDIRECT) && (SHADERPASS != SHADERPASS_RAYTRACING_GBUFFER)
     if (_IndirectDiffuseMode != INDIRECTDIFFUSEMODE_OFF
-#if (SHADERPASS == SHADERPASS_GBUFFER)
+#if (SHADERPASS == SHADERPASS_GBUFER)
         && _IndirectDiffuseMode != INDIRECTDIFFUSEMODE_MIXED && _ReflectionsMode != REFLECTIONSMODE_MIXED
 #endif
         )
@@ -168,7 +164,6 @@ void SampleBakedGI(
             backNormalWS,
             GetWorldSpaceNormalizeViewDir(posInputs.positionWS),
             posInputs.positionSS,
-            renderingLayers,
             bakeDiffuseLighting,
             backBakeDiffuseLighting);
     }
@@ -190,7 +185,7 @@ void SampleBakedGI(
     float3 backNormalWS,
     uint renderingLayers,
     float2 uvStaticLightmap,
-    float2 uvDynamicLightmap,
+    float2 uvDynamicLightmap,   
     out float3 bakeDiffuseLighting,
     out float3 backBakeDiffuseLighting)
 {
@@ -221,11 +216,7 @@ float4 SampleShadowMask(float3 positionRWS, float2 uvStaticLightmap) // normalWS
 {
 #if defined(LIGHTMAP_ON)
     float2 uv = uvStaticLightmap * unity_LightmapST.xy + unity_LightmapST.zw;
-    #if defined(LIGHTMAP_BICUBIC_SAMPLING)
-    return SampleLightmapBicubic(SHADOWMASK_NAME, SHADOWMASK_SAMPLER_NAME, SHADOWMASK_SAMPLE_EXTRA_ARGS);
-    #else
     return SAMPLE_TEXTURE2D_LIGHTMAP(SHADOWMASK_NAME, SHADOWMASK_SAMPLER_NAME, SHADOWMASK_SAMPLE_EXTRA_ARGS); // Can't reuse sampler from Lightmap because with shader graph, the compile could optimize out the lightmaps if metal is 1
-    #endif
 #elif (defined(PROBE_VOLUMES_L1) || defined(PROBE_VOLUMES_L2))
     return 1;
 #else

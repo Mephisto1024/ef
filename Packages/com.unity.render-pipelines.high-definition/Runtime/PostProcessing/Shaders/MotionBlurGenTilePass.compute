@@ -1,6 +1,6 @@
 #pragma kernel TileGenPass  GEN_PASS
 
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 #pragma multi_compile _ SCATTERING
 
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/PostProcessing/Shaders/MotionBlurTileCommon.hlsl"
@@ -90,25 +90,25 @@ void TileGenPass(uint3 id : SV_DispatchThreadID, uint gid : SV_GroupIndex, uint2
     uint threadIdx = groupThreadId.y * TILE_SIZE + groupThreadId.x;
 
     float2 motionVec = LOAD_TEXTURE2D_X(_MotionVecAndDepth, id.xy).xy;
-    float2 maxMotionVec = motionVec;
-    float minMotionVecLength = MotionVecLengthFromEncoded(motionVec);
-    float3 minMaxMotionVec = ParallelReduction(gid, threadIdx, motionVec);
+	float2 maxMotionVec = motionVec;
+	float minMotionVecLength = MotionVecLengthFromEncoded(motionVec);
+	float3 minMaxMotionVec = ParallelReduction(gid, threadIdx, motionVec);
 
-    if (all(id.xy < uint2(_ScreenSize.xy - TILE_SIZE)))
-    {
-        minMotionVecLength = minMaxMotionVec.x;
-        maxMotionVec = minMaxMotionVec.yz;
-    }
+	if (all(id.xy < uint2(_ScreenSize.xy - TILE_SIZE)))
+	{
+		minMotionVecLength = minMaxMotionVec.x;
+		maxMotionVec = minMaxMotionVec.yz;
+	}
 
-    if (threadIdx == 0)
-    {
+	if (threadIdx == 0)
+	{
 #ifdef SCATTERING
-        _TileToScatterMax[COORD_TEXTURE2D_X(groupID.xy)] = PackMotionVec(maxMotionVec);
-        _TileToScatterMin[COORD_TEXTURE2D_X(groupID.xy)] = (minMotionVecLength);
+		_TileToScatterMax[COORD_TEXTURE2D_X(groupID.xy)] = PackMotionVec(maxMotionVec);
+		_TileToScatterMin[COORD_TEXTURE2D_X(groupID.xy)] = (minMotionVecLength);
 #else
-        _TileMinMaxMotionVec[COORD_TEXTURE2D_X(groupID.xy)] = float3(maxMotionVec.x, maxMotionVec.y, minMotionVecLength);
+		_TileMinMaxMotionVec[COORD_TEXTURE2D_X(groupID.xy)] = float3(maxMotionVec.x, maxMotionVec.y, minMotionVecLength);
 #endif
-    }
+	}
 
 
 }

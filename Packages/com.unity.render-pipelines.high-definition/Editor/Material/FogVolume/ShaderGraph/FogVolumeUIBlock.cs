@@ -5,7 +5,6 @@ using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.Rendering;
 using UnityEditor.ShaderGraph;
 using System.Linq;
-using UnityEditor.Rendering.HighDefinition.ShaderGraph;
 
 // Include material common properties names
 using static UnityEngine.Rendering.HighDefinition.HDMaterialProperties;
@@ -19,12 +18,11 @@ namespace UnityEditor.Rendering.HighDefinition
     {
         static class Styles
         {
-            public static GUIContent FogVolumeHeader = new GUIContent("Fog Volume Options", "Controls the settings of the fog.");
+            public static GUIContent FogVolumeHeader = new GUIContent("Fog Options", "Controls the settings of the fog.");
+            public static readonly GUIContent blendMode = new GUIContent("Blend Mode", "Specifies how the fog will be blended with the global fog.");
         }
 
-        MaterialProperty blendMode;
-        MaterialProperty singleScatteringAlbedo;
-        MaterialProperty fogDistance;
+        MaterialProperty blendMode = null;
 
         /// <summary>
         /// Create the UI block for the fog volume material type.
@@ -38,8 +36,6 @@ namespace UnityEditor.Rendering.HighDefinition
         public override void LoadMaterialProperties()
         {
             blendMode = FindProperty(FogVolumeAPI.k_BlendModeProperty);
-            singleScatteringAlbedo = FindProperty(FogVolumeAPI.k_SingleScatteringAlbedoProperty);
-            fogDistance = FindProperty(FogVolumeAPI.k_FogDistanceProperty);
         }
 
         /// <summary>
@@ -47,9 +43,9 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         protected override void OnGUIOpen()
         {
-            materialEditor.ShaderProperty(singleScatteringAlbedo, FogVolumePropertyBlock.Styles.singleScatteringAlbedo);
-            materialEditor.ShaderProperty(fogDistance, FogVolumePropertyBlock.Styles.fogDistance);
-            materialEditor.ShaderProperty(blendMode, FogVolumePropertyBlock.Styles.blendMode);
+            // Disabled for now since we already have the option in the local volumetric fog.
+            // We'll enable this for VFX graph integration
+            // materialEditor.ShaderProperty(blendMode, Styles.blendMode);
         }
     }
 }

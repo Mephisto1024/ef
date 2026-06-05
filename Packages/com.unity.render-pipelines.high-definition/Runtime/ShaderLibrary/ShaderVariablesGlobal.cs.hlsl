@@ -7,7 +7,12 @@
 //
 // UnityEngine.Rendering.HighDefinition.ShaderVariablesGlobal:  static fields
 //
-#define RENDERING_LAYERS_MASK (65535)
+#define RENDERING_LIGHT_LAYERS_MASK (255)
+#define RENDERING_LIGHT_LAYERS_MASK_SHIFT (0)
+#define RENDERING_DECAL_LAYERS_MASK (65280)
+#define RENDERING_DECAL_LAYERS_MASK_SHIFT (8)
+#define DEFAULT_RENDERING_LAYER_MASK (257)
+#define DEFAULT_DECAL_LAYERS (255)
 
 // Generated from UnityEngine.Rendering.HighDefinition.ShaderVariablesGlobal
 // PackingRules = Exact
@@ -21,7 +26,6 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float4x4 _CameraViewProjMatrix;
     float4x4 _InvViewProjMatrix;
     float4x4 _NonJitteredViewProjMatrix;
-    float4x4 _NonJitteredInvViewProjMatrix;
     float4x4 _PrevViewProjMatrix;
     float4x4 _PrevInvViewProjMatrix;
     float4 _WorldSpaceCameraPos_Internal;
@@ -35,7 +39,6 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float4 _DynamicResolutionFullscreenScale;
     float4 _ZBufferParams;
     float4 _ProjectionParams;
-    float4 _InvProjParams;
     float4 unity_OrthoParams;
     float4 _ScreenParams;
     float4 _FrustumPlanes[6];
@@ -48,8 +51,6 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float4 unity_DeltaTime;
     float4 _TimeParameters;
     float4 _LastTimeParameters;
-    float4 _PlanetCenterRadius;
-    float4 _PlanetUpAltitude;
     int _FogEnabled;
     int _PBRFogEnabled;
     int _EnableVolumetricFog;
@@ -58,7 +59,7 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float _FogColorMode;
     float _GlobalMipBias;
     float _GlobalMipBiasPow2;
-    uint _RayTracingCheckerIndex;
+    float _Pad0;
     float4 _MipFogParameters;
     float4 _HeightFogBaseScattering;
     float _HeightFogBaseExtinction;
@@ -82,35 +83,14 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float4 _AreaShadowAtlasSize;
     float4 _CachedShadowAtlasSize;
     float4 _CachedAreaShadowAtlasSize;
-    float4 _BoundsSS;
-    float _UpDirectionX;
-    float _UpDirectionY;
-    float _BufferStride;
-    int _EnableWater;
-    float4 _WaterAmbientProbe;
-    float4 _UnderWaterScatteringExtinction;
-    float4 _UnderWaterUpHeight;
-    int _UnderWaterSurfaceIndex;
-    float _UnderWaterCausticsIntensity;
-    float _UnderWaterCausticsPlaneBlendDistance;
-    float _UnderWaterCausticsTilingFactor;
-    float4x4 _UnderWaterSurfaceTransform_Inverse;
-    float _UnderWaterCausticsMaxLOD;
-    float _UnderWaterCausticsShadowIntensity;
-    float _UnderWaterCausticsRegionSize;
-    int _CustomOutputForCustomPass;
-    int _PreRefractionPass;
-    int _SpecularFade;
-    uint _EnableRenderingLayers;
     int _ReflectionsMode;
+    int _UnusedPadding0;
+    int _UnusedPadding1;
+    int _UnusedPadding2;
     uint _DirectionalLightCount;
     uint _PunctualLightCount;
     uint _AreaLightCount;
     uint _EnvLightCount;
-    uint _WorldDirectionalLightCount;
-    uint _WorldPunctualLightCount;
-    uint _WorldAreaLightCount;
-    uint _WorldEnvLightCount;
     int _EnvLightSkyEnabled;
     uint _CascadeShadowCount;
     int _DirectionalShadowIndex;
@@ -151,8 +131,6 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float4 _ShapeParamsAndMaxScatterDists[16];
     float4 _TransmissionTintsAndFresnel0[16];
     float4 _WorldScalesAndFilterRadiiAndThicknessRemaps[16];
-    float4 _DualLobeAndDiffusePower[16];
-    float4 _BorderAttenuationColor[16];
     uint4 _DiffusionProfileHashTable[16];
     uint _EnableSubsurfaceScattering;
     uint _TexturingModeFlags;
@@ -176,11 +154,6 @@ GLOBAL_CBUFFER_START(ShaderVariablesGlobal, b0)
     float _DeExposureMultiplier;
     float4 _ScreenSizeOverride;
     float4 _ScreenCoordScaleBias;
-    float2 _VolumetricCloudsShadowScale;
-    uint _EnableComputeThickness;
-    float _VolumetricCloudsFallBackValue;
-    float4 _VolumetricCloudsShadowOriginToggle;
-    float4 _ColorPyramidUvScaleAndLimitCurrentFrame;
     float4 _ColorPyramidUvScaleAndLimitPrevFrame;
 CBUFFER_END
 

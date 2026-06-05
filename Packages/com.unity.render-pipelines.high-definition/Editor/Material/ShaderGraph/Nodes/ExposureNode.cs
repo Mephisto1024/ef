@@ -36,6 +36,8 @@ namespace UnityEditor.Rendering.HighDefinition
             UpdateNodeAfterDeserialization();
         }
 
+        public override string documentationURL => Documentation.GetPageLink("SGNode-Exposure");
+
         [SerializeField]
         ExposureType m_ExposureType;
         [EnumControl("Type")]

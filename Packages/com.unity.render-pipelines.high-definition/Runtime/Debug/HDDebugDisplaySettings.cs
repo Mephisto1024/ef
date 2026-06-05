@@ -3,26 +3,10 @@ namespace UnityEngine.Rendering.HighDefinition
     internal class HDDebugDisplaySettings : DebugDisplaySettings<HDDebugDisplaySettings>
     {
         /// <summary>
-        /// Rendering Debugger display stats.
-        /// </summary>
-        internal DebugDisplaySettingsStats<HDProfileId> displayStats { get; private set; }
-
-        /// <summary>
         /// Volume-related Rendering Debugger settings.
         /// </summary>
-        internal DebugDisplaySettingsVolume volumeSettings { get; private set; }
+        internal DebugDisplaySettingsVolume VolumeSettings { get; private set; }
 
-        /// <summary>
-        /// Decal-related Rendering Debugger settings.
-        /// </summary>
-        internal DebugDisplaySettingsDecal decalSettings { get; private set; }
-
-        /// <summary>
-        /// GPU Resident Drawer Rendering Debugger settings and statistics.
-        /// </summary>
-        internal DebugDisplayGPUResidentDrawer gpuResidentDrawerSettings { get; private set; }
-
-        internal DebugDisplaySettingsCamera cameraSettings { get; private set; }
 
 #if ENABLE_VIRTUALTEXTURES
         internal DebugDisplayVirtualTexturing vtSettings { get; private set; }
@@ -35,20 +19,10 @@ namespace UnityEngine.Rendering.HighDefinition
         public override void Reset()
         {
             base.Reset();
-            displayStats = Add(new DebugDisplaySettingsStats<HDProfileId>(new HDDebugDisplayStats()));
-            volumeSettings = Add(new DebugDisplaySettingsVolume());
-            decalSettings = Add(new DebugDisplaySettingsDecal());
-            gpuResidentDrawerSettings = Add(new DebugDisplayGPUResidentDrawer());
-            cameraSettings = Add(new DebugDisplaySettingsCamera());
+            VolumeSettings = Add(new DebugDisplaySettingsVolume(new HDVolumeDebugSettings()));
 #if ENABLE_VIRTUALTEXTURES
             vtSettings = Add(new DebugDisplayVirtualTexturing());
 #endif
-        }
-
-        internal void UpdateDisplayStats()
-        {
-            if (displayStats != null)
-                displayStats.debugDisplayStats.Update();
         }
     }
 }

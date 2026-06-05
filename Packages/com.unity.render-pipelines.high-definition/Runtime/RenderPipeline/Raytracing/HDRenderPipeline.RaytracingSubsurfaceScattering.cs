@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -25,8 +25,8 @@ namespace UnityEngine.Rendering.HighDefinition
 
         void InitializeSubsurfaceScatteringRT()
         {
-            ComputeShader rayTracingSubSurfaceCS = rayTracingResources.subSurfaceRayTracingCS;
-            ComputeShader deferredRayTracingCS = rayTracingResources.deferredRayTracingCS;
+            ComputeShader rayTracingSubSurfaceCS = m_GlobalSettings.renderPipelineRayTracingResources.subSurfaceRayTracingCS;
+            ComputeShader deferredRayTracingCS = m_GlobalSettings.renderPipelineRayTracingResources.deferredRaytracingCS;
 
             m_SSSClearTextureKernel = rayTracingSubSurfaceCS.FindKernel("ClearTexture");
             m_RaytracingDiffuseDeferredKernel = deferredRayTracingCS.FindKernel("RaytracingDiffuseDeferred");
@@ -80,8 +80,10 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle TraceRTSSS(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle depthStencilBuffer, TextureHandle normalBuffer, TextureHandle sssColor, TextureHandle ssgiBuffer, TextureHandle colorBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<TraceRTSSSPassData>("Composing the result of RTSSS", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingSSSTrace)))
+            using (var builder = renderGraph.AddRenderPass<TraceRTSSSPassData>("Composing the result of RTSSS", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingSSSTrace)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Grab the SSS params
                 var settings = hdCamera.volumeStack.GetComponent<SubSurfaceScattering>();
                 // Camera parameters
@@ -97,54 +99,49 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.rtDeferredLightingKernel = m_RaytracingDiffuseDeferredKernel;
 
                 // other required parameters
-                passData.rayTracingSubSurfaceRT = rayTracingResources.subSurfaceRayTracingRT;
-                passData.rayTracingSubSurfaceCS = rayTracingResources.subSurfaceRayTracingCS;
-                passData.deferredRayTracingCS = rayTracingResources.deferredRayTracingCS;
+                passData.rayTracingSubSurfaceRT = m_GlobalSettings.renderPipelineRayTracingResources.subSurfaceRayTracingRT;
+                passData.rayTracingSubSurfaceCS = m_GlobalSettings.renderPipelineRayTracingResources.subSurfaceRayTracingCS;
+                passData.deferredRayTracingCS = m_GlobalSettings.renderPipelineRayTracingResources.deferredRaytracingCS;
                 passData.accelerationStructure = RequestAccelerationStructure(hdCamera);
                 passData.lightCluster = RequestLightCluster();
                 passData.shaderVariablesRayTracingCB = m_ShaderVariablesRayTracingCB;
                 passData.ditheredTextureSet = GetBlueNoiseManager().DitheredTextureSet8SPP();
 
-                passData.depthStencilBuffer = depthStencilBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.sssColor = sssColor;
-                builder.UseTexture(passData.sssColor, AccessFlags.Read);
+                passData.depthStencilBuffer = builder.UseDepthBuffer(depthStencilBuffer, DepthAccess.Read);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.sssColor = builder.ReadTexture(sssColor);
                 passData.intermediateBuffer0 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 0" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 0" });
                 passData.intermediateBuffer1 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 1" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 1" });
                 passData.intermediateBuffer2 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 2" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 2" });
                 passData.intermediateBuffer3 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 3" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Texture 3" });
                 passData.directionBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Distance buffer" });
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Ray Traced SSS" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Distance buffer" });
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Ray Traced SSS" }));
 
                 builder.SetRenderFunc(
-                    (TraceRTSSSPassData data, UnsafeGraphContext ctx) =>
+                    (TraceRTSSSPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Evaluate the dispatch parameters
                         int numTilesXHR = (data.texWidth + (s_sssTileSize - 1)) / s_sssTileSize;
                         int numTilesYHR = (data.texHeight + (s_sssTileSize - 1)) / s_sssTileSize;
 
                         // Clear the integration texture first
-                        natCmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.clearTextureKernel, HDShaderIDs._DiffuseLightingTextureRW, data.outputBuffer);
-                        natCmd.DispatchCompute(data.rayTracingSubSurfaceCS, data.clearTextureKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                        ctx.cmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.clearTextureKernel, HDShaderIDs._DiffuseLightingTextureRW, data.outputBuffer);
+                        ctx.cmd.DispatchCompute(data.rayTracingSubSurfaceCS, data.clearTextureKernel, numTilesXHR, numTilesYHR, data.viewCount);
 
                         // Define the shader pass to use for the reflection pass
-                        natCmd.SetRayTracingShaderPass(data.rayTracingSubSurfaceRT, "SubSurfaceDXR");
+                        ctx.cmd.SetRayTracingShaderPass(data.rayTracingSubSurfaceRT, "SubSurfaceDXR");
 
                         // Set the acceleration structure for the pass
-                        natCmd.SetRayTracingAccelerationStructure(data.rayTracingSubSurfaceRT, HDShaderIDs._RaytracingAccelerationStructureName, data.accelerationStructure);
+                        ctx.cmd.SetRayTracingAccelerationStructure(data.rayTracingSubSurfaceRT, HDShaderIDs._RaytracingAccelerationStructureName, data.accelerationStructure);
 
                         // Inject the ray-tracing sampling data
-                        BlueNoise.BindDitheredTextureSet(natCmd, data.ditheredTextureSet);
+                        BlueNoise.BindDitheredTextureSet(ctx.cmd, data.ditheredTextureSet);
 
                         // For every sample that we need to process
                         for (int sampleIndex = 0; sampleIndex < data.sampleCount; ++sampleIndex)
@@ -153,41 +150,41 @@ namespace UnityEngine.Rendering.HighDefinition
                             data.shaderVariablesRayTracingCB._RaytracingNumSamples = data.sampleCount;
                             data.shaderVariablesRayTracingCB._RaytracingSampleIndex = sampleIndex;
                             data.shaderVariablesRayTracingCB._RayTracingAmbientProbeDimmer = 1.0f;
-                            ConstantBuffer.PushGlobal(natCmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
+                            ConstantBuffer.PushGlobal(ctx.cmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
 
                             // Bind the input textures for ray generation
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._SSSBufferTexture, data.sssColor);
-                            natCmd.SetGlobalTexture(HDShaderIDs._StencilTexture, data.depthStencilBuffer, RenderTextureSubElement.Stencil);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._SSSBufferTexture, data.sssColor);
+                            ctx.cmd.SetGlobalTexture(HDShaderIDs._StencilTexture, data.depthStencilBuffer, RenderTextureSubElement.Stencil);
 
                             // Set the output textures
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._ThroughputTextureRW, data.intermediateBuffer0);
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._NormalTextureRW, data.intermediateBuffer1);
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._PositionTextureRW, data.intermediateBuffer2);
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._DiffuseLightingTextureRW, data.intermediateBuffer3);
-                            natCmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._DirectionTextureRW, data.directionBuffer);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._ThroughputTextureRW, data.intermediateBuffer0);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._NormalTextureRW, data.intermediateBuffer1);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._PositionTextureRW, data.intermediateBuffer2);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._DiffuseLightingTextureRW, data.intermediateBuffer3);
+                            ctx.cmd.SetRayTracingTextureParam(data.rayTracingSubSurfaceRT, HDShaderIDs._DirectionTextureRW, data.directionBuffer);
 
                             // Run the computation
-                            natCmd.DispatchRays(data.rayTracingSubSurfaceRT, m_RayGenSubSurfaceShaderName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount, null);
+                            ctx.cmd.DispatchRays(data.rayTracingSubSurfaceRT, m_RayGenSubSurfaceShaderName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount);
 
                             // Now let's do the deferred shading pass on the samples
                             // Bind the lightLoop data
-                            data.lightCluster.BindLightClusterData(natCmd);
+                            data.lightCluster.BindLightClusterData(ctx.cmd);
 
                             // Bind the input textures
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._ThroughputTextureRW, data.intermediateBuffer0);
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._NormalTextureRW, data.intermediateBuffer1);
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._PositionTextureRW, data.intermediateBuffer2);
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._DirectionTextureRW, data.directionBuffer);
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._DiffuseLightingTextureRW, data.intermediateBuffer3);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._ThroughputTextureRW, data.intermediateBuffer0);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._NormalTextureRW, data.intermediateBuffer1);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._PositionTextureRW, data.intermediateBuffer2);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._DirectionTextureRW, data.directionBuffer);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._DiffuseLightingTextureRW, data.intermediateBuffer3);
 
                             // Bind the output texture (it is used for accumulation read and write)
-                            natCmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._RaytracingLitBufferRW, data.outputBuffer);
+                            ctx.cmd.SetComputeTextureParam(data.deferredRayTracingCS, data.rtDeferredLightingKernel, HDShaderIDs._RaytracingLitBufferRW, data.outputBuffer);
 
                             // Compute the Lighting
-                            natCmd.DispatchCompute(data.deferredRayTracingCS, data.rtDeferredLightingKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                            ctx.cmd.DispatchCompute(data.deferredRayTracingCS, data.rtDeferredLightingKernel, numTilesXHR, numTilesYHR, data.viewCount);
                         }
                     });
 
@@ -243,8 +240,10 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle CombineRTSSS(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle rayTracedSSS, TextureHandle depthStencilBuffer, TextureHandle sssColor, TextureHandle ssgiBuffer, TextureHandle diffuseLightingBuffer, TextureHandle colorBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<ComposeRTSSSPassData>("Composing the result of RTSSS", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingSSSCompose)))
+            using (var builder = renderGraph.AddRenderPass<ComposeRTSSSPassData>("Composing the result of RTSSS", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingSSSCompose)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Camera parameters
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -257,44 +256,33 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.combineSSSKernel = passData.validSSGI ? m_CombineSubSurfaceWithGIKernel : m_CombineSubSurfaceKernel;
 
                 // Other parameters
-                passData.rayTracingSubSurfaceCS = rayTracingResources.subSurfaceRayTracingCS;
+                passData.rayTracingSubSurfaceCS = m_GlobalSettings.renderPipelineRayTracingResources.subSurfaceRayTracingCS;
                 passData.combineLightingMat = m_CombineLightingPass;
 
-                passData.depthStencilBuffer = depthStencilBuffer;
-                builder.SetRenderAttachmentDepth(depthStencilBuffer, AccessFlags.Read);
-                passData.sssColor = sssColor;
-                builder.UseTexture(passData.sssColor, AccessFlags.Read);
-                if (passData.validSSGI)
-                    passData.ssgiBuffer = ssgiBuffer;
-                else
-                    passData.ssgiBuffer = renderGraph.defaultResources.blackTextureXR;
-                builder.UseTexture(passData.ssgiBuffer, AccessFlags.Read);
-
-                passData.diffuseLightingBuffer = diffuseLightingBuffer;
-                builder.UseTexture(passData.diffuseLightingBuffer, AccessFlags.Read);
-                passData.subsurfaceBuffer = rayTracedSSS;
-                builder.UseTexture(passData.subsurfaceBuffer, AccessFlags.Read);
-                passData.colorBuffer = colorBuffer;
-                builder.UseTexture(passData.colorBuffer, AccessFlags.ReadWrite);
+                passData.depthStencilBuffer = builder.UseDepthBuffer(depthStencilBuffer, DepthAccess.Read);
+                passData.sssColor = builder.ReadTexture(sssColor);
+                passData.ssgiBuffer = passData.validSSGI ? builder.ReadTexture(ssgiBuffer) : renderGraph.defaultResources.blackTextureXR;
+                passData.diffuseLightingBuffer = builder.ReadTexture(diffuseLightingBuffer);
+                passData.subsurfaceBuffer = builder.ReadTexture(rayTracedSSS);
+                passData.colorBuffer = builder.ReadWriteTexture(colorBuffer);
 
                 builder.SetRenderFunc(
-                    (ComposeRTSSSPassData data, UnsafeGraphContext ctx) =>
+                    (ComposeRTSSSPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Evaluate the dispatch parameters
                         int numTilesXHR = (data.texWidth + (s_sssTileSize - 1)) / s_sssTileSize;
                         int numTilesYHR = (data.texHeight + (s_sssTileSize - 1)) / s_sssTileSize;
 
-                        natCmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._SubSurfaceLightingBuffer, data.subsurfaceBuffer);
-                        natCmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._DiffuseLightingTextureRW, data.diffuseLightingBuffer);
-                        natCmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._SSSBufferTexture, data.sssColor);
+                        ctx.cmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._SubSurfaceLightingBuffer, data.subsurfaceBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._DiffuseLightingTextureRW, data.diffuseLightingBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._SSSBufferTexture, data.sssColor);
                         if (data.validSSGI)
-                            natCmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._IndirectDiffuseLightingBuffer, data.ssgiBuffer);
-                        natCmd.DispatchCompute(data.rayTracingSubSurfaceCS, data.combineSSSKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                            ctx.cmd.SetComputeTextureParam(data.rayTracingSubSurfaceCS, data.combineSSSKernel, HDShaderIDs._IndirectDiffuseLightingBuffer, data.ssgiBuffer);
+                        ctx.cmd.DispatchCompute(data.rayTracingSubSurfaceCS, data.combineSSSKernel, numTilesXHR, numTilesYHR, data.viewCount);
 
                         // Combine it with the rest of the lighting
                         data.combineLightingMat.SetTexture(HDShaderIDs._IrradianceSource, data.diffuseLightingBuffer);
-                        HDUtils.DrawFullScreen(natCmd, data.combineLightingMat, data.colorBuffer, data.depthStencilBuffer, shaderPassId: 1);
+                        HDUtils.DrawFullScreen(ctx.cmd, data.combineLightingMat, data.colorBuffer, data.depthStencilBuffer, shaderPassId: 1);
                     });
 
                 return passData.colorBuffer;

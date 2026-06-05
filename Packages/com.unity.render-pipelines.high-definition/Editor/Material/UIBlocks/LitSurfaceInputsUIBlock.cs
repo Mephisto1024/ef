@@ -206,6 +206,7 @@ namespace UnityEditor.Rendering.HighDefinition
         // Material ID
         MaterialProperty materialID = null;
         MaterialProperty transmissionEnable = null;
+        const string kTransmissionEnable = "_TransmissionEnable";
 
         // Coat mask
         MaterialProperty coatMask = null;
@@ -389,12 +390,12 @@ namespace UnityEditor.Rendering.HighDefinition
                 materialEditor.MinMaxShaderProperty(alphaRemapMin[m_LayerIndex], alphaRemapMax[m_LayerIndex], 0.0f, 1.0f, Styles.alphaRemappingText);
             }
 
-            materialEditor.TexturePropertySingleLine((materials.All(m => m.GetMaterialType() == MaterialId.LitSpecular)) ? Styles.maskMapSpecularText : Styles.maskMapSText, maskMap[m_LayerIndex]);
+            materialEditor.TexturePropertySingleLine((materials.All(m => m.GetMaterialId() == MaterialId.LitSpecular)) ? Styles.maskMapSpecularText : Styles.maskMapSText, maskMap[m_LayerIndex]);
 
             bool hasMetallic = materials.All(m =>
-                m.GetMaterialType() == MaterialId.LitStandard ||
-                m.GetMaterialType() == MaterialId.LitAniso ||
-                m.GetMaterialType() == MaterialId.LitIridescence);
+                m.GetMaterialId() == MaterialId.LitStandard ||
+                m.GetMaterialId() == MaterialId.LitAniso ||
+                m.GetMaterialId() == MaterialId.LitIridescence);
 
             if (maskMap[m_LayerIndex].textureValue == null)
             {
@@ -478,10 +479,10 @@ namespace UnityEditor.Rendering.HighDefinition
                 }
             }
 
-            if (materials.All(m => m.GetMaterialType() == materials[0].GetMaterialType()))
+            if (materials.All(m => m.GetMaterialId() == materials[0].GetMaterialId()))
             {
                 // We can use materials[0] because all the material IDs have the same value
-                switch (materials[0].GetMaterialType())
+                switch (materials[0].GetMaterialId())
                 {
                     case MaterialId.LitSSS:
                     case MaterialId.LitTranslucent:

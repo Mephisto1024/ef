@@ -6,7 +6,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
     /// <summary>Obsolete</summary>
     [Flags]
-    [Obsolete("#from(2021.1)")]
+    [Obsolete]
     internal enum ObsoleteCaptureSettingsOverrides
     {
         //CubeResolution = 1 << 0,
@@ -46,7 +46,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
     /// <summary>Obsolete</summary>
     [Serializable]
-    [Obsolete("#from(2021.1)")]
+    [Obsolete]
     internal class ObsoleteCaptureSettings
     {
         /// <summary>Obsolete</summary>

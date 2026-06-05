@@ -48,8 +48,6 @@ namespace UnityEngine.Rendering.HighDefinition
         roughReflections = 1 << 17,
         /// <summary>cube resolution.</summary>
         cubeResolution = 1 << 18,
-        /// <summary>importance</summary>
-        importance = 1 << 19,
     }
 
     /// <summary>
@@ -119,30 +117,26 @@ namespace UnityEngine.Rendering.HighDefinition
         public struct Lighting
         {
             /// <summary>Default value.</summary>
-            [Obsolete("Use Lighting.NewDefault() instead. #from(2019.3)")]
+            [Obsolete("Since 2019.3, use Lighting.NewDefault() instead.")]
             public static readonly Lighting @default = default;
             /// <summary>Default value.</summary>
             /// <returns>The default value.</returns>
             public static Lighting NewDefault() => new Lighting
             {
-                importance = 1,
                 multiplier = 1.0f,
                 weight = 1.0f,
-                lightLayer = (RenderingLayerMask) (uint) UnityEngine.RenderingLayerMask.defaultRenderingLayerMask,
+                lightLayer = LightLayerEnum.LightLayerDefault,
                 fadeDistance = 10000f,
                 rangeCompressionFactor = 1.0f
             };
 
-            /// <summary>A value used to better filter probes than only by size. Probe with higher importance are displayed over the lower ones,
-            /// and smaller (volume) probes of same importance are displayed on top of bigger ones.</summary>
-            public int importance;
             /// <summary>A multiplier applied to the radiance of the Probe.</summary>
             public float multiplier;
             /// <summary>A weight applied to the influence of the Probe.</summary>
             [Range(0, 1)]
             public float weight;
             /// <summary>An enum flag to select which Light Layers this Probe interacts with.</summary>
-            public RenderingLayerMask lightLayer;
+            public LightLayerEnum lightLayer;
             /// <summary>The distance at which reflections smoothly fade out before HDRP cut them completely.</summary>
             public float fadeDistance;
             /// <summary>The result of the rendering of the probe will be divided by this factor. When the probe is read, this factor is undone as the probe data is read.
@@ -156,7 +150,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public struct ProxySettings
         {
             /// <summary>Default value.</summary>
-            [Obsolete("Use ProxySettings.NewDefault() instead. #from(2019.3)")]
+            [Obsolete("Since 2019.3, use ProxySettings.NewDefault() instead.")]
             public static readonly ProxySettings @default = default;
             /// <summary>Default value.</summary>
             /// <returns>The default value.</returns>
@@ -187,7 +181,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public struct Frustum
         {
             /// <summary>Obsolete</summary>
-            [Obsolete("Use Frustum.NewDefault() instead. #from(2019.3)")]
+            [Obsolete("Since 2019.3, use Frustum.NewDefault() instead.")]
             public static readonly Frustum @default = default;
             /// <summary>Default value.</summary>
             /// <returns>The default value.</returns>
@@ -239,7 +233,7 @@ namespace UnityEngine.Rendering.HighDefinition
         internal const CubeReflectionResolution k_DefaultCubeResolution = CubeReflectionResolution.CubeReflectionResolution128;
 
         /// <summary>Default value.</summary>
-        [Obsolete("Use ProbeSettings.NewDefault() instead. #from(2019.3)")]
+        [Obsolete("Since 2019.3, use ProbeSettings.NewDefault() instead.")]
         public static ProbeSettings @default = default;
         /// <summary>Default value.</summary>
         /// <returns>The default value.</returns>

@@ -480,156 +480,156 @@ void main()
     // 5. Probe/SH 风格的体积光照。fine/mid/coarse 三层 3D 体积混合出漫反射颜色和主方向。
     if (_15._m102.y < 0.5)
     {
-        vec3 _601 = worldPos - (_15._m126.xyz + (cameraForwardWS * (-_15._m128.w)));
-        float _615 = spvNMax(clamp((spvNMax(abs(_601.x), abs(_601.z)) - 464.0) * 0.03125, 0.0, 1.0), clamp((abs(_601.y) - 208.0) * 0.03125, 0.0, 1.0));
-        vec4 _917;
-        vec4 _918;
-        vec4 _919;
-        float _920;
-        float _921;
-        if ((_15._m126.w != 0.0) && (_615 < 1.0))
+        vec3 outerProbeDeltaWS = worldPos - (_15._m126.xyz + (cameraForwardWS * (-_15._m128.w)));
+        float outerProbeFade = spvNMax(clamp((spvNMax(abs(outerProbeDeltaWS.x), abs(outerProbeDeltaWS.z)) - 464.0) * 0.03125, 0.0, 1.0), clamp((abs(outerProbeDeltaWS.y) - 208.0) * 0.03125, 0.0, 1.0));
+        vec4 volumeProbeSh2;
+        vec4 volumeProbeSh1;
+        vec4 volumeProbeSh0;
+        float shDirectionalBlend;
+        float shAmbientBlend;
+        if ((_15._m126.w != 0.0) && (outerProbeFade < 1.0))
         {
-            vec3 _628 = worldPos - (_15._m126.xyz + (cameraForwardWS * (-_15._m128.y)));
-            float _642 = spvNMax(clamp((spvNMax(abs(_628.x), abs(_628.z)) - 29.0) * 0.5, 0.0, 1.0), clamp((abs(_628.y) - 13.0) * 0.5, 0.0, 1.0));
-            float _718;
-            vec4 _719;
-            vec4 _720;
-            vec4 _721;
-            if (_642 < 1.0)
+            vec3 fineProbeDeltaWS = worldPos - (_15._m126.xyz + (cameraForwardWS * (-_15._m128.y)));
+            float fineProbeFade = spvNMax(clamp((spvNMax(abs(fineProbeDeltaWS.x), abs(fineProbeDeltaWS.z)) - 29.0) * 0.5, 0.0, 1.0), clamp((abs(fineProbeDeltaWS.y) - 13.0) * 0.5, 0.0, 1.0));
+            float fineCoverageAccum;
+            vec4 fineSh2Accum;
+            vec4 fineSh1Accum;
+            vec4 fineSh0Accum;
+            if (fineProbeFade < 1.0)
             {
-                vec3 _651 = ((worldPos * 2.0) + vec3(0.5)) * _15._m127.xyz;
-                vec3 _653 = _651 - floor(_651);
-                vec4 _657 = textureLod(sampler3D(probeMaskFineTex, samplerVolume), _653, 0.0);
-                float _658 = 1.0 - _642;
-                float _662 = _15._m127.y * 0.5;
-                float _667 = _653.x;
-                float _668 = clamp(_653.y, _662, 1.0 - _662) * 0.3333333432674407958984375;
-                float _669 = _653.z;
-                vec4 _672 = textureLod(sampler3D(probeDataFineTex, samplerLinearClamp), vec3(_667, _668, _669), 0.0);
-                float _688 = _657.x;
-                float _698 = _657.y;
-                float _708 = _657.z;
-                _718 = _615 + (_672.w * _658);
-                _719 = vec4(((textureLod(sampler3D(probeDataFineTex, samplerLinearClamp), vec3(_667, _668 + 0.666666686534881591796875, _669), 0.0).xyz * 4.0) - vec3(2.0)) * _708, _708) * _658;
-                _720 = vec4(((textureLod(sampler3D(probeDataFineTex, samplerLinearClamp), vec3(_667, _668 + 0.3333333432674407958984375, _669), 0.0).xyz * 4.0) - vec3(2.0)) * _698, _698) * _658;
-                _721 = vec4(((_672.xyz * 4.0) - vec3(2.0)) * _688, _688) * _658;
+                vec3 fineGridCoord = ((worldPos * 2.0) + vec3(0.5)) * _15._m127.xyz;
+                vec3 fineProbeUVW = fineGridCoord - floor(fineGridCoord);
+                vec4 fineProbeMask = textureLod(sampler3D(probeMaskFineTex, samplerVolume), fineProbeUVW, 0.0);
+                float fineProbeWeight = 1.0 - fineProbeFade;
+                float fineTexelHalfY = _15._m127.y * 0.5;
+                float fineU = fineProbeUVW.x;
+                float fineV0 = clamp(fineProbeUVW.y, fineTexelHalfY, 1.0 - fineTexelHalfY) * 0.3333333432674407958984375;
+                float fineW = fineProbeUVW.z;
+                vec4 fineProbeData0 = textureLod(sampler3D(probeDataFineTex, samplerLinearClamp), vec3(fineU, fineV0, fineW), 0.0);
+                float fineMask0 = fineProbeMask.x;
+                float fineMask1 = fineProbeMask.y;
+                float fineMask2 = fineProbeMask.z;
+                fineCoverageAccum = outerProbeFade + (fineProbeData0.w * fineProbeWeight);
+                fineSh2Accum = vec4(((textureLod(sampler3D(probeDataFineTex, samplerLinearClamp), vec3(fineU, fineV0 + 0.666666686534881591796875, fineW), 0.0).xyz * 4.0) - vec3(2.0)) * fineMask2, fineMask2) * fineProbeWeight;
+                fineSh1Accum = vec4(((textureLod(sampler3D(probeDataFineTex, samplerLinearClamp), vec3(fineU, fineV0 + 0.3333333432674407958984375, fineW), 0.0).xyz * 4.0) - vec3(2.0)) * fineMask1, fineMask1) * fineProbeWeight;
+                fineSh0Accum = vec4(((fineProbeData0.xyz * 4.0) - vec3(2.0)) * fineMask0, fineMask0) * fineProbeWeight;
             }
             else
             {
-                _718 = _615;
-                _719 = vec4(0.0);
-                _720 = vec4(0.0);
-                _721 = vec4(0.0);
+                fineCoverageAccum = outerProbeFade;
+                fineSh2Accum = vec4(0.0);
+                fineSh1Accum = vec4(0.0);
+                fineSh0Accum = vec4(0.0);
             }
-            vec3 _727 = worldPos - (_15._m126.xyz + (cameraForwardWS * (-_15._m128.z)));
-            float _741 = spvNMax(clamp((spvNMax(abs(_727.x), abs(_727.z)) - 116.0) * 0.125, 0.0, 1.0), clamp((abs(_727.y) - 52.0) * 0.125, 0.0, 1.0));
-            float _821;
-            vec4 _822;
-            vec4 _823;
-            vec4 _824;
-            if (_741 < 1.0)
+            vec3 midProbeDeltaWS = worldPos - (_15._m126.xyz + (cameraForwardWS * (-_15._m128.z)));
+            float midProbeFade = spvNMax(clamp((spvNMax(abs(midProbeDeltaWS.x), abs(midProbeDeltaWS.z)) - 116.0) * 0.125, 0.0, 1.0), clamp((abs(midProbeDeltaWS.y) - 52.0) * 0.125, 0.0, 1.0));
+            float midCoverageAccum;
+            vec4 midSh2Accum;
+            vec4 midSh1Accum;
+            vec4 midSh0Accum;
+            if (midProbeFade < 1.0)
             {
-                vec3 _750 = ((worldPos * 0.5) + vec3(0.5)) * _15._m127.xyz;
-                vec3 _752 = _750 - floor(_750);
-                vec4 _756 = textureLod(sampler3D(probeMaskMidTex, samplerVolume), _752, 0.0);
-                float _758 = _642 * (1.0 - _741);
-                float _762 = _15._m127.y * 0.5;
-                float _767 = _752.x;
-                float _768 = clamp(_752.y, _762, 1.0 - _762) * 0.3333333432674407958984375;
-                float _769 = _752.z;
-                vec4 _772 = textureLod(sampler3D(probeDataMidTex, samplerLinearClamp), vec3(_767, _768, _769), 0.0);
-                float _788 = _756.x;
-                float _799 = _756.y;
-                float _810 = _756.z;
-                _821 = _718 + (_772.w * _758);
-                _822 = _719 + (vec4(((textureLod(sampler3D(probeDataMidTex, samplerLinearClamp), vec3(_767, _768 + 0.666666686534881591796875, _769), 0.0).xyz * 4.0) - vec3(2.0)) * _810, _810) * _758);
-                _823 = _720 + (vec4(((textureLod(sampler3D(probeDataMidTex, samplerLinearClamp), vec3(_767, _768 + 0.3333333432674407958984375, _769), 0.0).xyz * 4.0) - vec3(2.0)) * _799, _799) * _758);
-                _824 = _721 + (vec4(((_772.xyz * 4.0) - vec3(2.0)) * _788, _788) * _758);
+                vec3 midGridCoord = ((worldPos * 0.5) + vec3(0.5)) * _15._m127.xyz;
+                vec3 midProbeUVW = midGridCoord - floor(midGridCoord);
+                vec4 midProbeMask = textureLod(sampler3D(probeMaskMidTex, samplerVolume), midProbeUVW, 0.0);
+                float midProbeWeight = fineProbeFade * (1.0 - midProbeFade);
+                float midTexelHalfY = _15._m127.y * 0.5;
+                float midU = midProbeUVW.x;
+                float midV0 = clamp(midProbeUVW.y, midTexelHalfY, 1.0 - midTexelHalfY) * 0.3333333432674407958984375;
+                float midW = midProbeUVW.z;
+                vec4 midProbeData0 = textureLod(sampler3D(probeDataMidTex, samplerLinearClamp), vec3(midU, midV0, midW), 0.0);
+                float midMask0 = midProbeMask.x;
+                float midMask1 = midProbeMask.y;
+                float midMask2 = midProbeMask.z;
+                midCoverageAccum = fineCoverageAccum + (midProbeData0.w * midProbeWeight);
+                midSh2Accum = fineSh2Accum + (vec4(((textureLod(sampler3D(probeDataMidTex, samplerLinearClamp), vec3(midU, midV0 + 0.666666686534881591796875, midW), 0.0).xyz * 4.0) - vec3(2.0)) * midMask2, midMask2) * midProbeWeight);
+                midSh1Accum = fineSh1Accum + (vec4(((textureLod(sampler3D(probeDataMidTex, samplerLinearClamp), vec3(midU, midV0 + 0.3333333432674407958984375, midW), 0.0).xyz * 4.0) - vec3(2.0)) * midMask1, midMask1) * midProbeWeight);
+                midSh0Accum = fineSh0Accum + (vec4(((midProbeData0.xyz * 4.0) - vec3(2.0)) * midMask0, midMask0) * midProbeWeight);
             }
             else
             {
-                _821 = _718;
-                _822 = _719;
-                _823 = _720;
-                _824 = _721;
+                midCoverageAccum = fineCoverageAccum;
+                midSh2Accum = fineSh2Accum;
+                midSh1Accum = fineSh1Accum;
+                midSh0Accum = fineSh0Accum;
             }
-            vec4 _907;
-            vec4 _908;
-            vec4 _909;
-            float _910;
-            if (_741 > 0.0)
+            vec4 finalSh2Accum;
+            vec4 finalSh1Accum;
+            vec4 finalSh0Accum;
+            float finalCoverageAccum;
+            if (midProbeFade > 0.0)
             {
-                vec3 _833 = ((worldPos * 0.125) + vec3(0.5)) * _15._m127.xyz;
-                vec3 _836 = _15._m127.xyz * 0.5;
-                vec3 _838 = clamp(_833 - floor(_833), _836, vec3(1.0) - _836);
-                vec4 _842 = textureLod(sampler3D(probeMaskCoarseTex, samplerVolume), _838, 0.0);
-                float _844 = _741 * (1.0 - _615);
-                float _848 = _15._m127.y * 0.5;
-                float _853 = _838.x;
-                float _854 = clamp(_838.y, _848, 1.0 - _848) * 0.3333333432674407958984375;
-                float _855 = _838.z;
-                vec4 _858 = textureLod(sampler3D(probeDataCoarseTex, samplerLinearClamp), vec3(_853, _854, _855), 0.0);
-                float _874 = _842.x;
-                float _885 = _842.y;
-                float _896 = _842.z;
-                _907 = _822 + (vec4(((textureLod(sampler3D(probeDataCoarseTex, samplerLinearClamp), vec3(_853, _854 + 0.666666686534881591796875, _855), 0.0).xyz * 4.0) - vec3(2.0)) * _896, _896) * _844);
-                _908 = _823 + (vec4(((textureLod(sampler3D(probeDataCoarseTex, samplerLinearClamp), vec3(_853, _854 + 0.3333333432674407958984375, _855), 0.0).xyz * 4.0) - vec3(2.0)) * _885, _885) * _844);
-                _909 = _824 + (vec4(((_858.xyz * 4.0) - vec3(2.0)) * _874, _874) * _844);
-                _910 = _821 + (_858.w * _844);
+                vec3 coarseGridCoord = ((worldPos * 0.125) + vec3(0.5)) * _15._m127.xyz;
+                vec3 coarseTexelHalfUVW = _15._m127.xyz * 0.5;
+                vec3 coarseProbeUVW = clamp(coarseGridCoord - floor(coarseGridCoord), coarseTexelHalfUVW, vec3(1.0) - coarseTexelHalfUVW);
+                vec4 coarseProbeMask = textureLod(sampler3D(probeMaskCoarseTex, samplerVolume), coarseProbeUVW, 0.0);
+                float coarseProbeWeight = midProbeFade * (1.0 - outerProbeFade);
+                float coarseTexelHalfY = _15._m127.y * 0.5;
+                float coarseU = coarseProbeUVW.x;
+                float coarseV0 = clamp(coarseProbeUVW.y, coarseTexelHalfY, 1.0 - coarseTexelHalfY) * 0.3333333432674407958984375;
+                float coarseW = coarseProbeUVW.z;
+                vec4 coarseProbeData0 = textureLod(sampler3D(probeDataCoarseTex, samplerLinearClamp), vec3(coarseU, coarseV0, coarseW), 0.0);
+                float coarseMask0 = coarseProbeMask.x;
+                float coarseMask1 = coarseProbeMask.y;
+                float coarseMask2 = coarseProbeMask.z;
+                finalSh2Accum = midSh2Accum + (vec4(((textureLod(sampler3D(probeDataCoarseTex, samplerLinearClamp), vec3(coarseU, coarseV0 + 0.666666686534881591796875, coarseW), 0.0).xyz * 4.0) - vec3(2.0)) * coarseMask2, coarseMask2) * coarseProbeWeight);
+                finalSh1Accum = midSh1Accum + (vec4(((textureLod(sampler3D(probeDataCoarseTex, samplerLinearClamp), vec3(coarseU, coarseV0 + 0.3333333432674407958984375, coarseW), 0.0).xyz * 4.0) - vec3(2.0)) * coarseMask1, coarseMask1) * coarseProbeWeight);
+                finalSh0Accum = midSh0Accum + (vec4(((coarseProbeData0.xyz * 4.0) - vec3(2.0)) * coarseMask0, coarseMask0) * coarseProbeWeight);
+                finalCoverageAccum = midCoverageAccum + (coarseProbeData0.w * coarseProbeWeight);
             }
             else
             {
-                _907 = _822;
-                _908 = _823;
-                _909 = _824;
-                _910 = _821;
+                finalSh2Accum = midSh2Accum;
+                finalSh1Accum = midSh1Accum;
+                finalSh0Accum = midSh0Accum;
+                finalCoverageAccum = midCoverageAccum;
             }
-            float _913 = clamp((_910 * 2.0) - 1.0, 0.0, 1.0);
-            _917 = _907;
-            _918 = _908;
-            _919 = _909;
-            _920 = _913 - _615;
-            _921 = (_913 + _615) * 0.5;
+            float probeCoverage01 = clamp((finalCoverageAccum * 2.0) - 1.0, 0.0, 1.0);
+            volumeProbeSh2 = finalSh2Accum;
+            volumeProbeSh1 = finalSh1Accum;
+            volumeProbeSh0 = finalSh0Accum;
+            shDirectionalBlend = probeCoverage01 - outerProbeFade;
+            shAmbientBlend = (probeCoverage01 + outerProbeFade) * 0.5;
         }
         else
         {
-            _917 = vec4(0.0);
-            _918 = vec4(0.0);
-            _919 = vec4(0.0);
-            _920 = 0.0;
-            _921 = 1.0;
+            volumeProbeSh2 = vec4(0.0);
+            volumeProbeSh1 = vec4(0.0);
+            volumeProbeSh0 = vec4(0.0);
+            shDirectionalBlend = 0.0;
+            shAmbientBlend = 1.0;
         }
-        vec4 _941 = _919 + vec4(_15._m129.x * _921, (_15._m129.y * _921) + ((_15._m129.w * _920) * 0.5), _15._m129.z * _921, (_15._m129.w * _921) + ((_15._m129.y * _920) * 0.375));
-        vec4 _961 = _918 + vec4(_15._m130.x * _921, (_15._m130.y * _921) + ((_15._m130.w * _920) * 0.5), _15._m130.z * _921, (_15._m130.w * _921) + ((_15._m130.y * _920) * 0.375));
-        vec4 _981 = _917 + vec4(_15._m131.x * _921, (_15._m131.y * _921) + ((_15._m131.w * _920) * 0.5), _15._m131.z * _921, (_15._m131.w * _921) + ((_15._m131.y * _920) * 0.375));
-        vec4 _985 = vec4(normalWS, 1.0);
-        vec3 _991 = spvNMax(vec3(dot(_941, _985), dot(_961, _985), dot(_981, _985)), vec3(0.0)) * probeLightingScale;
-        vec3 _999 = ((_941.xyz * 0.2125999927520751953125) + (_961.xyz * 0.715200006961822509765625)) + (_981.xyz * 0.072200000286102294921875);
-        vec3 _1003 = _999 * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(_999, _999)));
-        float _1005 = abs(_1003.y);
-        vec3 _1006 = _1003;
-        _1006.y = _1005;
-        vec4 _1007 = vec4(_1006.x, _1006.y, _1006.z, vec4(0.0).w);
-        _1007.w = 1.0;
-        vec4 _1011 = vec4(_1003.x, _1005, _1003.z, 1.0);
-        vec3 _1016 = spvNMax(vec3(dot(_941, _1011), dot(_961, _1011), dot(_981, _1011)), vec3(0.0));
-        float _1024 = _991.z;
-        float _1025 = _991.y;
-        vec4 _1030 = mix(vec4(_1024, _1025, -1.0, 0.666666686534881591796875), vec4(_1025, _1024, 0.0, -0.3333333432674407958984375), vec4(step(_1024, _1025)));
-        float _1031 = _991.x;
-        float _1032 = _1030.x;
-        vec4 _1040 = mix(vec4(_1032, _1030.yw, _1031), vec4(_1031, _1030.yz, _1032), vec4(step(_1032, _1031)));
-        float _1041 = _1040.x;
-        float _1042 = _1040.w;
-        float _1043 = _1040.y;
-        float _1045 = _1041 - spvNMin(_1042, _1043);
-        float _1055 = fract(abs(_1040.z + ((_1042 - _1043) / ((6.0 * _1045) + 9.9999997473787516355514526367188e-05))));
-        float _1062 = spvNMin(_1045 / (_1041 + 9.9999997473787516355514526367188e-05), mix(0.699999988079071044921875, 0.3499999940395355224609375, smoothstep(0.449999988079071044921875, 0.3499999940395355224609375, abs(_1055 - 0.5))) * clamp(_1041, 0.0, 1.0));
-        float _1064 = 2.0 / (2.0 - _1062);
-        probeDominantDir = _1007;
-        probeDiffuseColor = _991;
-        probeHueColor = mix(vec3(1.0), clamp(abs((fract(vec3(_1055, _1062, _1064).xxx + vec3(1.0, 0.666666686534881591796875, 0.3333333432674407958984375)) * 6.0) - vec3(3.0)) - vec3(1.0), vec3(0.0), vec3(1.0)), vec3(_1062)) * _1064;
-        probeIntensity = spvNMax(spvNMax(spvNMax(_1016.x, _1016.y), _1016.z), 0.0) * probeLightingScale;
+        vec4 shRow0 = volumeProbeSh0 + vec4(_15._m129.x * shAmbientBlend, (_15._m129.y * shAmbientBlend) + ((_15._m129.w * shDirectionalBlend) * 0.5), _15._m129.z * shAmbientBlend, (_15._m129.w * shAmbientBlend) + ((_15._m129.y * shDirectionalBlend) * 0.375));
+        vec4 shRow1 = volumeProbeSh1 + vec4(_15._m130.x * shAmbientBlend, (_15._m130.y * shAmbientBlend) + ((_15._m130.w * shDirectionalBlend) * 0.5), _15._m130.z * shAmbientBlend, (_15._m130.w * shAmbientBlend) + ((_15._m130.y * shDirectionalBlend) * 0.375));
+        vec4 shRow2 = volumeProbeSh2 + vec4(_15._m131.x * shAmbientBlend, (_15._m131.y * shAmbientBlend) + ((_15._m131.w * shDirectionalBlend) * 0.5), _15._m131.z * shAmbientBlend, (_15._m131.w * shAmbientBlend) + ((_15._m131.y * shDirectionalBlend) * 0.375));
+        vec4 normalProbeEval = vec4(normalWS, 1.0);
+        vec3 probeDiffuse = spvNMax(vec3(dot(shRow0, normalProbeEval), dot(shRow1, normalProbeEval), dot(shRow2, normalProbeEval)), vec3(0.0)) * probeLightingScale;
+        vec3 lumaDirection = ((shRow0.xyz * 0.2125999927520751953125) + (shRow1.xyz * 0.715200006961822509765625)) + (shRow2.xyz * 0.072200000286102294921875);
+        vec3 dominantDirSigned = lumaDirection * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(lumaDirection, lumaDirection)));
+        float dominantDirAbsY = abs(dominantDirSigned.y);
+        vec3 dominantDirUp = dominantDirSigned;
+        dominantDirUp.y = dominantDirAbsY;
+        vec4 dominantDirOut = vec4(dominantDirUp.x, dominantDirUp.y, dominantDirUp.z, vec4(0.0).w);
+        dominantDirOut.w = 1.0;
+        vec4 dominantDirEval = vec4(dominantDirSigned.x, dominantDirAbsY, dominantDirSigned.z, 1.0);
+        vec3 dominantDirLighting = spvNMax(vec3(dot(shRow0, dominantDirEval), dot(shRow1, dominantDirEval), dot(shRow2, dominantDirEval)), vec3(0.0));
+        float probeBlue = probeDiffuse.z;
+        float probeGreen = probeDiffuse.y;
+        vec4 hueSortGB = mix(vec4(probeBlue, probeGreen, -1.0, 0.666666686534881591796875), vec4(probeGreen, probeBlue, 0.0, -0.3333333432674407958984375), vec4(step(probeBlue, probeGreen)));
+        float probeRed = probeDiffuse.x;
+        float maxGreenBlue = hueSortGB.x;
+        vec4 hueSortRGB = mix(vec4(maxGreenBlue, hueSortGB.yw, probeRed), vec4(probeRed, hueSortGB.yz, maxGreenBlue), vec4(step(maxGreenBlue, probeRed)));
+        float maxChannel = hueSortRGB.x;
+        float hueCompareA = hueSortRGB.w;
+        float hueCompareB = hueSortRGB.y;
+        float chroma = maxChannel - spvNMin(hueCompareA, hueCompareB);
+        float probeHue = fract(abs(hueSortRGB.z + ((hueCompareA - hueCompareB) / ((6.0 * chroma) + 9.9999997473787516355514526367188e-05))));
+        float probeSaturation = spvNMin(chroma / (maxChannel + 9.9999997473787516355514526367188e-05), mix(0.699999988079071044921875, 0.3499999940395355224609375, smoothstep(0.449999988079071044921875, 0.3499999940395355224609375, abs(probeHue - 0.5))) * clamp(maxChannel, 0.0, 1.0));
+        float saturationValueScale = 2.0 / (2.0 - probeSaturation);
+        probeDominantDir = dominantDirOut;
+        probeDiffuseColor = probeDiffuse;
+        probeHueColor = mix(vec3(1.0), clamp(abs((fract(vec3(probeHue, probeSaturation, saturationValueScale).xxx + vec3(1.0, 0.666666686534881591796875, 0.3333333432674407958984375)) * 6.0) - vec3(3.0)) - vec3(1.0), vec3(0.0), vec3(1.0)), vec3(probeSaturation)) * saturationValueScale;
+        probeIntensity = spvNMax(spvNMax(spvNMax(dominantDirLighting.x, dominantDirLighting.y), dominantDirLighting.z), 0.0) * probeLightingScale;
     }
     else
     {

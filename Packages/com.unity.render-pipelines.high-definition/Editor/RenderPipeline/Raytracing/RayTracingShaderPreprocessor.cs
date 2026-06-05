@@ -9,6 +9,8 @@ namespace UnityEditor.Rendering.HighDefinition
 
         protected override bool DoShadersStripper(HDRenderPipelineAsset hdrpAsset, Shader shader, ShaderSnippetData snippet, ShaderCompilerData inputData)
         {
+            var globalSettings = HDRenderPipelineGlobalSettings.Ensure();
+
             // If ray tracing is disabled, strip all ray tracing shaders
             if (hdrpAsset.currentPlatformRenderPipelineSettings.supportRayTracing == false)
             {
@@ -37,7 +39,7 @@ namespace UnityEditor.Rendering.HighDefinition
                 // If requested by the render pipeline settings, or if we are in a release build
                 // don't compile the DXR debug pass
                 bool isDebugDXR = snippet.passName == "DebugDXR";
-                if (isDebugDXR && HDRPBuildData.instance.stripDebugVariants)
+                if (isDebugDXR && (!Debug.isDebugBuild || !globalSettings.supportRuntimeDebugDisplay))
                     return true;
             }
 

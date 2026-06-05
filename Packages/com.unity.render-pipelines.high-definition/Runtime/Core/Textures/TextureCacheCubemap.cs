@@ -23,11 +23,7 @@ namespace UnityEngine.Rendering.HighDefinition
             : base(cacheName, sliceSize)
         {
             if (HDRenderPipeline.isReady)
-            {
-                var runtimeShaders = GraphicsSettings.GetRenderPipelineSettings<HDRenderPipelineRuntimeShaders>();
-                m_BlitCubemapFaceMaterial = CoreUtils.CreateEngineMaterial(runtimeShaders.blitCubeTextureFacePS);
-            }
-
+                m_BlitCubemapFaceMaterial = CoreUtils.CreateEngineMaterial(HDRenderPipelineGlobalSettings.instance.renderPipelineResources.shaders.blitCubeTextureFacePS);
             m_BlitCubemapFaceProperties = new MaterialPropertyBlock();
         }
 

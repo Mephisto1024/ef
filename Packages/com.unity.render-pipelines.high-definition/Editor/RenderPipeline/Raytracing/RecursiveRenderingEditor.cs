@@ -37,41 +37,39 @@ namespace UnityEditor.Experimental.Rendering.HighDefinition
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.RayTracing);
-
             HDRenderPipelineAsset currentAsset = HDRenderPipeline.currentAsset;
-            bool notSupported = currentAsset != null && !currentAsset.currentPlatformRenderPipelineSettings.supportRayTracing;
-            if (notSupported)
+            if (!currentAsset?.currentPlatformRenderPipelineSettings.supportRayTracing ?? false)
             {
                 EditorGUILayout.Space();
-                HDEditorUtils.QualitySettingsHelpBox(HDRenderPipelineUI.Styles.rayTracingUnsupportedMessage,
-                    MessageType.Warning, HDRenderPipelineUI.ExpandableGroup.Rendering,
-                    "m_RenderPipelineSettings.supportRayTracing");
+                EditorGUILayout.HelpBox("The current HDRP Asset does not support Ray Tracing.", MessageType.Error, wide: true);
+                return;
             }
 
-            if (!notSupported && RenderPipelineManager.currentPipeline is not HDRenderPipeline { rayTracingSupported: true })
+            if (RenderPipelineManager.currentPipeline is not HDRenderPipeline { rayTracingSupported: true })
                 HDRenderPipelineUI.DisplayRayTracingSupportBox();
 
-            using var disableScope = new EditorGUI.DisabledScope(notSupported);
-
-            PropertyField(m_Enable, EditorGUIUtility.TrTextContent("State"));
-
-            if (m_Enable.overrideState.boolValue && m_Enable.value.boolValue)
+            // If ray tracing is supported display the content of the volume component
+            if (HDRenderPipeline.assetSupportsRayTracing)
             {
-                using (new IndentLevelScope())
+                PropertyField(m_Enable, EditorGUIUtility.TrTextContent("State"));
+
+                if (m_Enable.overrideState.boolValue && m_Enable.value.boolValue)
                 {
-                    PropertyField(m_LayerMask);
-                    PropertyField(m_MaxDepth);
-                    PropertyField(m_RayLength, k_RayLengthText);
-                    PropertyField(m_MinSmoothness);
                     using (new IndentLevelScope())
                     {
-                        if (showAdditionalProperties)
+                        PropertyField(m_LayerMask);
+                        PropertyField(m_MaxDepth);
+                        PropertyField(m_RayLength, k_RayLengthText);
+                        PropertyField(m_MinSmoothness);
+                        using (new IndentLevelScope())
                         {
-                            EditorGUILayout.LabelField("Fallback", EditorStyles.miniLabel);
-                            PropertyField(m_RayMiss);
-                            PropertyField(m_LastBounce);
-                            PropertyField(m_AmbientProbeDimmer);
+                            if (showAdditionalProperties)
+                            {
+                                EditorGUILayout.LabelField("Fallback", EditorStyles.miniLabel);
+                                PropertyField(m_RayMiss);
+                                PropertyField(m_LastBounce);
+                                PropertyField(m_AmbientProbeDimmer);
+                            }
                         }
                     }
                 }

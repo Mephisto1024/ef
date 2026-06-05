@@ -18,6 +18,8 @@ namespace UnityEditor.Rendering.HighDefinition
             UpdateNodeAfterDeserialization();
         }
 
+        public override string documentationURL => Documentation.GetPageLink("SurfaceGradientResolveNormal");
+
         const int kNormalInputSlotId = 0;
         const string kNormalInputSlotName = "Normal";
 

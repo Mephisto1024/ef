@@ -3,7 +3,7 @@ Shader "Hidden/HDRP/CompositeUI"
     HLSLINCLUDE
 
         #pragma target 4.5
-        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+        #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
         #pragma editor_sync_compilation
         #pragma multi_compile_local_fragment _ APPLY_AFTER_POST
         #pragma multi_compile_local _ DISABLE_TEXTURE2D_X_ARRAY
@@ -21,17 +21,13 @@ Shader "Hidden/HDRP/CompositeUI"
 
         CBUFFER_START(cb)
             float4 _HDROutputParams;
-            float4 _OffscreenUIViewportParams;
-            float4 _SrcOffset;
             int _NeedsFlip;
             int _BlitTexArraySlice;
         CBUFFER_END
 
-        #define _MinNits            _HDROutputParams.x
-        #define _MaxNits            _HDROutputParams.y
-        #define _PaperWhite         _HDROutputParams.z
-        #define _FullScreenHeight   _SrcOffset.w
-        #define _ViewportLoadOffset _SrcOffset.xy
+        #define _MinNits    _HDROutputParams.x
+        #define _MaxNits    _HDROutputParams.y
+        #define _PaperWhite _HDROutputParams.z
 
         struct Attributes
         {
@@ -62,14 +58,11 @@ Shader "Hidden/HDRP/CompositeUI"
 
             float2 uv = input.texcoord;
             float2 samplePos = input.positionCS.xy;
-            float2 pixelSampleOffset = float2(-_ViewportLoadOffset.x, _ViewportLoadOffset.y);
             if (_NeedsFlip)
             {
                 uv.y = _RTHandleScale.y - uv.y;
                 samplePos.y = _ScreenSize.y - samplePos.y;
-                pixelSampleOffset.y = (_FullScreenHeight - _ScreenSize.y) - pixelSampleOffset.y;
             }
-            samplePos += pixelSampleOffset;
 
             #if defined(USE_TEXTURE2D_X_AS_ARRAY) && defined(BLIT_SINGLE_SLICE)
             float4 outColor =  LOAD_TEXTURE2D_ARRAY(_InputTexture, samplePos.xy, _BlitTexArraySlice);
@@ -89,11 +82,10 @@ Shader "Hidden/HDRP/CompositeUI"
             outColor.xyz = afterPostColor.a * outColor.xyz + afterPostColor.xyz;
             #endif
 
-            float2 uiCoord = (samplePos * _ScreenSize.zw) * _OffscreenUIViewportParams.zw + _OffscreenUIViewportParams.xy;
             #if defined(USE_TEXTURE2D_X_AS_ARRAY) && defined(BLIT_SINGLE_SLICE)
-            float4 uiValue = SAMPLE_TEXTURE2D_ARRAY_LOD(_UITexture, s_point_clamp_sampler, uiCoord, _BlitTexArraySlice, 0);
+            float4 uiValue =  LOAD_TEXTURE2D_ARRAY(_UITexture, samplePos.xy, _BlitTexArraySlice);
             #else
-            float4 uiValue = SAMPLE_TEXTURE2D_X_LOD(_UITexture, s_point_clamp_sampler, uiCoord, 0);
+            float4 uiValue = LOAD_TEXTURE2D_X(_UITexture, samplePos.xy);
             #endif
 
 

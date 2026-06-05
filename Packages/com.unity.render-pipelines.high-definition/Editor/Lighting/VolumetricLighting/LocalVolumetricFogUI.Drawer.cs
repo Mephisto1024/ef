@@ -21,6 +21,7 @@ namespace UnityEditor.Rendering.HighDefinition
 
         public static readonly CED.IDrawer Inspector = CED.Group(
             CED.Group(
+                Drawer_ToolBar,
                 Drawer_PrimarySettings
                 ),
             CED.space,
@@ -37,18 +38,30 @@ namespace UnityEditor.Rendering.HighDefinition
             ))
         );
 
+        static void Drawer_ToolBar(SerializedLocalVolumetricFog serialized, Editor owner)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            EditMode.DoInspectorToolbar(new[] { LocalVolumetricFogEditor.k_EditShape, LocalVolumetricFogEditor.k_EditBlend }, Styles.s_Toolbar_Contents, () =>
+            {
+                var bounds = new Bounds();
+                foreach (Component targetObject in owner.targets)
+                {
+                    bounds.Encapsulate(targetObject.transform.position);
+                }
+                return bounds;
+            },
+                owner);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+
         static void Drawer_PrimarySettings(SerializedLocalVolumetricFog serialized, Editor owner)
         {
-            var mode = (LocalVolumetricFogMaskMode)serialized.maskMode.intValue;
-            if (mode == LocalVolumetricFogMaskMode.Texture)
-            {
-                EditorGUILayout.PropertyField(serialized.albedo, Styles.s_AlbedoLabel);
-                EditorGUILayout.PropertyField(serialized.meanFreePath, Styles.s_MeanFreePathLabel);
-            }
-
+            EditorGUILayout.PropertyField(serialized.albedo, Styles.s_AlbedoLabel);
+            EditorGUILayout.PropertyField(serialized.meanFreePath, Styles.s_MeanFreePathLabel);
             EditorGUILayout.PropertyField(serialized.maskMode, Styles.s_MaskMode);
-            if (mode == LocalVolumetricFogMaskMode.Texture)
-                EditorGUILayout.PropertyField(serialized.blendingMode, Styles.s_BlendingModeLabel);
+            EditorGUILayout.PropertyField(serialized.blendingMode, Styles.s_BlendingModeLabel);
             EditorGUILayout.PropertyField(serialized.priority, Styles.s_PriorityLabel);
         }
 
@@ -59,8 +72,6 @@ namespace UnityEditor.Rendering.HighDefinition
             float previousUniformFade = serialized.editorUniformFade.floatValue;
             Vector3 previousPositiveFade = serialized.editorPositiveFade.vector3Value;
             Vector3 previousNegativeFade = serialized.editorNegativeFade.vector3Value;
-
-            EditorGUILayout.PropertyField(serialized.scaleMode, Styles.s_ScaleMode);
 
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(serialized.size, Styles.s_Size);

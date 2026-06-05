@@ -4,8 +4,6 @@
 // Otherwise those parameters are not bound correctly at runtime.
 // ===========================================================================
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
-
 TEXTURE2D(_EmissiveColorMap);
 SAMPLER(sampler_EmissiveColorMap);
 
@@ -85,7 +83,6 @@ SAMPLER(sampler_CoatMaskMap);
 PROP_DECL_TEX2D(_BaseColorMap);
 PROP_DECL_TEX2D(_MaskMap);
 PROP_DECL_TEX2D(_BentNormalMap);
-PROP_DECL_TEX2D(_BentNormalMapOS);
 PROP_DECL_TEX2D(_NormalMap);
 PROP_DECL_TEX2D(_NormalMapOS);
 PROP_DECL_TEX2D(_DetailMap);
@@ -155,6 +152,7 @@ float _RayTracing;
 float4 _BaseColor;
 float4 _BaseColorMap_ST;
 float4 _BaseColorMap_TexelSize;
+float4 _BaseColorMap_MipInfo;
 
 float _Metallic;
 float _MetallicRemapMin;
@@ -214,6 +212,7 @@ float4 _BaseColorMap2_ST;
 float4 _BaseColorMap3_ST;
 
 float4 _BaseColorMap0_TexelSize;
+float4 _BaseColorMap0_MipInfo;
 
 PROP_DECL(float, _Metallic);
 PROP_DECL(float, _MetallicRemapMin);
@@ -285,10 +284,9 @@ float _TessellationFactorMaxDistance;
 float _TessellationFactorTriangleSize;
 float _TessellationShapeFactor;
 float _TessellationBackFaceCullEpsilon;
+float _TessellationObjectScale;
+float _TessellationTilingScale;
 #endif
-
-// Mipmap Streaming Debug
-UNITY_TEXTURE_STREAMING_DEBUG_VARS;
 
 CBUFFER_END
 

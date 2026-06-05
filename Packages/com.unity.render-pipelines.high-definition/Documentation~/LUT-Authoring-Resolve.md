@@ -1,4 +1,4 @@
-# Create an LUT in DaVinci Resolve
+# Authoring lookup textures with DaVinci Resolve
 
 The following process uses DaVinci Resolve, but you can apply it to other digital content creation tools such as [Photoshop](LUT-Authoring-Photoshop.md) or Nuke.
 
@@ -13,17 +13,17 @@ Resolve only exports LUTs of size 33 so set **Grading LUT Size** to **33** for i
 
 ## Step 2: Render the Camera view to an EXR file
 
-Export the current [Camera](hdrp-camera-component-reference.md)'s view to a log-encoded EXR file. To do this:
+Export the current [Camera](HDRP-Camera.md)'s view to a log-encoded EXR file. To do this:
 
 1. In the Scene view or Hierarchy, select a GameObject that contains a Camera component.
 2. Select **Edit** > **Rendering** > **Render Selected HDRP Camera to Log EXR** **(**or press **Ctrl+Shift+Alt+E)**.
 3. Save the EXR file.
 
-![Camera view before applying LUT effect.](Images/LUTAuthoringResolve1.png)
+![](Images/LUTAuthoringResolve1.png)
 
 After you export the EXR file, transform the data from the format that Unity uses (Alexa LogC El.1000) to Linear RGB space, so that external software can use it. To do this, HDRP provides a set of ready-to-use transform LUTs. To get them:
 
-1. Open the Package Manager window (menu: **Window** > **Package Management** > **Package Manager**).
+1. Open the Package Manager window (menu: **Window > Package Manager**).
 2. Select **High Definition RP** from the list of packages on the left.
 3. In the **Samples** section, select **Import into Project** next to **Additional Post-processing Data**.
 4. This imports the LUTs into Assets/HDRP Sample Content/Post-processing/Cube LUTs/.
@@ -47,13 +47,13 @@ Now import the EXR into Resolve and apply the **Unity Log To Linear r1** LUT to 
 2. In the context menu, select **3D Lut**.
 3. Select the **Unity Log To Linear r1** LUT.
 
-![Color settings in the DaVinci Resolve editor.](Images/LUTAuthoringResolve2.png)
+![](Images/LUTAuthoringResolve2.png)
 
 ## Step 4: Apply color grading
 
 You can now start grading your image. Make sure you only do global color operations because LUTs can't store local operators or any filters that affect neighboring pixels (such as blur or sharpen).
 
-![Fame in the video editor with LUT color grading.](Images/LUTAuthoringResolve3.png)
+![](Images/LUTAuthoringResolve3.png)
 
 ## Step 5: Export your work as a CUBE file
 
@@ -73,6 +73,6 @@ Unity automatically interprets the CUBE file as a usable Texture3D Asset. You ca
 4. Assign your CUBE Texture to the **Lookup Texture** property.
 5. Change the **Contribution** to set how much the **Lookup Texture** contributes to the Scene.
 
-![Using the CUBE file as a color lookup texture in Unity.](Images/LUTAuthoringResolve4.png)
+![](Images/LUTAuthoringResolve4.png)
 
 You can continue to color grade in Resolve and override the previously saved CUBE file. Unity automatically updates the grading in the Scene with your changes.

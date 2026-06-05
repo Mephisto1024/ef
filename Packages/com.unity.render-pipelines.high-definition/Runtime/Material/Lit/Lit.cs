@@ -18,8 +18,7 @@ namespace UnityEngine.Rendering.HighDefinition
             LitTransmission = 1 << 3,
             LitAnisotropy = 1 << 4,
             LitIridescence = 1 << 5,
-            LitClearCoat = 1 << 6,
-            LitColoredTransmission = 1 << 7,
+            LitClearCoat = 1 << 6
         };
 
         //-----------------------------------------------------------------------------
@@ -71,13 +70,13 @@ namespace UnityEngine.Rendering.HighDefinition
             public uint diffusionProfileHash;
             [SurfaceDataAttributes("Subsurface Mask", precision = FieldPrecision.Real)]
             public float subsurfaceMask;
+            [SurfaceDataAttributes("Transmission Mask", precision = FieldPrecision.Real)]
+            public float transmissionMask;
 
             // Transmission
             // + Diffusion Profile
             [SurfaceDataAttributes("Thickness", precision = FieldPrecision.Real)]
             public float thickness;
-            [SurfaceDataAttributes("Transmission Mask", precision = FieldPrecision.Real)]
-            public Vector3 transmissionMask;
 
             // Anisotropic
             [SurfaceDataAttributes("Tangent", true)]
@@ -121,8 +120,6 @@ namespace UnityEngine.Rendering.HighDefinition
             public Vector3 diffuseColor;
             [SurfaceDataAttributes(precision = FieldPrecision.Real)]
             public Vector3 fresnel0;
-            [SurfaceDataAttributes(precision = FieldPrecision.Real)]
-            public float fresnel90;
 
             [SurfaceDataAttributes(precision = FieldPrecision.Real)]
             public float ambientOcclusion; // Caution: This is accessible only if light layer is enabled, otherwise it is 1
@@ -202,7 +199,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         public Lit() { }
 
-        public override void Build(HDRenderPipeline _)
+        public override void Build(HDRenderPipelineAsset hdAsset, HDRenderPipelineRuntimeResources defaultResources)
         {
             PreIntegratedFGD.instance.Build(PreIntegratedFGD.FGDIndex.FGD_GGXAndDisneyDiffuse);
             LTCAreaLight.instance.Build();

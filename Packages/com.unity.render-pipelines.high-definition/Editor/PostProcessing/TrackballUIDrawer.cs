@@ -1,5 +1,4 @@
 using System;
-using JetBrains.Annotations;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 
@@ -18,7 +17,7 @@ namespace UnityEditor.Rendering.HighDefinition
         bool m_ResetState;
         Vector2 m_CursorPos;
 
-        public void OnGUI(SerializedProperty property, [CanBeNull] SerializedProperty overrideState, GUIContent title, Func<Vector4, Vector3> computeFunc)
+        public void OnGUI(SerializedProperty property, SerializedProperty overrideState, GUIContent title, Func<Vector4, Vector3> computeFunc)
         {
             if (property.propertyType != SerializedPropertyType.Vector4)
             {
@@ -38,9 +37,8 @@ namespace UnityEditor.Rendering.HighDefinition
 
             using (new EditorGUILayout.VerticalScope())
             {
-                bool isOverridden = overrideState?.boolValue ?? true;
-                using (new EditorGUI.DisabledScope(!isOverridden))
-                    DrawWheel(ref value, isOverridden);
+                using (new EditorGUI.DisabledScope(!overrideState.boolValue))
+                    DrawWheel(ref value, overrideState.boolValue);
 
                 DrawLabelAndOverride(title, overrideState);
             }
@@ -186,13 +184,8 @@ namespace UnityEditor.Rendering.HighDefinition
             GUI.Label(labelRect, title, EditorStyles.miniLabel);
 
             // Override checkbox
-            if (overrideState != null)
-            {
-                var overrideRect = new Rect(labelRect.x - 17, labelRect.y + 3, 17f, 17f);
-                overrideState.boolValue = GUI.Toggle(overrideRect, overrideState.boolValue,
-                    EditorGUIUtility.TrTextContent("", "Override this setting for this volume."),
-                    CoreEditorStyles.smallTickbox);
-            }
+            var overrideRect = new Rect(labelRect.x - 17, labelRect.y + 3, 17f, 17f);
+            overrideState.boolValue = GUI.Toggle(overrideRect, overrideState.boolValue, EditorGUIUtility.TrTextContent("", "Override this setting for this volume."), CoreEditorStyles.smallTickbox);
         }
 
         Vector3 GetInput(Rect bounds, Vector3 hsv, Vector2 thumbPos, float radius)

@@ -18,7 +18,7 @@ namespace UnityEditor.Rendering.HighDefinition
     [HasDependencies(typeof(DiffusionProfileInputMaterialSlot))]
     class DiffusionProfileInputMaterialSlot : Vector1MaterialSlot, IHasDependencies
     {
-        [SerializeField, Obsolete("Use m_DiffusionProfileAsset instead. #from(2021.1)")]
+        [SerializeField, Obsolete("Use m_DiffusionProfileAsset instead.")]
         PopupList m_DiffusionProfile;
 
         // Helper class to serialize an asset inside a shader graph

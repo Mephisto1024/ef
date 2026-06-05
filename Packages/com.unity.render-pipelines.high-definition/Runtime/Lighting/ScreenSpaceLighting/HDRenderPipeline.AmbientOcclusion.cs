@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -48,8 +48,7 @@ namespace UnityEngine.Rendering.HighDefinition
             }
             else
             {
-                // Ceil is needed because we upsample the AO too, round would loose a pixel is the resolution is odd
-                parameters.runningRes = new Vector2(Mathf.CeilToInt(camera.actualWidth * 0.5f), Mathf.CeilToInt(camera.actualHeight * 0.5f));
+                parameters.runningRes = new Vector2(Mathf.RoundToInt(camera.actualWidth * 0.5f), Mathf.RoundToInt(camera.actualHeight * 0.5f));
                 cb._AOBufferSize = new Vector4(parameters.runningRes.x, parameters.runningRes.y, 1.0f / parameters.runningRes.x, 1.0f / parameters.runningRes.y);
             }
 
@@ -139,9 +138,9 @@ namespace UnityEngine.Rendering.HighDefinition
         TextureHandle CreateAmbientOcclusionTexture(RenderGraph renderGraph, bool fullResolution)
         {
             if (fullResolution)
-                return renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true) { enableRandomWrite = true, format = GraphicsFormat.R8_UNorm, name = "Ambient Occlusion" });
+                return renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true) { enableRandomWrite = true, colorFormat = GraphicsFormat.R8_UNorm, name = "Ambient Occlusion" });
             else
-                return renderGraph.CreateTexture(new TextureDesc(Vector2.one * 0.5f, true, true) { enableRandomWrite = true, format = GraphicsFormat.R32_SFloat, name = "Final Half Res AO Packed" });
+                return renderGraph.CreateTexture(new TextureDesc(Vector2.one * 0.5f, true, true) { enableRandomWrite = true, colorFormat = GraphicsFormat.R32_SFloat, name = "Final Half Res AO Packed" });
         }
 
         TextureHandle RenderAmbientOcclusion(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle depthBuffer, TextureHandle depthPyramid, TextureHandle normalBuffer, TextureHandle motionVectors, TextureHandle historyValidityBuffer,
@@ -203,12 +202,12 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle RenderAO(RenderGraph renderGraph, in RenderAOParameters parameters, TextureHandle depthPyramid, TextureHandle normalBuffer)
         {
-            using (var builder = renderGraph.AddComputePass<RenderAOPassData>("GTAO Horizon search and integration", out var passData, ProfilingSampler.Get(HDProfileId.HorizonSSAO)))
+            using (var builder = renderGraph.AddRenderPass<RenderAOPassData>("GTAO Horizon search and integration", out var passData, ProfilingSampler.Get(HDProfileId.HorizonSSAO)))
             {
                 builder.EnableAsyncCompute(parameters.runAsync);
 
                 passData.parameters = parameters;
-                passData.gtaoCS = runtimeShaders.GTAOCS;
+                passData.gtaoCS = defaultResources.shaders.GTAOCS;
                 passData.gtaoCS.shaderKeywords = null;
 
                 if (parameters.temporalAccumulation)
@@ -222,16 +221,13 @@ namespace UnityEngine.Rendering.HighDefinition
 
                 float scaleFactor = parameters.fullResolution ? 1.0f : 0.5f;
 
-                passData.packedData = renderGraph.CreateTexture(new TextureDesc(Vector2.one * scaleFactor, true, true)
-                { format = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "AO Packed data" });
-                builder.UseTexture(passData.packedData, AccessFlags.Write);
-                passData.depthPyramid = depthPyramid;
-                builder.UseTexture(passData.depthPyramid, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
+                passData.packedData = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one * scaleFactor, true, true)
+                { colorFormat = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "AO Packed data" }));
+                passData.depthPyramid = builder.ReadTexture(depthPyramid);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
 
                 builder.SetRenderFunc(
-                    (RenderAOPassData data, ComputeGraphContext ctx) =>
+                    (RenderAOPassData data, RenderGraphContext ctx) =>
                     {
                         ConstantBuffer.Push(ctx.cmd, data.parameters.cb, data.gtaoCS, HDShaderIDs._ShaderVariablesAmbientOcclusion);
                         ctx.cmd.SetComputeTextureParam(data.gtaoCS, data.gtaoKernel, HDShaderIDs._AOPackedData, data.packedData);
@@ -262,7 +258,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle SpatialDenoiseAO(RenderGraph renderGraph, in RenderAOParameters parameters, TextureHandle aoPackedData)
         {
-            using (var builder = renderGraph.AddComputePass<SpatialDenoiseAOPassData>("Spatial Denoise GTAO", out var passData))
+            using (var builder = renderGraph.AddRenderPass<SpatialDenoiseAOPassData>("Spatial Denoise GTAO", out var passData))
             {
                 builder.EnableAsyncCompute(parameters.runAsync);
 
@@ -270,27 +266,21 @@ namespace UnityEngine.Rendering.HighDefinition
 
                 passData.parameters = parameters;
 
-                passData.spatialDenoiseAOCS = runtimeShaders.GTAOSpatialDenoiseCS;
+                passData.spatialDenoiseAOCS = defaultResources.shaders.GTAOSpatialDenoiseCS;
                 passData.spatialDenoiseAOCS.shaderKeywords = null;
                 if (parameters.temporalAccumulation)
                     passData.spatialDenoiseAOCS.EnableKeyword("TO_TEMPORAL");
                 passData.denoiseKernelSpatial = passData.spatialDenoiseAOCS.FindKernel("SpatialDenoise");
 
-                passData.packedData = aoPackedData;
-                builder.UseTexture(passData.packedData, AccessFlags.Read);
+                passData.packedData = builder.ReadTexture(aoPackedData);
                 if (parameters.temporalAccumulation)
-                {
-                    passData.denoiseOutput = renderGraph.CreateTexture(
-                        new TextureDesc(Vector2.one * (parameters.fullResolution ? 1.0f : 0.5f), true, true) { format = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "AO Packed blurred data" });
-                }
+                    passData.denoiseOutput = builder.WriteTexture(renderGraph.CreateTexture(
+                        new TextureDesc(Vector2.one * (parameters.fullResolution ? 1.0f : 0.5f), true, true) { colorFormat = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "AO Packed blurred data" }));
                 else
-                {
-                    passData.denoiseOutput = CreateAmbientOcclusionTexture(renderGraph, parameters.fullResolution);
-                }
-                builder.UseTexture(passData.denoiseOutput, AccessFlags.Write);
+                    passData.denoiseOutput = builder.WriteTexture(CreateAmbientOcclusionTexture(renderGraph, parameters.fullResolution));
 
                 builder.SetRenderFunc(
-                    (SpatialDenoiseAOPassData data, ComputeGraphContext ctx) =>
+                    (SpatialDenoiseAOPassData data, RenderGraphContext ctx) =>
                     {
                         const int groupSizeX = 8;
                         const int groupSizeY = 8;
@@ -335,37 +325,32 @@ namespace UnityEngine.Rendering.HighDefinition
             TextureHandle currentHistory,
             TextureHandle outputHistory)
         {
-            using (var builder = renderGraph.AddComputePass<TemporalDenoiseAOPassData>("Temporal Denoise GTAO", out var passData))
+            using (var builder = renderGraph.AddRenderPass<TemporalDenoiseAOPassData>("Temporal Denoise GTAO", out var passData))
             {
                 builder.EnableAsyncCompute(parameters.runAsync);
 
                 float scaleFactor = parameters.fullResolution ? 1.0f : 0.5f;
 
                 passData.parameters = parameters;
-                passData.temporalDenoiseAOCS = runtimeShaders.GTAOTemporalDenoiseCS;
+                passData.temporalDenoiseAOCS = defaultResources.shaders.GTAOTemporalDenoiseCS;
                 passData.temporalDenoiseAOCS.shaderKeywords = null;
                 if (parameters.fullResolution)
                     passData.temporalDenoiseAOCS.EnableKeyword("FULL_RES");
                 else
                     passData.temporalDenoiseAOCS.EnableKeyword("HALF_RES");
                 passData.denoiseKernelTemporal = passData.temporalDenoiseAOCS.FindKernel("TemporalDenoise");
-                passData.copyHistoryAOCS = runtimeShaders.GTAOCopyHistoryCS;
+                passData.copyHistoryAOCS = defaultResources.shaders.GTAOCopyHistoryCS;
                 passData.denoiseKernelCopyHistory = passData.copyHistoryAOCS.FindKernel("GTAODenoise_CopyHistory");
                 passData.historyReady = m_AOHistoryReady;
 
-                passData.motionVectors = motionVectors;
-                builder.UseTexture(passData.motionVectors, AccessFlags.Read);
-                passData.currentHistory = currentHistory;
-                builder.UseTexture(passData.currentHistory, AccessFlags.Read); // can also be written on first frame, but since it's an imported resource, it doesn't matter in term of lifetime.
-                passData.outputHistory = outputHistory;
-                builder.UseTexture(passData.outputHistory, AccessFlags.Write);
-                passData.packedDataBlurred = aoPackedDataBlurred;
-                builder.UseTexture(passData.packedDataBlurred, AccessFlags.Read);
-                passData.denoiseOutput = CreateAmbientOcclusionTexture(renderGraph, parameters.fullResolution);
-                builder.UseTexture(passData.denoiseOutput, AccessFlags.Write);
+                passData.motionVectors = builder.ReadTexture(motionVectors);
+                passData.currentHistory = builder.ReadTexture(currentHistory); // can also be written on first frame, but since it's an imported resource, it doesn't matter in term of lifetime.
+                passData.outputHistory = builder.WriteTexture(outputHistory);
+                passData.packedDataBlurred = builder.ReadTexture(aoPackedDataBlurred);
+                passData.denoiseOutput = builder.WriteTexture(CreateAmbientOcclusionTexture(renderGraph, parameters.fullResolution));
 
                 builder.SetRenderFunc(
-                    (TemporalDenoiseAOPassData data, ComputeGraphContext ctx) =>
+                    (TemporalDenoiseAOPassData data, RenderGraphContext ctx) =>
                     {
                         const int groupSizeX = 8;
                         const int groupSizeY = 8;
@@ -412,25 +397,22 @@ namespace UnityEngine.Rendering.HighDefinition
             if (parameters.fullResolution)
                 return input;
 
-            using (var builder = renderGraph.AddComputePass<UpsampleAOPassData>("Upsample GTAO", out var passData, ProfilingSampler.Get(HDProfileId.UpSampleSSAO)))
+            using (var builder = renderGraph.AddRenderPass<UpsampleAOPassData>("Upsample GTAO", out var passData, ProfilingSampler.Get(HDProfileId.UpSampleSSAO)))
             {
                 builder.EnableAsyncCompute(parameters.runAsync);
 
                 passData.parameters = parameters;
-                passData.upsampleAndBlurAOCS = runtimeShaders.GTAOBlurAndUpsample;
+                passData.upsampleAndBlurAOCS = defaultResources.shaders.GTAOBlurAndUpsample;
                 if (parameters.temporalAccumulation)
                     passData.upsampleAOKernel = passData.upsampleAndBlurAOCS.FindKernel(parameters.bilateralUpsample ? "BilateralUpsampling" : "BoxUpsampling");
                 else
                     passData.upsampleAOKernel = passData.upsampleAndBlurAOCS.FindKernel("BlurUpsample");
-                passData.input = input;
-                builder.UseTexture(passData.input, AccessFlags.Read);
-                passData.depthTexture = depthTexture;
-                builder.UseTexture(passData.depthTexture, AccessFlags.Read);
-                passData.output = CreateAmbientOcclusionTexture(renderGraph, true);
-                builder.UseTexture(passData.output, AccessFlags.Write);
+                passData.input = builder.ReadTexture(input);
+                passData.depthTexture = builder.ReadTexture(depthTexture);
+                passData.output = builder.WriteTexture(CreateAmbientOcclusionTexture(renderGraph, true));
 
                 builder.SetRenderFunc(
-                    (UpsampleAOPassData data, ComputeGraphContext ctx) =>
+                    (UpsampleAOPassData data, RenderGraphContext ctx) =>
                     {
                         ConstantBuffer.Set<ShaderVariablesAmbientOcclusion>(ctx.cmd, data.upsampleAndBlurAOCS, HDShaderIDs._ShaderVariablesAmbientOcclusion);
 

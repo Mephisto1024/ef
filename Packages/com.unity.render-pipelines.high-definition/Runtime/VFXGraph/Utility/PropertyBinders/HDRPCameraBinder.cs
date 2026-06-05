@@ -143,20 +143,15 @@ namespace UnityEngine.VFX.Utility
         /// <param name="component">Component to update.</param>
         public override void UpdateBinding(VisualEffect component)
         {
-            var targetSpace = component.visualEffectAsset.GetExposedSpace(m_Position);
-            Matrix4x4 readTransform;
-            if (targetSpace == VFXSpace.Local)
-            {
-                readTransform = component.transform.worldToLocalMatrix * AdditionalData.transform.localToWorldMatrix;
-            }
-            else
-            {
-                readTransform = AdditionalData.transform.localToWorldMatrix;
-            }
+            var depth = AdditionalData.GetGraphicsBuffer(HDAdditionalCameraData.BufferAccessType.Depth);
+            var color = AdditionalData.GetGraphicsBuffer(HDAdditionalCameraData.BufferAccessType.Color);
 
-            component.SetVector3(m_Position, readTransform.GetPosition());
-            component.SetVector3(m_Angles, readTransform.rotation.eulerAngles);
-            component.SetVector3(m_Scale, readTransform.lossyScale);
+            if (depth == null && color == null)
+                return;
+
+            component.SetVector3(m_Position, AdditionalData.transform.position);
+            component.SetVector3(m_Angles, AdditionalData.transform.eulerAngles);
+            component.SetVector3(m_Scale, AdditionalData.transform.lossyScale);
 
             component.SetBool(m_Orthographic, m_Camera.orthographic);
             component.SetFloat(m_OrthographicSize, m_Camera.orthographicSize);
@@ -172,9 +167,6 @@ namespace UnityEngine.VFX.Utility
             Vector2 scaledSize = DynamicResolutionHandler.instance.GetScaledSize(new Vector2Int(m_Camera.pixelWidth, m_Camera.pixelHeight));
             DynamicResolutionHandler.ClearSelectedCamera();
             component.SetVector2(m_ScaledDimensions, scaledSize);
-
-            var depth = AdditionalData.GetGraphicsBuffer(HDAdditionalCameraData.BufferAccessType.Depth);
-            var color = AdditionalData.GetGraphicsBuffer(HDAdditionalCameraData.BufferAccessType.Color);
 
             if (depth != null)
                 component.SetTexture(m_DepthBuffer, depth.rt);

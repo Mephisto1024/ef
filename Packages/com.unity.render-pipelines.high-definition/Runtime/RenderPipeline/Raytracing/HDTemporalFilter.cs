@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -39,10 +39,10 @@ namespace UnityEngine.Rendering.HighDefinition
         {
         }
 
-        public void Init(HDRenderPipeline renderPipeline)
+        public void Init(HDRenderPipelineRuntimeResources rpResources)
         {
             // Keep track of the resources
-            m_TemporalFilterCS = renderPipeline.runtimeShaders.temporalFilterCS;
+            m_TemporalFilterCS = rpResources.shaders.temporalFilterCS;
 
             m_ValidateHistoryKernel = m_TemporalFilterCS.FindKernel("ValidateHistory");
 
@@ -103,8 +103,11 @@ namespace UnityEngine.Rendering.HighDefinition
         public TextureHandle HistoryValidity(RenderGraph renderGraph, HDCamera hdCamera, float historyValidity,
             TextureHandle depthBuffer, TextureHandle normalBuffer, TextureHandle motionVectorBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<HistoryValidityPassData>("History Validity Evaluation", out var passData, ProfilingSampler.Get(HDProfileId.HistoryValidity)))
+            using (var builder = renderGraph.AddRenderPass<HistoryValidityPassData>("History Validity Evaluation", out var passData, ProfilingSampler.Get(HDProfileId.HistoryValidity)))
             {
+                // Cannot run in async
+                builder.EnableAsyncCompute(false);
+
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
                 passData.viewCount = hdCamera.viewCount;
@@ -120,39 +123,32 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.temporalFilterCS = m_TemporalFilterCS;
 
                 // Input Buffers
-                passData.depthStencilBuffer = depthBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
+                passData.depthStencilBuffer = builder.ReadTexture(depthBuffer);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
                 if (hdCamera.frameSettings.IsEnabled(FrameSettingsField.MotionVectors))
-                    passData.motionVectorBuffer = motionVectorBuffer;
+                    passData.motionVectorBuffer = builder.ReadTexture(motionVectorBuffer);
                 else
-                    passData.motionVectorBuffer = renderGraph.defaultResources.blackTextureXR;
-                builder.UseTexture(passData.motionVectorBuffer, AccessFlags.Read);
+                    passData.motionVectorBuffer = builder.ReadTexture(renderGraph.defaultResources.blackTextureXR);
 
                 // Grab and import the history buffers
                 var historyDepth = hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.Depth);
                 var historyNormal = hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.Normal);
-                passData.historyDepthTexture = renderGraph.ImportTexture(historyDepth);
-                builder.UseTexture(passData.historyDepthTexture, AccessFlags.Read);
-                passData.historyNormalTexture = renderGraph.ImportTexture(historyNormal);
-                builder.UseTexture(passData.historyNormalTexture, AccessFlags.Read);
+                passData.historyDepthTexture = builder.ReadTexture(renderGraph.ImportTexture(historyDepth));
+                passData.historyNormalTexture = builder.ReadTexture(renderGraph.ImportTexture(historyNormal));
                 passData.historySizeAndScale = (historyDepth != null && historyNormal != null) ? HDRenderPipeline.EvaluateRayTracingHistorySizeAndScale(hdCamera, historyDepth) : Vector4.one;
 
                 // Output buffers
-                passData.validationBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.R8_UInt, enableRandomWrite = true, name = "ValidationTexture" });
-                builder.UseTexture(passData.validationBuffer, AccessFlags.Write);
+                passData.validationBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.R8_UInt, enableRandomWrite = true, name = "ValidationTexture" }));
 
                 builder.SetRenderFunc(
-                    (HistoryValidityPassData data, UnsafeGraphContext ctx) =>
+                    (HistoryValidityPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         RTHandle historyDepthTexture = data.historyDepthTexture;
                         RTHandle historyNormalTexture = data.historyNormalTexture;
                         // If we do not have a depth and normal history buffers, we can skip right away
                         if (historyDepthTexture == null || historyNormalTexture == null)
                         {
-                            CoreUtils.SetRenderTarget(natCmd, data.validationBuffer, clearFlag: ClearFlag.Color, Color.black);
+                            CoreUtils.SetRenderTarget(ctx.cmd, data.validationBuffer, clearFlag: ClearFlag.Color, Color.black);
                             return;
                         }
 
@@ -163,24 +159,24 @@ namespace UnityEngine.Rendering.HighDefinition
 
                         // First of all we need to validate the history to know where we can or cannot use the history signal
                         // Bind the input buffers
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._HistoryDepthTexture, data.historyDepthTexture);
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._HistoryNormalTexture, data.historyNormalTexture);
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._CameraMotionVectorsTexture, data.motionVectorBuffer);
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._StencilTexture, data.depthStencilBuffer, 0, RenderTextureSubElement.Stencil);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._HistoryDepthTexture, data.historyDepthTexture);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._HistoryNormalTexture, data.historyNormalTexture);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._CameraMotionVectorsTexture, data.motionVectorBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._StencilTexture, data.depthStencilBuffer, 0, RenderTextureSubElement.Stencil);
 
                         // Bind the constants
-                        natCmd.SetComputeFloatParam(data.temporalFilterCS, HDShaderIDs._HistoryValidity, data.historyValidity);
-                        natCmd.SetComputeFloatParam(data.temporalFilterCS, HDShaderIDs._PixelSpreadAngleTangent, data.pixelSpreadTangent);
-                        natCmd.SetComputeIntParam(data.temporalFilterCS, HDShaderIDs._ObjectMotionStencilBit, (int)StencilUsage.ObjectMotionVector);
-                        natCmd.SetComputeVectorParam(data.temporalFilterCS, HDShaderIDs._HistorySizeAndScale, data.historySizeAndScale);
+                        ctx.cmd.SetComputeFloatParam(data.temporalFilterCS, HDShaderIDs._HistoryValidity, data.historyValidity);
+                        ctx.cmd.SetComputeFloatParam(data.temporalFilterCS, HDShaderIDs._PixelSpreadAngleTangent, data.pixelSpreadTangent);
+                        ctx.cmd.SetComputeIntParam(data.temporalFilterCS, HDShaderIDs._ObjectMotionStencilBit, (int)StencilUsage.ObjectMotionVector);
+                        ctx.cmd.SetComputeVectorParam(data.temporalFilterCS, HDShaderIDs._HistorySizeAndScale, data.historySizeAndScale);
 
                         // Bind the output buffer
-                        natCmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._ValidationBufferRW, data.validationBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.temporalFilterCS, data.validateHistoryKernel, HDShaderIDs._ValidationBufferRW, data.validationBuffer);
 
                         // Evaluate the validity
-                        natCmd.DispatchCompute(data.temporalFilterCS, data.validateHistoryKernel, numTilesX, numTilesY, data.viewCount);
+                        ctx.cmd.DispatchCompute(data.temporalFilterCS, data.validateHistoryKernel, numTilesX, numTilesY, data.viewCount);
                     });
                 return passData.validationBuffer;
             }
@@ -225,8 +221,11 @@ namespace UnityEngine.Rendering.HighDefinition
             TextureHandle historyBuffer,
             TextureHandle depthBuffer, TextureHandle normalBuffer, TextureHandle motionVectorBuffer, TextureHandle historyValidationBuffer)
         {
-            using (var builder = renderGraph.AddUnsafePass<TemporalFilterPassData>("TemporalDenoiser", out var passData, ProfilingSampler.Get(HDProfileId.TemporalFilter)))
+            using (var builder = renderGraph.AddRenderPass<TemporalFilterPassData>("TemporalDenoiser", out var passData, ProfilingSampler.Get(HDProfileId.TemporalFilter)))
             {
+                // Cannot run in async
+                builder.EnableAsyncCompute(false);
+
                 // Camera parameters
                 passData.texWidth = (int)Mathf.Floor((float)hdCamera.actualWidth * filterParams.resolutionMultiplier);
                 passData.texHeight = (int)Mathf.Floor((float)hdCamera.actualHeight * filterParams.resolutionMultiplier);
@@ -249,32 +248,24 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.temporalFilterCS = m_TemporalFilterCS;
 
                 // Prepass Buffers
-                passData.depthStencilBuffer = depthBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.motionVectorBuffer = motionVectorBuffer;
-                builder.UseTexture(passData.motionVectorBuffer, AccessFlags.Read);
+                passData.depthStencilBuffer = builder.ReadTexture(depthBuffer);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.motionVectorBuffer = builder.ReadTexture(motionVectorBuffer);
 
                 // Effect buffers
-                passData.velocityBuffer = velocityBuffer;
-                builder.UseTexture(passData.velocityBuffer, AccessFlags.Read);
-                passData.noisyBuffer = noisyBuffer;
-                builder.UseTexture(passData.noisyBuffer, AccessFlags.Read);
-                passData.validationBuffer = historyValidationBuffer;
-                builder.UseTexture(passData.validationBuffer, AccessFlags.Read);
+                passData.velocityBuffer = builder.ReadTexture(velocityBuffer);
+                passData.noisyBuffer = builder.ReadTexture(noisyBuffer);
+                passData.validationBuffer = builder.ReadTexture(historyValidationBuffer);
 
                 // History buffer
-                passData.historyBuffer = historyBuffer;
-                builder.UseTexture(passData.historyBuffer, AccessFlags.ReadWrite);
+                passData.historyBuffer = builder.ReadWriteTexture(historyBuffer);
 
                 // Output buffers
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Temporal Filter Output" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.ReadWrite);
+                passData.outputBuffer = builder.ReadWriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Temporal Filter Output" }));
 
                 builder.SetRenderFunc(
-                    (TemporalFilterPassData data, UnsafeGraphContext ctx) =>
+                    (TemporalFilterPassData data, RenderGraphContext ctx) =>
                     {
                         // Evaluate the dispatch parameters
                         int areaTileSize = 8;
@@ -378,8 +369,11 @@ namespace UnityEngine.Rendering.HighDefinition
             bool distanceBased, bool singleChannel, float historyValidity)
         {
             TemporalDenoiserArrayOutputData resultData = new TemporalDenoiserArrayOutputData();
-            using (var builder = renderGraph.AddUnsafePass<TemporalFilterArrayPassData>("TemporalDenoiser", out var passData, ProfilingSampler.Get(HDProfileId.TemporalFilter)))
+            using (var builder = renderGraph.AddRenderPass<TemporalFilterArrayPassData>("TemporalDenoiser", out var passData, ProfilingSampler.Get(HDProfileId.TemporalFilter)))
             {
+                // Cannot run in async
+                builder.EnableAsyncCompute(false);
+
                 // Set the camera parameters
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -404,61 +398,36 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.temporalFilterCS = m_TemporalFilterCS;
 
                 // Input buffers
-                passData.depthStencilBuffer = depthBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.motionVectorBuffer = motionVectorBuffer;
-                builder.UseTexture(passData.motionVectorBuffer, AccessFlags.Read);
+                passData.depthStencilBuffer = builder.ReadTexture(depthBuffer);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.motionVectorBuffer = builder.ReadTexture(motionVectorBuffer);
 
-                passData.velocityBuffer = velocityBuffer;
-                builder.UseTexture(passData.velocityBuffer, AccessFlags.Read);
-                passData.noisyBuffer = noisyBuffer;
-                builder.UseTexture(passData.noisyBuffer, AccessFlags.Read);
-                if (distanceBased)
-                    passData.distanceBuffer = distanceBuffer;
-                else
-                    passData.distanceBuffer = renderGraph.defaultResources.blackTextureXR;
-                builder.UseTexture(passData.distanceBuffer, AccessFlags.Read);
-
-                passData.validationBuffer = historyValidationBuffer;
-                builder.UseTexture(passData.validationBuffer, AccessFlags.Read);
+                passData.velocityBuffer = builder.ReadTexture(velocityBuffer);
+                passData.noisyBuffer = builder.ReadTexture(noisyBuffer);
+                passData.distanceBuffer = distanceBased ? builder.ReadTexture(distanceBuffer) : renderGraph.defaultResources.blackTextureXR;
+                passData.validationBuffer = builder.ReadTexture(historyValidationBuffer);
 
                 // History buffers
-                passData.outputHistoryBuffer = renderGraph.ImportTexture(historyBuffer);
-                builder.UseTexture(passData.outputHistoryBuffer, AccessFlags.ReadWrite);
+                passData.outputHistoryBuffer = builder.ReadWriteTexture(renderGraph.ImportTexture(historyBuffer));
                 passData.inputHistoryBuffer = passData.outputHistoryBuffer;
-                passData.validationHistoryBuffer = renderGraph.ImportTexture(validationHistoryBuffer);
-                builder.UseTexture(passData.validationHistoryBuffer, AccessFlags.ReadWrite);
-
-                if (distanceBased)
-                    passData.distanceHistorySignal = renderGraph.ImportTexture(distanceHistorySignal);
-                else
-                    passData.distanceHistorySignal = renderGraph.defaultResources.blackTextureXR;
-                builder.UseTexture(passData.distanceHistorySignal, AccessFlags.ReadWrite);
+                passData.validationHistoryBuffer = builder.ReadWriteTexture(renderGraph.ImportTexture(validationHistoryBuffer));
+                passData.distanceHistorySignal = distanceBased ? builder.ReadWriteTexture(renderGraph.ImportTexture(distanceHistorySignal)) : renderGraph.defaultResources.blackTextureXR;
 
                 // Intermediate buffers
                 passData.intermediateSignalOutput = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Filter Output" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Filter Output" });
                 passData.intermediateValidityOutput = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Validity output" });
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Validity output" });
 
                 // Output textures
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Temporal Filter Output" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.ReadWrite);
+                passData.outputBuffer = builder.ReadWriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Temporal Filter Output" }));
+                passData.outputDistanceSignal = distanceBased ? builder.ReadWriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Temporal Filter Distance output" })) : new TextureHandle();
 
-                if (distanceBased)
-                {
-                    passData.outputDistanceSignal = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                        { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Temporal Filter Distance output" });
-                    builder.UseTexture(passData.outputDistanceSignal, AccessFlags.ReadWrite);
-                }
-                else
-                    passData.outputDistanceSignal = new TextureHandle();
 
                 builder.SetRenderFunc(
-                    (TemporalFilterArrayPassData data, UnsafeGraphContext ctx) =>
+                    (TemporalFilterArrayPassData data, RenderGraphContext ctx) =>
                     {
                         // Evaluate the dispatch parameters
                         int tfTileSize = 8;

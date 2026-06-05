@@ -1,6 +1,6 @@
 using System;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -65,7 +65,7 @@ namespace UnityEngine.Rendering.HighDefinition
             cmd.SetRayTracingTextureParam(data.screenSpaceShadowsRT, HDShaderIDs._RaytracedAreaShadowIntegration, data.outputShadowTexture);
 
             // Evaluate the intersection
-            cmd.DispatchRays(data.screenSpaceShadowsRT, m_RayGenAreaShadowSingleName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount, null);
+            cmd.DispatchRays(data.screenSpaceShadowsRT, m_RayGenAreaShadowSingleName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount);
 
             // Let's do the following samples (if any)
             for (int sampleIndex = 1; sampleIndex < data.numSamples; ++sampleIndex)
@@ -108,7 +108,7 @@ namespace UnityEngine.Rendering.HighDefinition
                 cmd.SetRayTracingTextureParam(data.screenSpaceShadowsRT, HDShaderIDs._RaytracedAreaShadowIntegration, data.outputShadowTexture);
 
                 // Evaluate the intersection
-                cmd.DispatchRays(data.screenSpaceShadowsRT, m_RayGenAreaShadowSingleName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount, null);
+                cmd.DispatchRays(data.screenSpaceShadowsRT, m_RayGenAreaShadowSingleName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount);
             }
 
             if (data.filterTracedShadow)
@@ -252,7 +252,7 @@ namespace UnityEngine.Rendering.HighDefinition
             RTHandle analyticHistoryArray = RequestShadowHistoryValidityBuffer(hdCamera);
 
             TextureHandle areaShadow;
-            using (var builder = renderGraph.AddUnsafePass<RTShadowAreaPassData>("Screen Space Shadows Debug", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingAreaLightShadow)))
+            using (var builder = renderGraph.AddRenderPass<RTShadowAreaPassData>("Screen Space Shadows Debug", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingAreaLightShadow)))
             {
                 // Set the camera parameters
                 passData.texWidth = hdCamera.actualWidth;
@@ -294,60 +294,47 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.screenSpaceShadowsCS = m_ScreenSpaceShadowsCS;
                 passData.screenSpaceShadowsRT = m_ScreenSpaceShadowsRT;
                 passData.screenSpaceShadowsFilterCS = m_ScreenSpaceShadowsFilterCS;
-                passData.scramblingTex = runtimeTextures.scramblingTex;
+                passData.scramblingTex = m_Asset.renderPipelineResources.textures.scramblingTex;
                 passData.ditheredTextureSet = GetBlueNoiseManager().DitheredTextureSet8SPP();
 
                 // Input Buffers
-                passData.depthStencilBuffer = depthBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.motionVectorsBuffer = motionVectorsBuffer;
-                builder.UseTexture(passData.motionVectorsBuffer, AccessFlags.Read);
+                passData.depthStencilBuffer = builder.UseDepthBuffer(depthBuffer, DepthAccess.Read);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.motionVectorsBuffer = builder.ReadTexture(motionVectorsBuffer);
 
                 if (hdCamera.frameSettings.litShaderMode == LitShaderMode.Deferred)
                 {
-                    passData.gbuffer0 = prepassOutput.gbuffer.mrt[0];
-                    passData.gbuffer1 = prepassOutput.gbuffer.mrt[1];
-                    passData.gbuffer2 = prepassOutput.gbuffer.mrt[2];
-                    passData.gbuffer3 = prepassOutput.gbuffer.mrt[3];
+                    passData.gbuffer0 = builder.ReadTexture(prepassOutput.gbuffer.mrt[0]);
+                    passData.gbuffer1 = builder.ReadTexture(prepassOutput.gbuffer.mrt[1]);
+                    passData.gbuffer2 = builder.ReadTexture(prepassOutput.gbuffer.mrt[2]);
+                    passData.gbuffer3 = builder.ReadTexture(prepassOutput.gbuffer.mrt[3]);
                 }
                 else
                 {
-                    passData.gbuffer0 = renderGraph.defaultResources.blackTextureXR;
-                    passData.gbuffer1 = renderGraph.defaultResources.blackTextureXR;
-                    passData.gbuffer2 = renderGraph.defaultResources.blackTextureXR;
-                    passData.gbuffer3 = renderGraph.defaultResources.blackTextureXR;
+                    passData.gbuffer0 = builder.ReadTexture(renderGraph.defaultResources.blackTextureXR);
+                    passData.gbuffer1 = builder.ReadTexture(renderGraph.defaultResources.blackTextureXR);
+                    passData.gbuffer2 = builder.ReadTexture(renderGraph.defaultResources.blackTextureXR);
+                    passData.gbuffer3 = builder.ReadTexture(renderGraph.defaultResources.blackTextureXR);
                 }
 
-                builder.UseTexture(passData.gbuffer0, AccessFlags.Read);
-                builder.UseTexture(passData.gbuffer1, AccessFlags.Read);
-                builder.UseTexture(passData.gbuffer2, AccessFlags.Read);
-                builder.UseTexture(passData.gbuffer3, AccessFlags.Read);
-
-                passData.shadowHistoryArray = renderGraph.ImportTexture(shadowHistoryArray);
-                builder.UseTexture(passData.shadowHistoryArray, AccessFlags.ReadWrite);
-                passData.analyticHistoryArray = renderGraph.ImportTexture(analyticHistoryArray);
-                builder.UseTexture(passData.analyticHistoryArray, AccessFlags.ReadWrite);
+                passData.shadowHistoryArray = builder.ReadWriteTexture(renderGraph.ImportTexture(shadowHistoryArray));
+                passData.analyticHistoryArray = builder.ReadWriteTexture(renderGraph.ImportTexture(analyticHistoryArray));
 
                 // Intermediate buffers
-                passData.directionBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Direction Buffer" });
-                passData.rayLengthBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "Ray Length Buffer" });
-                passData.intermediateBufferRGBA1 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Buffer RGBA1" }); ;
-                passData.intermediateBufferRG0 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Buffer RG0" });
+                passData.directionBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Direction Buffer" });
+                passData.rayLengthBuffer = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.R32_SFloat, enableRandomWrite = true, name = "Ray Length Buffer" });
+                passData.intermediateBufferRGBA1 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Buffer RGBA1" }); ;
+                passData.intermediateBufferRG0 = builder.CreateTransientTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Intermediate Buffer RG0" });
 
                 // Debug textures
-                passData.rayCountTexture = rayCountTexture;
-                builder.UseTexture(passData.rayCountTexture, AccessFlags.ReadWrite);
+                passData.rayCountTexture = builder.ReadWriteTexture(rayCountTexture);
 
                 // Output buffers
-                passData.outputShadowTexture = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true) { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Shadow Buffer" });
-                builder.UseTexture(passData.outputShadowTexture, AccessFlags.ReadWrite);
-
+                passData.outputShadowTexture = builder.ReadWriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true) { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Shadow Buffer" }));
                 builder.SetRenderFunc(
-                    (RTShadowAreaPassData data, UnsafeGraphContext ctx) =>
+                    (RTShadowAreaPassData data, RenderGraphContext context) =>
                     {
-                        ExecuteSSSAreaRayTrace(CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd), data);
+                        ExecuteSSSAreaRayTrace(context.cmd, data);
                     });
                 areaShadow = passData.outputShadowTexture;
             }

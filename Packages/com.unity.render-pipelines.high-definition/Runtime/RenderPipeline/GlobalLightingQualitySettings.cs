@@ -90,6 +90,10 @@ namespace UnityEngine.Rendering.HighDefinition
             RTGIFullResolution[(int)ScalableSettingLevelParameter.Level.Medium] = false;
             RTGIFullResolution[(int)ScalableSettingLevelParameter.Level.High] = true;
 
+            RTGIClampValue[(int)ScalableSettingLevelParameter.Level.Low] = 2.0f;
+            RTGIClampValue[(int)ScalableSettingLevelParameter.Level.Medium] = 3.0f;
+            RTGIClampValue[(int)ScalableSettingLevelParameter.Level.High] = 5.0f;
+
             RTGIRaySteps[(int)ScalableSettingLevelParameter.Level.Low] = 32;
             RTGIRaySteps[(int)ScalableSettingLevelParameter.Level.Medium] = 48;
             RTGIRaySteps[(int)ScalableSettingLevelParameter.Level.High] = 64;
@@ -123,6 +127,10 @@ namespace UnityEngine.Rendering.HighDefinition
             RTRRayLength[(int)ScalableSettingLevelParameter.Level.Medium] = 50.0f;
             RTRRayLength[(int)ScalableSettingLevelParameter.Level.High] = 50.0f;
 
+            RTRClampValue[(int)ScalableSettingLevelParameter.Level.Low] = 0.8f;
+            RTRClampValue[(int)ScalableSettingLevelParameter.Level.Medium] = 1.0f;
+            RTRClampValue[(int)ScalableSettingLevelParameter.Level.High] = 1.2f;
+
             RTRFullResolution[(int)ScalableSettingLevelParameter.Level.Low] = false;
             RTRFullResolution[(int)ScalableSettingLevelParameter.Level.Medium] = false;
             RTRFullResolution[(int)ScalableSettingLevelParameter.Level.High] = true;
@@ -135,13 +143,13 @@ namespace UnityEngine.Rendering.HighDefinition
             RTRDenoise[(int)ScalableSettingLevelParameter.Level.Medium] = true;
             RTRDenoise[(int)ScalableSettingLevelParameter.Level.High] = true;
 
-            RTRDenoiserRadiusDimmer[(int)ScalableSettingLevelParameter.Level.Low] = 0.75f;
-            RTRDenoiserRadiusDimmer[(int)ScalableSettingLevelParameter.Level.Medium] = 0.75f;
-            RTRDenoiserRadiusDimmer[(int)ScalableSettingLevelParameter.Level.High] = 1.0f;
+            RTRDenoiserRadius[(int)ScalableSettingLevelParameter.Level.Low] = 8;
+            RTRDenoiserRadius[(int)ScalableSettingLevelParameter.Level.Medium] = 12;
+            RTRDenoiserRadius[(int)ScalableSettingLevelParameter.Level.High] = 16;
 
-            RTRDenoiserAntiFlicker[(int)ScalableSettingLevelParameter.Level.Low] = 1.0f;
-            RTRDenoiserAntiFlicker[(int)ScalableSettingLevelParameter.Level.Medium] = 1.0f;
-            RTRDenoiserAntiFlicker[(int)ScalableSettingLevelParameter.Level.High] = 1.0f;
+            RTRSmoothDenoising[(int)ScalableSettingLevelParameter.Level.Low] = true;
+            RTRSmoothDenoising[(int)ScalableSettingLevelParameter.Level.Medium] = false;
+            RTRSmoothDenoising[(int)ScalableSettingLevelParameter.Level.High] = false;
 
             // Fog
             Fog_ControlMode[(int)ScalableSettingLevelParameter.Level.Low] = FogControl.Balance;
@@ -217,6 +225,9 @@ namespace UnityEngine.Rendering.HighDefinition
         public float[] RTGIRayLength = new float[s_QualitySettingCount];
         /// <summary>Controls if the effect should be computed at full resolution. The array must have one entry per scalable setting level.</summary>
         public bool[] RTGIFullResolution = new bool[s_QualitySettingCount];
+        /// <summary>Clamp value used to reduce the variance in the integration signal. The array must have one entry per scalable setting level, and elements must be between 0.001 and 10.</summary>
+        [Range(0.001f, 10.0f)]
+        public float[] RTGIClampValue = new float[s_QualitySettingCount];
         /// <summary>Controls the number of ray steps for hybrid tracing. The array must have one entry per scalable setting level, and elements must above 0.</summary>
         [Min(0)]
         public int[] RTGIRaySteps = new int[s_QualitySettingCount];
@@ -240,6 +251,9 @@ namespace UnityEngine.Rendering.HighDefinition
         /// <summary>Controls the length of ray traced reflection rays. The array must have one entry per scalable setting level, and elements must above 0.01.</summary>
         [Min(0.01f)]
         public float[] RTRRayLength = new float[s_QualitySettingCount];
+        /// <summary>Clamp value used to reduce the variance in the integration signal. The array must have one entry per scalable setting level, and elements must be between 0.001 and 10.</summary>
+        [Range(0.001f, 10.0f)]
+        public float[] RTRClampValue = new float[s_QualitySettingCount];
         /// <summary>Controls if the effect should be computed at full resolution. The array must have one entry per scalable setting level.</summary>
         public bool[] RTRFullResolution = new bool[s_QualitySettingCount];
         /// <summary>Controls if the effect should be computed at full resolution. The array must have one entry per scalable setting level, and elements must above 0.</summary>
@@ -247,12 +261,11 @@ namespace UnityEngine.Rendering.HighDefinition
         public int[] RTRRayMaxIterations = new int[s_QualitySettingCount];
         /// <summary>Flag that enables the first denoising pass. The array must have one entry per scalable setting level.</summary>
         public bool[] RTRDenoise = new bool[s_QualitySettingCount];
-        /// <summary>Flag that defines the radius of the denoiser. The array must have one entry per scalable setting level.</summary>
-        [Range(0.0f, 1.0f)]
-        public float[] RTRDenoiserRadiusDimmer = new float[s_QualitySettingCount];
         /// <summary>Flag that defines the radius of the first denoiser. The array must have one entry per scalable setting level, and elements must be between 1 and 32.</summary>
-        [Range(0.0f, 1.0f)]
-        public float[] RTRDenoiserAntiFlicker = new float[s_QualitySettingCount];
+        [Range(1, 32)]
+        public int[] RTRDenoiserRadius = new int[s_QualitySettingCount];
+        /// <summary>Flag that defines smooth denoising status. The array must have one entry per scalable setting level.</summary>
+        public bool[] RTRSmoothDenoising = new bool[s_QualitySettingCount];
 
         // TODO: Volumetric fog quality
         /// <summary>Controls which control mode should be used to define the volumetric fog parameters. The array must have one entry per scalable setting level.</summary>

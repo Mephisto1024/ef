@@ -15,7 +15,7 @@ namespace UnityEditor.Rendering.HighDefinition
     /// </summary>
     class TerrainLitGUI : HDShaderGUI, ITerrainLayerCustomUI
     {
-        const SurfaceOptionUIBlock.Features surfaceOptionFeatures = SurfaceOptionUIBlock.Features.Unlit | SurfaceOptionUIBlock.Features.ReceiveDecal | SurfaceOptionUIBlock.Features.AlphaCutoff;
+        const SurfaceOptionUIBlock.Features surfaceOptionFeatures = SurfaceOptionUIBlock.Features.Unlit | SurfaceOptionUIBlock.Features.ReceiveDecal;
         const AdvancedOptionsUIBlock.Features advancedOptionsFeatures = AdvancedOptionsUIBlock.Features.Instancing | AdvancedOptionsUIBlock.Features.SpecularOcclusion;
 
         [Flags]
@@ -98,7 +98,7 @@ namespace UnityEditor.Rendering.HighDefinition
                     heightTransition = prop;
                 else if (prop.name == kEnableInstancedPerPixelNormal)
                     enableInstancedPerPixelNormal = prop;
-                else if ((prop.propertyFlags & (ShaderPropertyFlags.HideInInspector | ShaderPropertyFlags.PerRendererData)) == 0)
+                else if ((prop.flags & (MaterialProperty.PropFlags.HideInInspector | MaterialProperty.PropFlags.PerRendererData)) == 0)
                     customProperties.Add(prop);
             }
         }
@@ -321,23 +321,12 @@ namespace UnityEditor.Rendering.HighDefinition
 
                     if (TextureHasAlpha(terrainLayer.diffuseTexture))
                     {
-                        terrainLayer.smoothnessSource = (UnityEngine.TerrainLayerSmoothnessSource)EditorGUILayout.EnumPopup(EditorGUIUtility.TrTextContent("Smoothness Source"), terrainLayer.smoothnessSource);
-                        if (terrainLayer.smoothnessSource == TerrainLayerSmoothnessSource.DiffuseAlphaChannel)
-                        {
-                            // See also: TerrainLitShaderGUI, TerrainLayerInspector
-                            GUIStyle warnStyle = new GUIStyle(GUI.skin.label);
-                            warnStyle.wordWrap = true;
-                            GUILayout.Label("Smoothness is controlled by diffuse alpha channel", warnStyle);
-                        }
-                        else
-                        {
-                            smoothness = EditorGUILayout.Slider(s_Styles.smoothness, smoothness, 0, 1);
-                        }
+                        GUIStyle warnStyle = new GUIStyle(GUI.skin.label);
+                        warnStyle.wordWrap = true;
+                        GUILayout.Label("Smoothness is controlled by diffuse alpha channel", warnStyle);
                     }
                     else
-                    {
                         smoothness = EditorGUILayout.Slider(s_Styles.smoothness, smoothness, 0, 1);
-                    }
                 }
             }
 

@@ -32,16 +32,4 @@ namespace UnityEditor.Rendering.HighDefinition
             uiBlocks.Add(new SurfaceOptionUIBlock(MaterialUIBlock.ExpandableBit.Base, features: vfxSurfaceOptionFeatures));
         }
     }
-
-    internal class VFXShaderGraphGUISixWay : SixWayGUI
-    {
-        const SurfaceOptionUIBlock.Features vfxSurfaceOptionFeatures = (SurfaceOptionUIBlock.Features.Lit | SurfaceOptionUIBlock.Features.ShowDepthOffsetOnly) ^ SurfaceOptionUIBlock.Features.DoubleSidedNormalMode ^ SurfaceOptionUIBlock.Features.PreserveSpecularLighting;
-
-        public VFXShaderGraphGUISixWay()
-        {
-            uiBlocks.Clear();
-            uiBlocks.Add(new SurfaceOptionUIBlock(MaterialUIBlock.ExpandableBit.Base, features: vfxSurfaceOptionFeatures ));
-            uiBlocks.Add(new SixWayUIBlock(MaterialUIBlock.ExpandableBit.Base));
-        }
-    }
 }

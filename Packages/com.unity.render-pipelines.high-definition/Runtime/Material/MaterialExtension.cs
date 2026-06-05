@@ -8,7 +8,7 @@ using UnityEditor.Rendering.HighDefinition;
 using static UnityEngine.Rendering.HighDefinition.HDRenderQueue;
 using static UnityEngine.Rendering.HighDefinition.HDMaterialProperties;
 
-namespace UnityEngine.Rendering.HighDefinition
+namespace UnityEditor.Rendering.HighDefinition
 {
     // Note: There is another SurfaceType in ShaderGraph (AlphaMode.cs) which conflicts in HDRP shader graph files
     enum SurfaceType
@@ -44,6 +44,16 @@ namespace UnityEngine.Rendering.HighDefinition
         None,
         Phong
     }
+
+    enum MaterialId
+    {
+        LitSSS = 0,
+        LitStandard = 1,
+        LitAniso = 2,
+        LitIridescence = 3,
+        LitSpecular = 4,
+        LitTranslucent = 5
+    };
 
     enum NormalMapSpace
     {
@@ -113,25 +123,6 @@ namespace UnityEngine.Rendering.HighDefinition
         Front = CullMode.Front,
     }
 
-    /// <summary>This enum describes the different "Material Types" supported by the HDRP Lit shader and Lit ShaderGraph.</summary>
-    public enum MaterialId
-    {
-        /// <summary>Sub-surface scattering.</summary>
-        LitSSS = 0,
-        /// <summary>Standard. This is the default mode.</summary>
-        LitStandard = 1,
-        /// <summary>Anisotropic.</summary>
-        LitAniso = 2,
-        /// <summary>Iridescence.</summary>
-        LitIridescence = 3,
-        /// <summary>Specular Color.</summary>
-        LitSpecular = 4,
-        /// <summary>Translucent</summary>
-        LitTranslucent = 5,
-        /// <summary>Colored Translucent</summary>
-        LitColoredTranslucent = 6,
-    }
-
     /// <summary>Emissive Intensity Unit</summary>
     public enum EmissiveIntensityUnit
     {
@@ -146,8 +137,11 @@ namespace UnityEngine.Rendering.HighDefinition
         public static SurfaceType GetSurfaceType(this Material material)
             => material.HasProperty(kSurfaceType) ? (SurfaceType)material.GetFloat(kSurfaceType) : SurfaceType.Opaque;
 
-        public static BlendingMode GetBlendMode(this Material material)
-            => material.HasProperty(kBlendMode) ? (BlendingMode)material.GetFloat(kBlendMode) : BlendingMode.Additive;
+        public static MaterialId GetMaterialId(this Material material)
+            => material.HasProperty(kMaterialID) ? (MaterialId)material.GetFloat(kMaterialID) : MaterialId.LitStandard;
+
+        public static BlendMode GetBlendMode(this Material material)
+            => material.HasProperty(kBlendMode) ? (BlendMode)material.GetFloat(kBlendMode) : BlendMode.Additive;
 
         public static int GetLayerCount(this Material material)
             => material.HasProperty(kLayerCount) ? material.GetInt(kLayerCount) : 1;
@@ -170,15 +164,6 @@ namespace UnityEngine.Rendering.HighDefinition
         public static bool GetAddPrecomputedVelocity(this Material material)
             => material.HasProperty(kAddPrecomputedVelocity) ? material.GetInt(kAddPrecomputedVelocity) == 1 : false;
 
-        public static bool ReceiveSSRTransparent(this Material material)
-            => material.HasProperty(kReceivesSSRTransparent) ? material.GetFloat(kReceivesSSRTransparent) > 0.0f : false;
-
-        public static ScreenSpaceRefraction.RefractionModel GetRefractionModel(this Material material)
-        {
-            var canHaveRefraction = material.GetSurfaceType() == SurfaceType.Transparent && !k_RenderQueue_PreRefraction.Contains(material.renderQueue);
-            return canHaveRefraction && material.HasProperty(kRefractionModel) ? (ScreenSpaceRefraction.RefractionModel)material.GetFloat(kRefractionModel) : ScreenSpaceRefraction.RefractionModel.None;
-        }
-
         public static void ResetMaterialCustomRenderQueue(this Material material)
         {
             // using GetOpaqueEquivalent / GetTransparentEquivalent allow to handle the case when we switch surfaceType
@@ -198,12 +183,6 @@ namespace UnityEngine.Rendering.HighDefinition
             float sortingPriority = material.HasProperty(kTransparentSortPriority) ? material.GetFloat(kTransparentSortPriority) : 0.0f;
             bool alphaTest = material.HasProperty(kAlphaCutoffEnabled) && material.GetFloat(kAlphaCutoffEnabled) > 0.0f;
             bool decalEnable = material.HasProperty(kEnableDecals) && material.GetFloat(kEnableDecals) > 0.0f;
-
-            #if UNITY_EDITOR
-            // Since we are gonna override the renderQueue value, we revert it before to avoid keeping an out of date property override
-            // Render queue value should not be accessed between the next two lines
-            HDMaterial.RevertRenderQueueOverride(material);
-            #endif
             material.renderQueue = HDRenderQueue.ChangeType(targetQueueType, (int)sortingPriority, alphaTest, decalEnable);
         }
 
@@ -248,14 +227,16 @@ namespace UnityEngine.Rendering.HighDefinition
             return false;
         }
     }
+}
 
+namespace UnityEngine.Rendering.HighDefinition
+{
     /// <summary>
     /// Utility class for setting properties, keywords and passes on a material to ensure it is in a valid state for rendering with HDRP.
     /// </summary>
     public static partial class HDMaterial
     {
         //enum representing all shader and shadergraph that we expose to user
-        // Warning: must match orders defined in s_ShaderPaths and s_SubTargetIds
         internal enum ShaderID
         {
             Lit,
@@ -275,11 +256,7 @@ namespace UnityEngine.Rendering.HighDefinition
             SG_Decal,
             SG_Eye,
             SG_Water,
-            SG_TerrainLit,
-            SG_WaterDecal,
             SG_FogVolume,
-            SG_SixWay,
-            SG_PBRSky,
             Count_All,
             Count_ShaderGraph = Count_All - Count_Standard,
             SG_External = -1, // material packaged outside of HDRP
@@ -308,10 +285,7 @@ namespace UnityEngine.Rendering.HighDefinition
             "DecalSubTarget",
             "EyeSubTarget",
             "WaterSubTarget",
-            "WaterDecalSubTarget",
             "FogVolumeSubTarget",
-            "HDSixWaySubTarget",
-            "PBRSkySubTarget",
         };
 
         // list of methods for resetting keywords
@@ -334,10 +308,7 @@ namespace UnityEngine.Rendering.HighDefinition
             { ShaderID.SG_StackLit, ShaderGraphAPI.ValidateLightingMaterial },
             { ShaderID.SG_Decal, ShaderGraphAPI.ValidateDecalMaterial },
             { ShaderID.SG_Eye, ShaderGraphAPI.ValidateLightingMaterial },
-            { ShaderID.SG_TerrainLit, ShaderGraphAPI.ValidateTerrain },
             { ShaderID.SG_FogVolume, ShaderGraphAPI.ValidateFogVolumeMaterial },
-            { ShaderID.SG_SixWay, ShaderGraphAPI.ValidateSixWayMaterial },
-            { ShaderID.SG_WaterDecal, ShaderGraphAPI.ValidateWaterDecalMaterial },
         };
 
         internal static ShaderID GetShaderID(Material material)
@@ -482,7 +453,7 @@ namespace UnityEngine.Rendering.HighDefinition
         public static void SetEmissiveIntensity(Material material, float intensity, EmissiveIntensityUnit unit)
         {
             if (unit == EmissiveIntensityUnit.EV100)
-                intensity = LightUnitUtils.Ev100ToNits(intensity);
+                intensity = LightUtils.ConvertEvToLuminance(intensity);
             material.SetFloat(kEmissiveIntensity, intensity);
             material.SetFloat(kEmissiveIntensityUnit, (float)unit);
             if (material.GetFloat(kUseEmissiveIntensity) > 0.0f)
@@ -534,42 +505,6 @@ namespace UnityEngine.Rendering.HighDefinition
 #endif
         }
 
-        /// <summary>
-        /// Gets the "Material Type" of the material. Returns MaterialId.LitStandard in case the material doesn't have a Type.
-        /// </summary>
-        /// <param name="material">The material used to get the type.</param>
-        /// <returns>The "Material Type" of the material if the value exists, MaterialId.LitStandard otherwise.</returns>
-        public static MaterialId GetMaterialType(this Material material)
-            => material.HasProperty(kMaterialID) ? (MaterialId)material.GetFloat(kMaterialID) : MaterialId.LitStandard;
-
-        /// <summary>
-        /// Tries to set the "Material Type" property of the material. The function returns true if it have successfully
-        /// updated the material type. The function can fail if the material doesn't have a _MaterialID property or
-        /// if you're trying to set a type that wasn't exposed on the ShaderGraph shader of this material.
-        /// </summary>
-        /// <param name="material">The material to change.</param>
-        /// <param name="type">The new "Material Type" value to set on the material.</param>
-        /// <returns>True if the function has successfully changed the material. False otherwise.</returns>
-        public static bool SetMaterialType(this Material material, MaterialId type)
-        {
-            if (material.HasProperty(kMaterialID))
-            {
-                // Only SG have TypeMask
-                if (material.HasProperty(kMaterialTypeMask))
-                {
-                    int index = material.shader.FindPropertyIndex(kMaterialTypeMask);
-                    int materialTypeMask = (int)material.shader.GetPropertyDefaultFloatValue(index);
-
-                    if ((materialTypeMask & (1 << (int)type)) == 0)
-                        return false;
-                }
-                material.SetFloat(kMaterialID, (int)type);
-                HDMaterial.ValidateMaterial(material);
-                return true;
-            }
-            return false;
-        }
-
 #if UNITY_EDITOR
         internal static void SetDiffusionProfileAsset(Material material, DiffusionProfileSettings profile, int assetPropertyId, int index = 0)
         {
@@ -618,7 +553,7 @@ namespace UnityEngine.Rendering.HighDefinition
             if (shader.FindPropertyIndex("_DiffusionProfileAsset3") != -1)
                 yield return Shader.PropertyToID("_DiffusionProfileAsset3");
 
-            int propertyCount = shader.GetPropertyCount();
+            int propertyCount = UnityEditor.ShaderUtil.GetPropertyCount(shader);
             for (int propIdx = 0; propIdx < propertyCount; ++propIdx)
             {
                 var attributes = shader.GetPropertyAttributes(propIdx);
@@ -627,19 +562,14 @@ namespace UnityEngine.Rendering.HighDefinition
                     if (attribute == "DiffusionProfile")
                     {
                         propIdx++;
-                        var type = shader.GetPropertyType(propIdx);
-                        if (type == ShaderPropertyType.Vector)
+                        var type = UnityEditor.ShaderUtil.GetPropertyType(shader, propIdx);
+                        if (type == UnityEditor.ShaderUtil.ShaderPropertyType.Vector)
                             yield return shader.GetPropertyNameId(propIdx);
                         break;
                     }
                 }
             }
         }
-
-        static System.Reflection.MethodInfo s_RevertRenderQueue = typeof(Material).GetMethod("RevertPropertyOverride_Serialized",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-        internal static void RevertRenderQueueOverride(Material material) => s_RevertRenderQueue.Invoke(material, new object[] { 1 << 4 });
 #endif
 
         // this will work on ALL shadergraph-built shaders, in memory or asset based

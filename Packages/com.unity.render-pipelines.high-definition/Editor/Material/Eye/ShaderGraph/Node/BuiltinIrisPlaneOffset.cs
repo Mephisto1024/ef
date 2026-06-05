@@ -6,12 +6,12 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.ShaderGraph
 {
     [SRPFilter(typeof(HDRenderPipeline))]
-    [Title("Utility", "High Definition Render Pipeline", "Eye", "Builtin Iris Plane Offset")]
+    [Title("Utility", "High Definition Render Pipeline", "Eye", "Builtin Iris Planet Offset (Preview)")]
     class BuiltinIrisPlaneOffset : AbstractMaterialNode, IGeneratesBodyCode
     {
         public BuiltinIrisPlaneOffset()
         {
-            name = "Builtin Iris Plane Offset";
+            name = "Builtin Iris Plane Offset (Preview)";
             UpdateNodeAfterDeserialization();
         }
 

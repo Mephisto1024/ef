@@ -46,6 +46,7 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
     $SurfaceDescription.CuticleAngle:                surfaceData.cuticleAngle =                   surfaceDescription.CuticleAngle;
 
     $SurfaceDescription.StrandCountProbe:            surfaceData.strandCountProbe =               surfaceDescription.StrandCountProbe;
+    $SurfaceDescription.StrandShadowBias:            surfaceData.strandShadowBias =               surfaceDescription.StrandShadowBias;
 
     // These static material feature allow compile time optimization
     surfaceData.materialFeatures = 0;
@@ -57,10 +58,6 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
 
     #ifdef _MATERIAL_FEATURE_HAIR_MARSCHNER
         surfaceData.materialFeatures |= MATERIALFEATUREFLAGS_HAIR_MARSCHNER;
-    #endif
-
-    #ifdef _MATERIAL_FEATURE_HAIR_MARSCHNER_CINEMATIC
-        surfaceData.materialFeatures |= MATERIALFEATUREFLAGS_HAIR_MARSCHNER_CINEMATIC;
     #endif
 
     float3 doubleSidedConstants = GetDoubleSidedConstants();
@@ -115,17 +112,10 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
     $BentNormal: GetNormalWS(fragInputs, surfaceDescription.BentNormal, bentNormalWS, doubleSidedConstants);
 
     #ifdef DEBUG_DISPLAY
-    #if !defined(SHADER_STAGE_RAY_TRACING)
-        // Mipmap mode debugging isn't supported with ray tracing as it relies on derivatives
         if (_DebugMipMapMode != DEBUGMIPMAPMODE_NONE)
         {
-            #ifdef FRAG_INPUTS_USE_TEXCOORD0
-                surfaceData.diffuseColor = GET_TEXTURE_STREAMING_DEBUG(posInput.positionSS, fragInputs.texCoord0);
-            #else
-                surfaceData.diffuseColor = GET_TEXTURE_STREAMING_DEBUG_NO_UV(posInput.positionSS);
-            #endif
+            // TODO: need to update mip info
         }
-    #endif
 
         // We need to call ApplyDebugToSurfaceData after filling the surfarcedata and before filling builtinData
         // as it can modify attribute use for static lighting
@@ -136,7 +126,7 @@ void BuildSurfaceData(FragInputs fragInputs, inout SurfaceDescription surfaceDes
         // Just use the value passed through via the slot (not active otherwise)
     #elif defined(_SPECULAR_OCCLUSION_FROM_AO_BENT_NORMAL)
         // If we have bent normal and ambient occlusion, process a specular occlusion
-        surfaceData.specularOcclusion = GetSpecularOcclusionFromBentAO(V, bentNormalWS, N, surfaceData.ambientOcclusion, PerceptualSmoothnessToRoughness(surfaceData.perceptualSmoothness));
+        surfaceData.specularOcclusion = GetSpecularOcclusionFromBentAO(V, bentNormalWS, N, surfaceData.ambientOcclusion, PerceptualSmoothnessToPerceptualRoughness(surfaceData.perceptualSmoothness));
     #elif defined(_AMBIENT_OCCLUSION) && defined(_SPECULAR_OCCLUSION_FROM_AO)
         surfaceData.specularOcclusion = GetSpecularOcclusionFromAmbientOcclusion(ClampNdotV(dot(N, V)), surfaceData.ambientOcclusion, PerceptualSmoothnessToRoughness(surfaceData.perceptualSmoothness));
     #endif

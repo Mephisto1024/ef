@@ -1,5 +1,5 @@
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering.RenderGraphModule;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
@@ -16,7 +16,7 @@ namespace UnityEngine.Rendering.HighDefinition
 
         void InitRayTracedIndirectDiffuse()
         {
-            ComputeShader indirectDiffuseShaderCS = rayTracingResources.indirectDiffuseRayTracingCS;
+            ComputeShader indirectDiffuseShaderCS = m_GlobalSettings.renderPipelineRayTracingResources.indirectDiffuseRaytracingCS;
 
             // Grab all the kernels we shall be using
             m_RaytracingIndirectDiffuseFullResKernel = indirectDiffuseShaderCS.FindKernel("RaytracingIndirectDiffuseFullRes");
@@ -77,10 +77,10 @@ namespace UnityEngine.Rendering.HighDefinition
             deferredParameters.mipChainBuffer = hdCamera.depthBufferMipChainInfo.GetOffsetBufferData(m_DepthPyramidMipLevelOffsetsBuffer);
 
             // Shaders
-            deferredParameters.rayMarchingCS = rayTracingResources.rayMarchingCS;
-            deferredParameters.gBufferRaytracingRT = rayTracingResources.gBufferRayTracingRT;
-            deferredParameters.deferredRaytracingCS = rayTracingResources.deferredRayTracingCS;
-            deferredParameters.rayBinningCS = rayTracingResources.rayBinningCS;
+            deferredParameters.rayMarchingCS = m_GlobalSettings.renderPipelineRayTracingResources.rayMarchingCS;
+            deferredParameters.gBufferRaytracingRT = m_GlobalSettings.renderPipelineRayTracingResources.gBufferRaytracingRT;
+            deferredParameters.deferredRaytracingCS = m_GlobalSettings.renderPipelineRayTracingResources.deferredRaytracingCS;
+            deferredParameters.rayBinningCS = m_GlobalSettings.renderPipelineRayTracingResources.rayBinningCS;
 
             // Make a copy of the previous values that were defined in the CB
             deferredParameters.raytracingCB = m_ShaderVariablesRayTracingCB;
@@ -92,10 +92,8 @@ namespace UnityEngine.Rendering.HighDefinition
             deferredParameters.raytracingCB._RayTracingDiffuseLightingOnly = 1;
             deferredParameters.raytracingCB._RayTracingAPVRayMiss = 1;
             deferredParameters.raytracingCB._RayTracingRayMissFallbackHierarchy = deferredParameters.rayMiss;
-            deferredParameters.raytracingCB._RayTracingRayMissUseAmbientProbeAsSky = 1;
             deferredParameters.raytracingCB._RayTracingLastBounceFallbackHierarchy = deferredParameters.lastBounceFallbackHierarchy;
             deferredParameters.raytracingCB._RayTracingAmbientProbeDimmer = settings.ambientProbeDimmer.value;
-            deferredParameters.raytracingCB._RaytracingAPVLayerMask = settings.adaptiveProbeVolumesLayerMask.value;
 
             return deferredParameters;
         }
@@ -123,8 +121,10 @@ namespace UnityEngine.Rendering.HighDefinition
 
         TextureHandle DirGenRTGI(RenderGraph renderGraph, HDCamera hdCamera, GlobalIllumination settings, TextureHandle depthStencilbuffer, TextureHandle normalBuffer, bool fullResolution)
         {
-            using (var builder = renderGraph.AddUnsafePass<DirGenRTGIPassData>("Generating the rays for RTGI", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingIndirectDiffuseDirectionGeneration)))
+            using (var builder = renderGraph.AddRenderPass<DirGenRTGIPassData>("Generating the rays for RTGI", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingIndirectDiffuseDirectionGeneration)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Set the camera parameters
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
@@ -134,35 +134,31 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.fullResolution = fullResolution;
 
                 // Grab the right kernel
-                passData.directionGenCS = rayTracingResources.indirectDiffuseRayTracingCS;
+                passData.directionGenCS = m_GlobalSettings.renderPipelineRayTracingResources.indirectDiffuseRaytracingCS;
                 passData.dirGenKernel = fullResolution ? m_RaytracingIndirectDiffuseFullResKernel : m_RaytracingIndirectDiffuseHalfResKernel;
 
                 // Grab the additional parameters
                 passData.ditheredTextureSet = GetBlueNoiseManager().DitheredTextureSet8SPP();
                 passData.shaderVariablesRayTracingCB = m_ShaderVariablesRayTracingCB;
 
-                passData.depthStencilBuffer = depthStencilbuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "GI Ray Directions" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                passData.depthStencilBuffer = builder.ReadTexture(depthStencilbuffer);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "GI Ray Directions" }));
 
                 builder.SetRenderFunc(
-                    (DirGenRTGIPassData data, UnsafeGraphContext ctx) =>
+                    (DirGenRTGIPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Inject the ray-tracing sampling data
-                        BlueNoise.BindDitheredTextureSet(natCmd, data.ditheredTextureSet);
+                        BlueNoise.BindDitheredTextureSet(ctx.cmd, data.ditheredTextureSet);
 
                         // Bind all the required textures
-                        natCmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                        natCmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._StencilTexture, data.depthStencilBuffer, 0, RenderTextureSubElement.Stencil);
-                        natCmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._StencilTexture, data.depthStencilBuffer, 0, RenderTextureSubElement.Stencil);
+                        ctx.cmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
 
                         // Bind the output buffers
-                        natCmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._RaytracingDirectionBuffer, data.outputBuffer);
+                        ctx.cmd.SetComputeTextureParam(data.directionGenCS, data.dirGenKernel, HDShaderIDs._RaytracingDirectionBuffer, data.outputBuffer);
 
                         int numTilesXHR, numTilesYHR;
                         if (data.fullResolution)
@@ -179,7 +175,7 @@ namespace UnityEngine.Rendering.HighDefinition
                         }
 
                         // Compute the directions
-                        natCmd.DispatchCompute(data.directionGenCS, data.dirGenKernel, numTilesXHR, numTilesYHR, data.viewCount);
+                        ctx.cmd.DispatchCompute(data.directionGenCS, data.dirGenKernel, numTilesXHR, numTilesYHR, data.viewCount);
                     });
 
                 return passData.outputBuffer;
@@ -209,35 +205,32 @@ namespace UnityEngine.Rendering.HighDefinition
         TextureHandle UpscaleRTGI(RenderGraph renderGraph, HDCamera hdCamera, GlobalIllumination settings,
             TextureHandle depthPyramid, TextureHandle normalBuffer, TextureHandle indirectDiffuseBuffer, TextureHandle directionBuffer, bool fullResolution)
         {
-            using (var builder = renderGraph.AddUnsafePass<UpscaleRTGIPassData>("Upscale the RTGI result", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingIndirectDiffuseUpscale)))
+            using (var builder = renderGraph.AddRenderPass<UpscaleRTGIPassData>("Upscale the RTGI result", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingIndirectDiffuseUpscale)))
             {
+                builder.EnableAsyncCompute(false);
+
                 // Set the camera parameters
                 passData.texWidth = hdCamera.actualWidth;
                 passData.texHeight = hdCamera.actualHeight;
                 passData.viewCount = hdCamera.viewCount;
 
                 // Grab the right kernel
-                passData.upscaleCS = rayTracingResources.indirectDiffuseRayTracingCS;
+                passData.upscaleCS = m_GlobalSettings.renderPipelineRayTracingResources.indirectDiffuseRaytracingCS;
                 passData.upscaleKernel = fullResolution ? m_IndirectDiffuseUpscaleFullResKernel : m_IndirectDiffuseUpscaleHalfResKernel;
 
                 // Grab the additional parameters
                 passData.blueNoiseTexture = GetBlueNoiseManager().textureArray16RGB;
-                passData.scramblingTexture = runtimeTextures.scramblingTex;
+                passData.scramblingTexture = m_Asset.renderPipelineResources.textures.scramblingTex;
 
-                passData.depthBuffer = depthPyramid;
-                builder.UseTexture(passData.depthBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.indirectDiffuseBuffer = indirectDiffuseBuffer;
-                builder.UseTexture(passData.indirectDiffuseBuffer, AccessFlags.Read);
-                passData.directionBuffer = directionBuffer;
-                builder.UseTexture(passData.directionBuffer, AccessFlags.Read);
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Reflection Ray Indirect Diffuse" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
+                passData.depthBuffer = builder.ReadTexture(depthPyramid);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.indirectDiffuseBuffer = builder.ReadTexture(indirectDiffuseBuffer);
+                passData.directionBuffer = builder.ReadTexture(directionBuffer);
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Reflection Ray Indirect Diffuse" }));
 
                 builder.SetRenderFunc(
-                    (UpscaleRTGIPassData data, UnsafeGraphContext ctx) =>
+                    (UpscaleRTGIPassData data, RenderGraphContext ctx) =>
                     {
                         // Inject all the parameters for the compute
                         ctx.cmd.SetComputeTextureParam(data.upscaleCS, data.upscaleKernel, HDShaderIDs._DepthTexture, data.depthBuffer);
@@ -271,7 +264,7 @@ namespace UnityEngine.Rendering.HighDefinition
         {
             return hdCamera.GetCurrentFrameRT((int)HDCameraFrameHistoryType.RaytracedIndirectDiffuseHF)
                 ?? hdCamera.AllocHistoryFrameRT((int)HDCameraFrameHistoryType.RaytracedIndirectDiffuseHF,
-                IndirectDiffuseHistoryBufferAllocatorFunction, 1);
+                ReflectionHistoryBufferAllocatorFunction, 1);
         }
 
         TextureHandle RenderIndirectDiffusePerformance(RenderGraph renderGraph, HDCamera hdCamera,
@@ -293,9 +286,9 @@ namespace UnityEngine.Rendering.HighDefinition
 
             // Trace the rays and evaluate the lighting
             DeferredLightingRTParameters deferredParamters = PrepareIndirectDiffuseDeferredLightingRTParameters(hdCamera, fullResolution);
-            RayTracingDefferedLightLoopOutput lightloopOutput = DeferredLightingRT(renderGraph, hdCamera, in deferredParamters, directionBuffer, prepassOutput, skyTexture, rayCountTexture);
+            TextureHandle lightingBuffer = DeferredLightingRT(renderGraph, in deferredParamters, directionBuffer, prepassOutput, skyTexture, rayCountTexture);
 
-            rtgiResult = UpscaleRTGI(renderGraph, hdCamera, settings, prepassOutput.depthBuffer, prepassOutput.normalBuffer, lightloopOutput.lightingBuffer, directionBuffer, fullResolution);
+            rtgiResult = UpscaleRTGI(renderGraph, hdCamera, settings, prepassOutput.depthBuffer, prepassOutput.normalBuffer, lightingBuffer, directionBuffer, fullResolution);
 
             // Denoise if required
             rtgiResult = DenoiseRTGI(renderGraph, hdCamera, rtgiResult, prepassOutput.depthBuffer, prepassOutput.normalBuffer, prepassOutput.resolvedMotionVectorsBuffer, historyValidationTexture, fullResolution);
@@ -315,11 +308,10 @@ namespace UnityEngine.Rendering.HighDefinition
             public int sampleCount;
             public float clampValue;
             public int bounceCount;
-            public float lodBias;
+            public int lodBias;
             public int rayMiss;
             public int lastBounceFallbackHierarchy;
             public float ambientProbeDimmer;
-            public UnityEngine.RenderingLayerMask apvLayerMask;
 
             // Other parameters
             public RayTracingShader indirectDiffuseRT;
@@ -333,14 +325,14 @@ namespace UnityEngine.Rendering.HighDefinition
             public TextureHandle normalBuffer;
             public TextureHandle rayCountTexture;
             public TextureHandle outputBuffer;
-
-            public bool enableDecals;
         }
 
         TextureHandle QualityRTGI(RenderGraph renderGraph, HDCamera hdCamera, TextureHandle depthStencilBuffer, TextureHandle normalBuffer, TextureHandle rayCountTexture)
         {
-            using (var builder = renderGraph.AddUnsafePass<TraceQualityRTGIPassData>("Quality RT Indirect Diffuse", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingIndirectDiffuseEvaluation)))
+            using (var builder = renderGraph.AddRenderPass<TraceQualityRTGIPassData>("Quality RT Indirect Diffuse", out var passData, ProfilingSampler.Get(HDProfileId.RaytracingIndirectDiffuseEvaluation)))
             {
+                builder.EnableAsyncCompute(false);
+
                 var settings = hdCamera.volumeStack.GetComponent<GlobalIllumination>();
 
                 // Set the camera parameters
@@ -357,23 +349,22 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.rayMiss = (int)settings.rayMiss.value;
                 passData.lastBounceFallbackHierarchy = (int)settings.lastBounceFallbackHierarchy.value;
                 passData.ambientProbeDimmer = settings.ambientProbeDimmer.value;
-                passData.apvLayerMask = settings.adaptiveProbeVolumesLayerMask.value;
 
                 // Grab the additional parameters
-                if (apvIsEnabled)
+                if (IsAPVEnabled())
                 {
                     if(m_Asset.currentPlatformRenderPipelineSettings.probeVolumeSHBands == ProbeVolumeSHBands.SphericalHarmonicsL1)
                     {
-                        passData.indirectDiffuseRT = rayTracingResources.indirectDiffuseRayTracingL1RT;
+                        passData.indirectDiffuseRT = m_GlobalSettings.renderPipelineRayTracingResources.indirectDiffuseRaytracingL1RT;
                     }
                     else
                     {
-                        passData.indirectDiffuseRT = rayTracingResources.indirectDiffuseRaytracingL2RT;
+                        passData.indirectDiffuseRT = m_GlobalSettings.renderPipelineRayTracingResources.indirectDiffuseRaytracingL2RT;
                     }
                 }
                 else
                 {
-                    passData.indirectDiffuseRT = rayTracingResources.indirectDiffuseRayTracingOffRT;
+                    passData.indirectDiffuseRT = m_GlobalSettings.renderPipelineRayTracingResources.indirectDiffuseRaytracingOffRT;
                 }
 
                 passData.accelerationStructure = RequestAccelerationStructure(hdCamera);
@@ -385,45 +376,38 @@ namespace UnityEngine.Rendering.HighDefinition
                 passData.shaderVariablesRayTracingCB = m_ShaderVariablesRayTracingCB;
 
                 // Set the input and output textures
-                passData.depthStencilBuffer = depthStencilBuffer;
-                builder.UseTexture(passData.depthStencilBuffer, AccessFlags.Read);
-                passData.normalBuffer = normalBuffer;
-                builder.UseTexture(passData.normalBuffer, AccessFlags.Read);
-                passData.rayCountTexture = rayCountTexture;
-                builder.UseTexture(passData.rayCountTexture, AccessFlags.ReadWrite);
-                passData.outputBuffer = renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
-                { format = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Ray Traced Indirect Diffuse" });
-                builder.UseTexture(passData.outputBuffer, AccessFlags.Write);
-
-                passData.enableDecals = hdCamera.frameSettings.IsEnabled(FrameSettingsField.Decals);
+                passData.depthStencilBuffer = builder.ReadTexture(depthStencilBuffer);
+                passData.normalBuffer = builder.ReadTexture(normalBuffer);
+                passData.rayCountTexture = builder.ReadWriteTexture(rayCountTexture);
+                passData.outputBuffer = builder.WriteTexture(renderGraph.CreateTexture(new TextureDesc(Vector2.one, true, true)
+                { colorFormat = GraphicsFormat.R16G16B16A16_SFloat, enableRandomWrite = true, name = "Ray Traced Indirect Diffuse" }));
 
                 builder.SetRenderFunc(
-                    (TraceQualityRTGIPassData data, UnsafeGraphContext ctx) =>
+                    (TraceQualityRTGIPassData data, RenderGraphContext ctx) =>
                     {
-                        var natCmd = CommandBufferHelpers.GetNativeCommandBuffer(ctx.cmd);
                         // Define the shader pass to use for the indirect diffuse pass
-                        natCmd.SetRayTracingShaderPass(data.indirectDiffuseRT, "IndirectDXR");
+                        ctx.cmd.SetRayTracingShaderPass(data.indirectDiffuseRT, "IndirectDXR");
 
                         // Set the acceleration structure for the pass
-                        natCmd.SetRayTracingAccelerationStructure(data.indirectDiffuseRT, HDShaderIDs._RaytracingAccelerationStructureName, data.accelerationStructure);
+                        ctx.cmd.SetRayTracingAccelerationStructure(data.indirectDiffuseRT, HDShaderIDs._RaytracingAccelerationStructureName, data.accelerationStructure);
 
                         // Inject the ray-tracing sampling data
-                        BlueNoise.BindDitheredTextureSet(natCmd, data.ditheredTextureSet);
+                        BlueNoise.BindDitheredTextureSet(ctx.cmd, data.ditheredTextureSet);
 
                         // Set the data for the ray generation
-                        natCmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._IndirectDiffuseTextureRW, data.outputBuffer);
-                        natCmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
-                        natCmd.SetGlobalTexture(HDShaderIDs._StencilTexture, data.depthStencilBuffer, RenderTextureSubElement.Stencil);
-                        natCmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._IndirectDiffuseTextureRW, data.outputBuffer);
+                        ctx.cmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._DepthTexture, data.depthStencilBuffer);
+                        ctx.cmd.SetGlobalTexture(HDShaderIDs._StencilTexture, data.depthStencilBuffer, RenderTextureSubElement.Stencil);
+                        ctx.cmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._NormalBufferTexture, data.normalBuffer);
 
                         // Set ray count texture
-                        natCmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._RayCountTexture, data.rayCountTexture);
+                        ctx.cmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._RayCountTexture, data.rayCountTexture);
 
                         // LightLoop data
-                        data.lightCluster.BindLightClusterData(natCmd);
+                        data.lightCluster.BindLightClusterData(ctx.cmd);
 
                         // Set the data for the ray miss
-                        natCmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._SkyTexture, data.skyTexture);
+                        ctx.cmd.SetRayTracingTextureParam(data.indirectDiffuseRT, HDShaderIDs._SkyTexture, data.skyTexture);
 
                         // Update global constant buffer
                         data.shaderVariablesRayTracingCB._RayTracingClampingFlag = 1;
@@ -440,21 +424,16 @@ namespace UnityEngine.Rendering.HighDefinition
                         data.shaderVariablesRayTracingCB._RayTracingRayMissFallbackHierarchy = data.rayMiss;
                         data.shaderVariablesRayTracingCB._RayTracingLastBounceFallbackHierarchy = data.lastBounceFallbackHierarchy;
                         data.shaderVariablesRayTracingCB._RayTracingAmbientProbeDimmer = data.ambientProbeDimmer;
-                        data.shaderVariablesRayTracingCB._RaytracingAPVLayerMask = data.apvLayerMask;
-
-                        ConstantBuffer.PushGlobal(natCmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
+                        ConstantBuffer.PushGlobal(ctx.cmd, data.shaderVariablesRayTracingCB, HDShaderIDs._ShaderVariablesRaytracing);
 
                         // Only use the shader variant that has multi bounce if the bounce count > 1
-                        CoreUtils.SetKeyword(natCmd, "MULTI_BOUNCE_INDIRECT", data.bounceCount > 1);
-
-                        if (data.enableDecals)
-                            DecalSystem.instance.SetAtlas(natCmd);
+                        CoreUtils.SetKeyword(ctx.cmd, "MULTI_BOUNCE_INDIRECT", data.bounceCount > 1);
 
                         // Run the computation
-                        natCmd.DispatchRays(data.indirectDiffuseRT, m_RayGenIndirectDiffuseIntegrationName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount, null);
+                        ctx.cmd.DispatchRays(data.indirectDiffuseRT, m_RayGenIndirectDiffuseIntegrationName, (uint)data.texWidth, (uint)data.texHeight, (uint)data.viewCount);
 
                         // Disable the keywords we do not need anymore
-                        CoreUtils.SetKeyword(natCmd, "MULTI_BOUNCE_INDIRECT", false);
+                        CoreUtils.SetKeyword(ctx.cmd, "MULTI_BOUNCE_INDIRECT", false);
                     });
 
                 return passData.outputBuffer;

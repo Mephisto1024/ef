@@ -7,7 +7,7 @@ Shader "Hidden/HDRP/CustomPassRenderersUtils"
     HLSLINCLUDE
 
     #pragma target 4.5
-    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+    #pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
     // #pragma enable_d3d11_debug_symbols
 
@@ -42,7 +42,7 @@ Shader "Hidden/HDRP/CustomPassRenderersUtils"
             Tags { "LightMode" = "DepthToColorPass" }
 
             Blend Off
-            ZWrite On
+            ZWrite Off
             ZTest LEqual
 
             Cull Back
@@ -103,7 +103,7 @@ Shader "Hidden/HDRP/CustomPassRenderersUtils"
             Tags { "LightMode" = "NormalToColorPass" }
 
             Blend Off
-            ZWrite On
+            ZWrite Off
             ZTest LEqual
 
             Cull Back
@@ -132,7 +132,7 @@ Shader "Hidden/HDRP/CustomPassRenderersUtils"
             Tags { "LightMode" = "TangentToColorPass" }
 
             Blend Off
-            ZWrite On
+            ZWrite Off
             ZTest LEqual
 
             Cull Back

@@ -3,14 +3,14 @@ using UnityEngine.Serialization;
 
 namespace UnityEngine.Rendering.HighDefinition
 {
-    [Obsolete("For data migration. #from(2021.1)")]
+    [Obsolete("For data migration")]
     enum ObsoleteLitShaderMode
     {
         Forward,
         Deferred
     }
 
-    [Flags, Obsolete("For data migration. #from(2021.1)")]
+    [Flags, Obsolete("For data migration")]
     enum ObsoleteLightLoopSettingsOverrides
     {
         FptlForForwardOpaque = 1 << 0,
@@ -22,7 +22,7 @@ namespace UnityEngine.Rendering.HighDefinition
         //Fptl = 1 << 6, //isFptlEnabled set up by system
     }
 
-    [Flags, Obsolete("For data migration. #from(2021.1)")]
+    [Flags, Obsolete("For data migration")]
     enum ObsoleteFrameSettingsOverrides
     {
         //lighting settings
@@ -65,7 +65,7 @@ namespace UnityEngine.Rendering.HighDefinition
         VolumeVoxelizationsAsync = 1 << 31,
     }
 
-    [Serializable, Obsolete("For data migration. #from(2021.1)")]
+    [Serializable, Obsolete("For data migration")]
     class ObsoleteLightLoopSettings
     {
         public ObsoleteLightLoopSettingsOverrides overrides;
@@ -83,7 +83,7 @@ namespace UnityEngine.Rendering.HighDefinition
     // Each camera must have its own per frame settings
     [Serializable]
     [System.Diagnostics.DebuggerDisplay("FrameSettings overriding {overrides.ToString(\"X\")}")]
-    [Obsolete("For data migration. #from(2021.1)")]
+    [Obsolete("For data migration")]
     class ObsoleteFrameSettings
     {
         public ObsoleteFrameSettingsOverrides overrides;
@@ -192,6 +192,8 @@ namespace UnityEngine.Rendering.HighDefinition
 
             if (oldFrameSettingsFormat.lightLoopSettings != null)
             {
+                newFrameSettingsFormat.SetEnabled(FrameSettingsField.DeferredTile, oldFrameSettingsFormat.lightLoopSettings.enableDeferredTileAndCluster);
+                newFrameSettingsFormat.SetEnabled(FrameSettingsField.ComputeLightEvaluation, oldFrameSettingsFormat.lightLoopSettings.enableComputeLightEvaluation);
                 newFrameSettingsFormat.SetEnabled(FrameSettingsField.ComputeLightVariants, oldFrameSettingsFormat.lightLoopSettings.enableComputeLightVariants);
                 newFrameSettingsFormat.SetEnabled(FrameSettingsField.ComputeMaterialVariants, oldFrameSettingsFormat.lightLoopSettings.enableComputeMaterialVariants);
                 newFrameSettingsFormat.SetEnabled(FrameSettingsField.FPTLForForwardOpaque, oldFrameSettingsFormat.lightLoopSettings.enableFptlForForwardOpaque);
@@ -315,8 +317,14 @@ namespace UnityEngine.Rendering.HighDefinition
                     {
                         switch (val)
                         {
+                            case ObsoleteLightLoopSettingsOverrides.TileAndCluster:
+                                newFrameSettingsOverrideMask.mask[(int)FrameSettingsField.DeferredTile] = true;
+                                break;
                             case ObsoleteLightLoopSettingsOverrides.BigTilePrepass:
                                 newFrameSettingsOverrideMask.mask[(int)FrameSettingsField.BigTilePrepass] = true;
+                                break;
+                            case ObsoleteLightLoopSettingsOverrides.ComputeLightEvaluation:
+                                newFrameSettingsOverrideMask.mask[(int)FrameSettingsField.ComputeLightEvaluation] = true;
                                 break;
                             case ObsoleteLightLoopSettingsOverrides.ComputeLightVariants:
                                 newFrameSettingsOverrideMask.mask[(int)FrameSettingsField.ComputeLightVariants] = true;
@@ -327,9 +335,6 @@ namespace UnityEngine.Rendering.HighDefinition
                             case ObsoleteLightLoopSettingsOverrides.FptlForForwardOpaque:
                                 newFrameSettingsOverrideMask.mask[(int)FrameSettingsField.FPTLForForwardOpaque] = true;
                                 break;
-                            // Obsolete
-                            case ObsoleteLightLoopSettingsOverrides.TileAndCluster: break;
-                            case ObsoleteLightLoopSettingsOverrides.ComputeLightEvaluation: break;
                             default:
                                 throw new ArgumentException("Unknown ObsoleteLightLoopSettingsOverrides");
                         }
@@ -450,17 +455,6 @@ namespace UnityEngine.Rendering.HighDefinition
         internal static void MigrateVirtualTexturing(ref FrameSettings cameraFrameSettings)
         {
             cameraFrameSettings.SetEnabled(FrameSettingsField.VirtualTexturing, true);
-        }
-        
-        internal static void MigrateAmethystFeatures(ref FrameSettings cameraFrameSettings)
-        {
-            cameraFrameSettings.SetEnabled(FrameSettingsField.Water, true);
-            cameraFrameSettings.SetEnabled(FrameSettingsField.WaterDecals, true);
-            cameraFrameSettings.SetEnabled(FrameSettingsField.WaterExclusion, true);
-            cameraFrameSettings.SetEnabled(FrameSettingsField.ComputeThickness, true);
-            cameraFrameSettings.SetEnabled(FrameSettingsField.LensFlareScreenSpace, true);
-            cameraFrameSettings.SetEnabled(FrameSettingsField.HighQualityLineRendering, true);
-            cameraFrameSettings.SetEnabled(FrameSettingsField.RaytracingVFX, true);
         }
     }
 }

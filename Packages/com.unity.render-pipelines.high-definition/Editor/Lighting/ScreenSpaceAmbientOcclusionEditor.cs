@@ -76,7 +76,7 @@ namespace UnityEditor.Rendering.HighDefinition
         {
             public static readonly string currentAssetDoesNotSupportSSAO = "The current HDRP Asset does not support Screen Space Ambient Occlusion.";
             public static readonly string performanceImpacted = "Performance will be seriously impacted by high direction count.";
-            public static readonly GUIContent rayTracing = EditorGUIUtility.TrTextContent("Ray Tracing", "Enable ray traced ambient occlusion.");
+            public static readonly GUIContent rayTracing = EditorGUIUtility.TrTextContent("Ray Tracing (Preview)", "Enable ray traced ambient occlusion.");
             public static readonly GUIContent intesity = EditorGUIUtility.TrTextContent("Intensity", "Controls the strength of the ambient occlusion effect. Increase this value to produce darker areas.");
             public static readonly GUIContent directLightingStrenght = EditorGUIUtility.TrTextContent("Direct Lighting Strength", "Controls how much the ambient light affects occlusion.");
             public static readonly GUIContent layerMask = EditorGUIUtility.TrTextContent("Layer Mask", "Layer mask used to include the objects for ambient occlusion.");
@@ -93,24 +93,21 @@ namespace UnityEditor.Rendering.HighDefinition
             public static readonly GUIContent stepCount = EditorGUIUtility.TrTextContent("Step Count", "Number of steps to take along one signed direction during horizon search (this is the number of steps in positive and negative direction).");
             public static readonly GUIContent tempAccum = EditorGUIUtility.TrTextContent("Temporal Accumulation", "Whether the results are accumulated over time or not. This can get better results cheaper, but it can lead to temporal artifacts. Requires Motion Vectors to be enabled.");
             public static readonly GUIContent directionCount = EditorGUIUtility.TrTextContent("Direction Count", "Number of directions searched for occlusion at each each pixel.");
-            public static readonly GUIContent blurSharpness = EditorGUIUtility.TrTextContent("Blur Sharpness", "Modify the non-temporal blur to change how sharp features are preserved. Lower values blurrier/softer, higher values sharper but with risk of noise.");
+            public static readonly GUIContent blurSharpness = EditorGUIUtility.TrTextContent("Blur sharpness", "Modify the non-temporal blur to change how sharp features are preserved. Lower values blurrier/softer, higher values sharper but with risk of noise.");
             public static readonly GUIContent bilateralAggressiveness = EditorGUIUtility.TrTextContent("Bilateral Aggressiveness", "Higher this value, the less lenient with depth differences the spatial filter is. Increase if for example noticing white halos where AO should be.");
-            public static readonly GUIContent ghostingReduction = EditorGUIUtility.TrTextContent("Ghosting Reduction", "Moving this factor closer to 0 will increase the amount of accepted samples during temporal accumulation, increasing the ghosting, but reducing the temporal noise.");
+            public static readonly GUIContent ghostingReduction = EditorGUIUtility.TrTextContent("Ghosting reduction", "Moving this factor closer to 0 will increase the amount of accepted samples during temporal accumulation, increasing the ghosting, but reducing the temporal noise.");
             public static readonly GUIContent bilateralUpsample = EditorGUIUtility.TrTextContent("Bilateral Upsample", "This upsample method preserves sharp edges better, however can result in visible aliasing and it is slightly more expensive.");
         }
 
         public override void OnInspectorGUI()
         {
-            HDEditorUtils.EnsureFrameSetting(FrameSettingsField.SSAO);
-            HDRenderPipelineAsset currentAsset = HDRenderPipeline.currentAsset;
-            bool notSupported = currentAsset != null && !currentAsset.currentPlatformRenderPipelineSettings.supportSSAO;
-            if (notSupported)
+            if (!HDRenderPipeline.currentAsset?.currentPlatformRenderPipelineSettings.supportSSAO ?? false)
             {
                 EditorGUILayout.Space();
-                HDEditorUtils.QualitySettingsHelpBox(Styles.currentAssetDoesNotSupportSSAO, MessageType.Warning,
-                    HDRenderPipelineUI.ExpandableGroup.Lighting, "m_RenderPipelineSettings.supportSSAO");
+                HDEditorUtils.QualitySettingsHelpBox(Styles.currentAssetDoesNotSupportSSAO, MessageType.Error,
+                    HDRenderPipelineUI.Expandable.Lighting, "m_RenderPipelineSettings.supportSSAO");
+                return;
             }
-            using var disableScope = new EditorGUI.DisabledScope(notSupported);
 
             if (HDRenderPipeline.assetSupportsRayTracing)
             {
@@ -118,7 +115,6 @@ namespace UnityEditor.Rendering.HighDefinition
 
                 if (m_RayTracing.overrideState.boolValue && m_RayTracing.value.boolValue)
                 {
-                    HDEditorUtils.EnsureFrameSetting(FrameSettingsField.RayTracing);
                     // If ray tracing is supported display the content of the volume component
                     if (RenderPipelineManager.currentPipeline is not HDRenderPipeline { rayTracingSupported: true })
                         HDRenderPipelineUI.DisplayRayTracingSupportBox();

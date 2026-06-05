@@ -1,7 +1,6 @@
 #ifndef RAY_TRACING_COMMON_HLSL
 #define RAY_TRACING_COMMON_HLSL
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RaytracingSampling.hlsl"
 
 #if SHADER_API_GAMECORE_XBOXSERIES
@@ -61,38 +60,14 @@ struct StandardBSDFData
     uint isUnlit;
 };
 
-uint2 ComputeCheckerBoardOffset(uint2 traceCoord, uint subPixelIndex)
-{
-    uint checker = (traceCoord.x & 1) ^ (traceCoord.y & 1);
-    subPixelIndex = (subPixelIndex + checker) & 0x3;
-    return uint2(((subPixelIndex >> 1) ^ subPixelIndex) & 1, subPixelIndex >> 1);
-}
-
-// This function compute the checkerboard undersampling position
-// Warning: This function is broken, but keeping it to not break anything
-// Use ComputeCheckerBoardOffset instead
-uint ComputeCheckerBoardIndex(uint2 traceCoord, uint subPixelIndex)
-{
-    // TODO: missing parenthesis around the & operations
-    uint localOffset = (traceCoord.x & 1 + traceCoord.y & 1) & 1;
-    uint checkerBoardLocation = (subPixelIndex + localOffset) & 0x3;
-    return checkerBoardLocation;
-}
-
-uint2 HalfResolutionIndexToOffset(uint index)
-{
-    return uint2(index & 0x1, index / 2);
-}
-
 // This function defines what is the source pixel from where we should read the depth and normal for rendering in half resolution
-uint2 ComputeSourceCoordinates(uint2 halfResCoord, uint subPixelIndex)
+uint2 ComputeSourceCoordinates(uint2 halfResCoord, int frameIndex)
 {
-    // TODO, there remains spots where the half res checker board pattern is still broken, there needs to be a pass done on it
-    uint checkerBoardIndex = ComputeCheckerBoardIndex(halfResCoord, subPixelIndex);
-    return halfResCoord * 2; //+ HalfResolutionIndexToOffset(checkerBoardIndex);
+    return halfResCoord * 2;
 }
 
 // These need to be negative for RayDistanceIndicatesHitSkyOrUnlit
+#define RAY_TRACING_DISTANCE_FLAG_UNLIT -1.0
 #define RAY_TRACING_DISTANCE_FLAG_SKY 0.0
 
 bool RayTracingGBufferIsUnlit(float rayDistance)

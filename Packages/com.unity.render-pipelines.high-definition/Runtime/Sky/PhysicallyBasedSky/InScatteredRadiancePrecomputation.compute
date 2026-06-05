@@ -1,9 +1,7 @@
 // #pragma enable_d3d11_debug_symbols
-#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch switch2
+#pragma only_renderers d3d11 playstation xboxone xboxseries vulkan metal switch
 
 #pragma kernel main
-
-#define _PlanetaryRadius _GroundAlbedo_PlanetRadius.w
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
@@ -111,13 +109,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         NdotL  = dot(normalize(P), L);
 
         const float3 sigmaE       = AtmosphereExtinction(height);
+        const float3 scatteringMS = AirScatter(height) + AerosolScatter(height);
         const float3 transmittanceOverSegment = TransmittanceFromOpticalDepth(sigmaE * dt);
 
         // Apply the phase function at runtime.
         float3 sunTransmittance = EvaluateSunColorAttenuation(NdotL, r);
         float3 airTerm      = sunTransmittance * AirScatter(height);
         float3 aerosolTerm  = sunTransmittance * AerosolScatter(height);
-        float3 scatteringMS = AirScatter(height) + AerosolScatter(height);
         float3 msTerm       = EvaluateMultipleScattering(NdotL, height) * scatteringMS;
 
         airTableEntry     += IntegrateOverSegment(airTerm, transmittanceOverSegment, transmittance, sigmaE);

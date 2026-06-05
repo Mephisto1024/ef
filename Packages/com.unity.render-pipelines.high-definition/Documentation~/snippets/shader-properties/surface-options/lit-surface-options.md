@@ -7,8 +7,8 @@
 <thead>
   <tr>
     <th>Property</th>
-    <th>Option</th>
-    <th>Sub-option</th>
+    <th></th>
+    <th></th>
     <th>Description</th>
   </tr>
 </thead>

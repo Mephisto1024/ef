@@ -1,8 +1,6 @@
 #ifndef UNITY_HD_RAYTRACING_SHADOW_LOOP_HLSL
 #define UNITY_HD_RAYTRACING_SHADOW_LOOP_HLSL
 
-#define USE_LIGHT_CLUSTER
-
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/Raytracing/Shaders/RayTracingLightCluster.hlsl"
 
 //#define SHADOW_LOOP_MULTIPLY
@@ -68,7 +66,6 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
 
     // Indices of the subranges to process
     uint lightStart = 0, lightEnd = 0;
-    uint cellIndex;
 
     // Index used to loop over the lights
     uint i = 0;
@@ -83,10 +80,11 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
     {
         #ifdef USE_LIGHT_CLUSTER
         // Get the punctual light count
+        uint cellIndex;
         GetLightCountAndStartCluster(actualWSPos, LIGHTCATEGORY_PUNCTUAL, lightStart, lightEnd, cellIndex);
         #else
         lightStart = 0;
-        lightEnd = _WorldPunctualLightCount;
+        lightEnd = _PunctualLightCountRT;
         #endif
 
         for (i = lightStart; i < lightEnd; i++)
@@ -94,7 +92,7 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
             #ifdef USE_LIGHT_CLUSTER
             LightData lightData = FetchClusterLightIndex(cellIndex, i);
             #else
-            LightData lightData = _WorldLightDatas[i];
+            LightData lightData = _LightDatasRT[i];
             #endif
             if (IsMatchingLightLayer(lightData.lightLayers, renderLayer) &&
                         lightData.shadowIndex >= 0 &&
@@ -104,46 +102,27 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
                 float3 L;
                 float4 distances; // {d, d^2, 1/d, d_proj}
                 GetPunctualLightVectors(posInput.positionWS, lightData, L, distances);
-
-                // Projector lights (box, pyramid) always have cookies, so we can perform clipping inside the if().
-                float lightinBounds = 1.0;
-                if (lightData.lightType == GPULIGHTTYPE_PROJECTOR_PYRAMID || lightData.lightType == GPULIGHTTYPE_PROJECTOR_BOX)
-                {
-                    float3 lightToSample = posInput.positionWS - lightData.positionRWS;
-                    float3x3 lightToWorld = float3x3(lightData.right, lightData.up, lightData.forward);
-                    float3 positionLS   = mul(lightToSample, transpose(lightToWorld));
-
-                    // Perform orthographic or perspective projection.
-                    float  perspectiveZ = (lightData.lightType != GPULIGHTTYPE_PROJECTOR_BOX) ? positionLS.z : 1.0;
-                    float2 positionCS   = positionLS.xy / perspectiveZ;
-
-                    float z = positionLS.z;
-                    float r = lightData.range;
-
-                    // Box lights have no range attenuation, so we must clip manually.
-                    lightinBounds = Max3(abs(positionCS.x), abs(positionCS.y), abs(z - 0.5 * r) - 0.5 * r + 1) <= lightData.boxLightSafeExtent ?  1 : 0;
-                }
-
-                if (distances.x < lightData.range
-                    && PunctualLightAttenuation(distances, lightData.rangeAttenuationScale, lightData.rangeAttenuationBias, lightData.angleScale, lightData.angleOffset) > 0.0
-                    && lightinBounds > 0.0
-                    && L.y > 0.0)
+                float lightRadSqr = lightData.size.x;
+                if (distances.x < lightData.range &&
+                    PunctualLightAttenuation(distances, lightData.rangeAttenuationScale, lightData.rangeAttenuationBias,
+                                                        lightData.angleScale,            lightData.angleOffset) > 0.0 &&
+                    L.y > 0.0)
                 {
                     shadowP = GetPunctualShadowAttenuation(shadowContext, posInput.positionSS, posInput.positionWS, normalWS, lightData.shadowIndex, L, distances.x, lightData.lightType == GPULIGHTTYPE_POINT, lightData.lightType != GPULIGHTTYPE_PROJECTOR_BOX);
                     shadowP = lightData.nonLightMappedOnly ? min(1.0f, shadowP) : shadowP;
-                    shadowP = lerp(1.0f, shadowP, lightData.shadowDimmer);
-
-    #ifdef SHADOW_LOOP_MULTIPLY
-                    shadow *= lerp(lightData.shadowTint, float3(1, 1, 1), shadowP);
-    #elif defined(SHADOW_LOOP_AVERAGE)
-                    shadow += lerp(lightData.shadowTint, float3(1, 1, 1), shadowP);
-    #else
-                    shadow = min(shadow, shadowP.xxx);
-    #endif
-    #ifdef SHADOW_LOOP_WEIGHT
-                    shadowCount += 1.0f;
-    #endif
                 }
+                shadowP = lerp(1.0f, shadowP, lightData.shadowDimmer);
+
+#ifdef SHADOW_LOOP_MULTIPLY
+                shadow *= lerp(lightData.shadowTint, float3(1, 1, 1), shadowP);
+#elif defined(SHADOW_LOOP_AVERAGE)
+                shadow += lerp(lightData.shadowTint, float3(1, 1, 1), shadowP);
+#else
+                shadow = min(shadow, shadowP.xxx);
+#endif
+#ifdef SHADOW_LOOP_WEIGHT
+                shadowCount += 1.0f;
+#endif
             }
         }
 }
@@ -154,8 +133,8 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
         // Let's loop through all the
         GetLightCountAndStartCluster(actualWSPos, LIGHTCATEGORY_AREA, lightStart, lightEnd, cellIndex);
         #else
-        lightStart = _WorldPunctualLightCount;
-        lightEnd = _WorldPunctualLightCount + _WorldAreaLightCount;
+        lightStart = _PunctualLightCountRT;
+        lightEnd = _PunctualLightCountRT + _AreaLightCountRT;
         #endif
 
         for (i = lightStart; i < lightEnd; i++)
@@ -163,7 +142,7 @@ void ShadowLoopMin(HDShadowContext shadowContext, PositionInputs posInput, float
             #ifdef USE_LIGHT_CLUSTER
             LightData lightData = FetchClusterLightIndex(cellIndex, i);
             #else
-            LightData lightData = _WorldLightDatas[i];
+            LightData lightData = _LightDatasRT[i];
             #endif
             if (IsMatchingLightLayer(lightData.lightLayers, renderLayer))
             {
