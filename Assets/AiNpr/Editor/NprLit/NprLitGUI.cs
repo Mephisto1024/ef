@@ -10,7 +10,7 @@ namespace UnityEditor.Rendering.HighDefinition
     /// <summary>
     /// GUI for HDRP Lit materials (and tesselation), does not include shader graph + function to setup material keywords for Lit
     /// </summary>
-    class NprHairGUI : HDShaderGUI
+    class NprLitGUI : HDShaderGUI
     {
         // For lit GUI we don't display the heightmap nor layering options
         const LitSurfaceInputsUIBlock.Features litSurfaceFeatures = LitSurfaceInputsUIBlock.Features.All ^ LitSurfaceInputsUIBlock.Features.HeightMap ^ LitSurfaceInputsUIBlock.Features.LayerOptions;
@@ -20,8 +20,7 @@ namespace UnityEditor.Rendering.HighDefinition
             new SurfaceOptionUIBlock(MaterialUIBlock.ExpandableBit.Base, features: SurfaceOptionUIBlock.Features.Lit),
             new TessellationOptionsUIBlock(MaterialUIBlock.ExpandableBit.Tessellation),
             new LitSurfaceInputsUIBlock(MaterialUIBlock.ExpandableBit.Input, features: litSurfaceFeatures),
-            new NprHairUIBlock(MaterialUIBlock.ExpandableBit.User0),
-            new NprDiffuseRampUIBlock(MaterialUIBlock.ExpandableBit.User1),
+            //new NprHairUIBlock(MaterialUIBlock.ExpandableBit.User0),
             //new DetailInputsUIBlock(MaterialUIBlock.ExpandableBit.Detail),
             // We don't want distortion in Lit
             new TransparencyUIBlock(MaterialUIBlock.ExpandableBit.Transparency, features: TransparencyUIBlock.Features.All & ~TransparencyUIBlock.Features.Distortion),

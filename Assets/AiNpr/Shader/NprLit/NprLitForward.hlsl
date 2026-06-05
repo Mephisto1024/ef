@@ -2,8 +2,6 @@
 #error SHADERPASS_is_not_correctly_define
 #endif
 
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
-
 
 #ifdef _WRITE_TRANSPARENT_MOTION_VECTOR
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/ShaderPass/MotionVectorVertexShaderCommon.hlsl"
@@ -261,9 +259,9 @@ void Frag(PackedVaryingsToPS packedInput
             normalTSA.z = max(1e-16, sqrt(1.0 - clamp(dot(normalXYA, normalXYA), 0.0, 1.0)));
             float2 normalXYAScaled = normalTSA.xy * _NormalScale;   //光照、漫反射、Ramp、边缘光法线
 
-            UVMapping hairStrandMapping = layerTexCoord.base;
-            hairStrandMapping.uv = hairStrandMapping.uv * _HairStrandMap_ST.xy + _HairStrandMap_ST.zw;
-            float4 strandMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_HairStrandMap, sampler_HairStrandMap, hairStrandMapping);
+            //UVMapping hairStrandMapping = layerTexCoord.base;
+            //hairStrandMapping.uv = hairStrandMapping.uv * _HairStrandMap_ST.xy + _HairStrandMap_ST.zw;
+            //float4 strandMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_HairStrandMap, sampler_HairStrandMap, hairStrandMapping);
         
             // 3. 由 TBN、实例基矩阵和控制 mask 生成世界空间法线与各向异性发丝切线。
             float3 rootToPixelVector = posInput.positionWS - TransformObjectToWorld(0);
@@ -290,151 +288,22 @@ void Frag(PackedVaryingsToPS packedInput
             float2 screenUV = posInput.positionSS.xy / _ScreenParams.xy;;
             float2 pixelCoordU = float2(posInput.positionSS.xy);
             float3 cameraForwardWS = TransformViewToWorldDir(float3(0,0,1));
-            float _15_m113w = 0.0;
-            float _15_m42x = 1.0;
-            float probeLightingScale = lerp(0.28, 1.0, _15_m113w) * _15_m42x;
+            //float probeLightingScale = mix(_15._m44.x, 1.0, _15._m113.w) * _15._m42.x;
             float4 probeDominantDir;
             float3 probeDiffuseColor;
             float3 probeHueColor;
             float probeIntensity;
             
-            // *5. Probe/SH 风格的体积光照。fine/mid/coarse 三层 3D 体积混合出漫反射颜色和主方向。
-            float _15_m102y = 1.0;
-            float3 _15_m103xyz = float3(0.87, 0.93, 1.12);
-            if (_15_m102y < 0.5)
-            {
-                
-            }
-            else
-            {
-                probeDominantDir = 0.0;
-                probeDiffuseColor = 1.0;
-                probeHueColor = _15_m103xyz;
-                probeIntensity = probeLightingScale;
-            }
-            // *6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
-            float instanceColorOverride =0;
+            // 5. Probe/SH 风格的体积光照。fine/mid/coarse 三层 3D 体积混合出漫反射颜色和主方向。
+            
+            // 6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
             //float instanceColorOverride = mix(_18._m0[instanceIndex]._m6.x, _15._m111.y, _15._m111.x);
-            float heightColorOverride = 0;
-            //float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.2, 0.15, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
+            //float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
             float overrideSpecBoost;
             float3 baseForLightness;
             float3 baseForDiffuse;
-            if ((instanceColorOverride + heightColorOverride) > 0.0)
-            {
-                float overrideAmount  = max(instanceColorOverride, heightColorOverride);
-                float colorScale = lerp(1.0, 0.8, overrideAmount);
-                overrideSpecBoost = lerp(1.0, 2.0, overrideAmount);
-                baseForLightness = readableBaseColor * colorScale;
-                baseForDiffuse   = baseColor * colorScale;
-            }
-            else
-            {
-                overrideSpecBoost = 1.0;
-                baseForLightness = readableBaseColor;
-                baseForDiffuse = baseColor;
-            }
-            float3 diffuseAlbedo = baseForDiffuse * 0.96;
-            float3 specularTintMask = 0.04 * primarySpecMask;
-            float3 rampAlbedo = baseForLightness * 0.96;
         
-            // 8. 主光与屏幕遮蔽数据准备。
-            DirectionalLightData light = _DirectionalLightDatas[_DirectionalShadowIndex];
-            float3 L = -light.forward;
-            
-            float3 mainLightDirWS = lerp(-light.forward, float3(-0.26, 0.58, 0.76), 1);     // 覆盖主光方向//?
-            float3 mainLightDirFlatWS = normalize(float3(mainLightDirWS.x, 1e-16, mainLightDirWS.z));
-            float _15_m113y = 1.0;
-            float3 mainLightColor = lerp(light.color, 1, _15_m113y);    // 覆盖主光颜色//?
-            float3 mainLightColorScaled = mainLightColor * lerp(1.62, 1.0, _15_m113w);    // 增强漫反射和边缘光//?
-            
-            int _1197 = int(pixelCoordU.x);
-            int _1198 = int(pixelCoordU.y);
-            //float4 screenOcclusionSample = texelFetch(screenOcclusionTex, ivec3(_1197, _1198, 0).xy, 0);
-            //float screenOcclusion = screenOcclusionSample.y;      //screenOcclusionSample.x 系角色自投影
-            //float screenOcclusion = 1.0;
-            float sceneShadow = 1.0;
-            float characterSelfShadow = 1.0;
-            float lightingSceneBlend = lerp( lerp( 1.0, sceneShadow, 1.0 ), 1.0, 1 );     //? 
-            float nDotMainLight = dot(normalWS, mainLightDirWS);
-            float _15_m101z = 0.7;
-            float3 directAlbedo = rampAlbedo * _15_m101z;     //?
-            float3 softDirectAlbedo = directAlbedo * 0.65;
-            float diffuseLuma = dot(diffuseAlbedo, float3(0.2, 0.7, 0.07));
-            float cameraBackLightFactor = clamp(-dot(mainLightDirFlatWS.xz, normalize(cameraForwardWS.xz)), 0.0, 1.0);
-            float _15_m113x = 1.0;      //?
-            float mainRampBlend = 1.0 - _15_m113x;
-            // hairRampTex 作为 1D ramp 使用：y 固定 0.5，x 来自 N dot L/视角偏置光照；RGB 改色，A 是权重/mask。
-            float remappedNdotMainLight =((-nDotMainLight) * ((nDotMainLight * 0.5) - 1.0)) + 0.5;
-    
-            float cameraBackWeight = cameraBackLightFactor;
-            // 相机俯仰角修正：相机越接近水平看角色，权重越大；越从上/下看，权重越小
-            float cameraPitchWeight =smoothstep(0.25, 0.75, 1.0 - abs(cameraForwardWS.y));
-            // 5. 最终用于 mix 的 ramp 混合权重
-            float rampBlendWeight = cameraBackWeight * cameraPitchWeight * mainRampBlend;
-            // 6. 在普通 NdotL 和改造 NdotL 之间混合
-            float rampLightTerm = lerp(nDotMainLight, remappedNdotMainLight, rampBlendWeight);
-            // 7. 手动 ramp 偏移/覆写
-            float rampManualOffset = _DiffuseRampOffset * _15_m113x;
-            // 8. 加上偏移，并限制到 [-1, 1]
-            float rampCoordSigned = clamp(rampLightTerm + rampManualOffset, -1.0, 1.0);
-    
-            float2 rampUV = float2((rampCoordSigned * 0.5) + 0.5, 0.5);
-            float4 rampSampleMain = SAMPLE_TEXTURE2D(_DiffuseRampMap, sampler_LinearClamp , rampUV);
-            // rampSampleMain.w 后续会与 controlMask.z 和屏幕遮蔽取交集。
-            float rampMainWeight = rampSampleMain.w;
-            float3 rampColor = rampSampleMain.rgb;
-            float rampColorChroma = max(max(rampColor.r, rampColor.g), rampColor.b)
-                                  - min(min(rampColor.r, rampColor.g), rampColor.b);
-            float4 rampSampleView = SAMPLE_TEXTURE2D(_DiffuseRampMap, sampler_LinearClamp, float2((dot(normalWS, cameraForwardWS) * 0.5) + 0.5, 0.5));
-            float rampNormalWeight = rampSampleView.w;
-            float shadowedMask = lightOcclusionMask * characterSelfShadow;
-            float sharedLightMask = min(min(characterSelfShadow, lightOcclusionMask), rampMainWeight);
-            float directRampWeight = rampNormalWeight * shadowedMask;
-            
-            float3 probeAmbientTint = ( (clamp(dot(normalWS, float3(0,1,0)) + 0.15, 0.0, 1.0) * 1.5) + 0.5) * lerp(probeHueColor, 1.0, _15_m102y * sharedLightMask);
-            float3 _1288 = float3(sharedLightMask.xxx);
-            float3 sceneBlendVec = (lightingSceneBlend);
-            float mainLightLuma = Luminance(mainLightColorScaled);
-            float3 mainLightDiffuse = lerp(mainLightLuma.xxx, mainLightColorScaled, sharedLightMask);
-            float ambientProbeBoostA = min(lerp(0.65, 1.0, probeIntensity), 1.5);
-            float ambientProbeBoostB = clamp(probeIntensity, 1.25, 1.75);
-            float ambientProbeBoost = lerp(ambientProbeBoostA, ambientProbeBoostB, 0 );
-    
-            float3 ambientOnlyDiffuse = probeAmbientTint * ambientProbeBoost * 0.9 ;
-    
-            float3 probeLightTint = lerp(1.0, mainLightColor, _15_m113y);
-            float3 probeDiffuse = probeAmbientTint * clamp(probeIntensity, 0.0, 1.5) * probeLightTint;
-    
-            float3 sceneDiffuse = (mainLightDiffuse + probeDiffuse) * 1.1;
-    
-            float3 diffuseLightColor = lerp(ambientOnlyDiffuse, sceneDiffuse, lightingSceneBlend);
-            
-            float graySoft = Luminance(softDirectAlbedo);
-            float3 boostedSoft = lerp(graySoft, softDirectAlbedo, 1.2);
-    
-            float3 directWeight = clamp(shadowedMask * rampNormalWeight + rampMainWeight, 0.0, 1.0);
-            float3 rampedDirect = lerp(boostedSoft, directAlbedo, directWeight);
-    
-            float3 rampedBaseColor = lerp(rampedDirect, diffuseAlbedo, sharedLightMask);
-            //float3 rampedBaseColor = mix(mix(mix(vec3(dot(softDirectAlbedo, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), softDirectAlbedo, vec3(1.2000000476837158203125)), directAlbedo, vec3(clamp((occludedMask * rampNormalWeight) + rampMainWeight, 0.0, 1.0))), diffuseAlbedo, _1288);
-            float3 rampColoredBase = rampedBaseColor * (1.0 - rampColorChroma + (rampSampleMain.xyz * rampColorChroma));
-        
-            float3 brightDiffuse = lerp(diffuseLuma, diffuseAlbedo, 1.2);
-    
-            float3 directSide = lerp(directAlbedo,brightDiffuse,directRampWeight);
-    
-            float lumaBase = Luminance(rampedBaseColor);
-            float lumaRamp = Luminance(rampColoredBase);
-    
-            float3 rampSide = rampColoredBase * clamp(lumaBase / max(lumaRamp, 0.001), 0.0, 1.5);
-    
-            float3 shadedBaseColor = lerp(directSide,rampSide,sceneBlendVec);
-        
-            //float3 shadedBaseColor = lerp(lerp(directAlbedo, lerp(diffuseLuma, diffuseAlbedo, 1.2), directRampWeight), rampColoredBase * clamp(dot(rampedBaseColor, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625)) * (1.0 / spvNMax(dot(rampColoredBase, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625)), 0.001000000047497451305389404296875)), 0.0, 1.5), sceneBlendVec);
-            float4 shadedBaseAndBlend = float4(shadedBaseColor, lightingSceneBlend);
-            float specLightWeight = lerp(directRampWeight, sharedLightMask, lightingSceneBlend);
-            outColor = float4(shadedBaseColor.xyz,1);
+            //outColor = float4(secondaryNormalWS.xyz,1);
                 
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);

@@ -1,15 +1,9 @@
-Shader "AiNpr/NprHair"
+Shader "AiNpr/NprLit"
 {
     Properties
     {
         // Following set of parameters represent the parameters node inside the MaterialGraph.
         // They are use to fill a SurfaceData. With a MaterialGraph this should not exist.
-
-        _HairStrandMap("HairStrandMap", 2D) = "black" {}
-        
-        //== diffuse ramp
-        _DiffuseRampMap("DiffuseRampMap", 2D) = "black" {}
-
         
         // Reminder. Color here are in linear but the UI (color picker) do the conversion sRGB to linear
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
@@ -368,7 +362,7 @@ Shader "AiNpr/NprHair"
     //-------------------------------------------------------------------------------------
 
     // #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/Lit.cs.hlsl"
-    #include "Assets/AiNpr/Shader/NprHair/NprHairProperties.hlsl"
+    #include "Assets/AiNpr/Shader/NprLit/NprLitProperties.hlsl"
 
     // TODO:
     // Currently, Lit.hlsl and LitData.hlsl are included for every pass. Split Lit.hlsl in two:
@@ -814,7 +808,7 @@ Shader "AiNpr/NprHair"
 
             #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/ShaderPass/LitSharePass.hlsl"
             #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Material/Lit/LitData.hlsl"
-            #include "Assets/AiNpr/Shader/NprHair/NprHairForward.hlsl"
+            #include "Assets/AiNpr/Shader/NprLit/NprLitForward.hlsl"
 
             #pragma vertex Vert
             #pragma fragment Frag
@@ -889,5 +883,5 @@ Shader "AiNpr/NprHair"
     
 
     FallBack "Hidden/HDRP/FallbackError"
-    CustomEditor "Rendering.HighDefinition.NprHairGUI"
+    CustomEditor "Rendering.HighDefinition.NprLitGUI"
 }

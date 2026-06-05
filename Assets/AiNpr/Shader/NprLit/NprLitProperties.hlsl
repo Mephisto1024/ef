@@ -4,14 +4,6 @@
 // Otherwise those parameters are not bound correctly at runtime.
 // ===========================================================================
 
-//== npr hair
-TEXTURE2D(_HairStrandMap);
-SAMPLER(sampler_HairStrandMap);
-//==
-
-//== diffuse ramp
-TEXTURE2D(_DiffuseRampMap);
-//==
 
 TEXTURE2D(_EmissiveColorMap);
 SAMPLER(sampler_EmissiveColorMap);
@@ -78,9 +70,7 @@ SAMPLER(sampler_CoatMaskMap);
 
 CBUFFER_START(UnityPerMaterial)
 
-float4 _HairStrandMap_ST;
 
-#include "Assets/AiNpr/Shader/Properties/DiffuseRampProperties.hlsl"
 // shared constant between lit and layered lit
 float _AlphaCutoff;
 float _UseShadowThreshold;

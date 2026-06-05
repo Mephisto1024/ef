@@ -640,16 +640,16 @@ void main()
     }
     // 6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
     float instanceColorOverride = mix(_18._m0[instanceIndex]._m6.x, _15._m111.y, _15._m111.x);
-    float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
+    float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.2, 0.15, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
     float overrideSpecBoost;
     vec3 baseForLightness;
     vec3 baseForDiffuse;
     SPIRV_CROSS_BRANCH
-    if ((instanceColorOverride + heightColorOverride) > 0.00999999977648258209228515625)
+    if ((instanceColorOverride + heightColorOverride) > 0.0)
     {
         float _1122 = spvNMax(instanceColorOverride, heightColorOverride);
         float _1123 = 1.0 - _1122;
-        float _1125 = _1123 + (0.800000011920928955078125 * _1122);
+        float _1125 = _1123 + (0.8 * _1122);
         overrideSpecBoost = _1123 + (2.0 * _1122);
         baseForLightness = readableBaseColor * _1125;
         baseForDiffuse = baseColor * _1125;
@@ -660,16 +660,16 @@ void main()
         baseForLightness = readableBaseColor;
         baseForDiffuse = baseColor;
     }
-    vec3 diffuseAlbedo = baseForDiffuse * 0.959999978542327880859375;
-    vec3 specularTintMask = vec3(0.039999999105930328369140625) * primarySpecMask;
-    vec3 rampAlbedo = baseForLightness * 0.959999978542327880859375;
+    vec3 diffuseAlbedo = baseForDiffuse * 0.96;
+    vec3 specularTintMask = vec3(0.04) * primarySpecMask;
+    vec3 rampAlbedo = baseForLightness * 0.96;
     // 7. 将 motion vector 编码到第二个 render target。
     vec2 motionNdcDelta = (currClipPos.xy / vec2(spvNMax(currClipPos.z, 9.9999999392252902907785028219223e-09))) - (prevClipPos.xy / vec2(spvNMax(prevClipPos.z, 9.9999999392252902907785028219223e-09)));
     motionNdcDelta.y = -motionNdcDelta.y;
     vec2 encodedMotionXY = ((sqrt(sqrt(abs(motionNdcDelta * 0.5))) * vec2(ivec2(sign(motionNdcDelta)))) * 0.5) + vec2(0.5);
     vec4 motionOutput = vec4(encodedMotionXY.x, encodedMotionXY.y, vec4(0.0).z, vec4(0.0).w);
     motionOutput.z = 1.0;
-    motionOutput.w = 0.4000000059604644775390625;
+    motionOutput.w = 0.4;
     // 8. 主光与屏幕遮蔽数据准备。
     vec3 mainLightDirWS = mix(-_33._m0.xyz, _15._m112.xyz, vec3(_15._m102.w));
     vec3 mainLightDirFlatWS = normalize(vec3(mainLightDirWS.x, 6.103515625e-05, mainLightDirWS.z));
@@ -677,13 +677,14 @@ void main()
     vec3 mainLightColorScaled = mainLightColor * mix(_33._m3.w, 1.0, _15._m113.w);
     int _1197 = int(pixelCoordU.x);
     int _1198 = int(pixelCoordU.y);
-    vec4 screenOcclusionSample = texelFetch(screenOcclusionTex, ivec3(_1197, _1198, 0).xy, 0);
-    float screenOcclusion = screenOcclusionSample.y;
-    float lightingSceneBlend = mix(mix(1.0, screenOcclusionSample.x, _35._m6.x), 1.0, _15._m102.z);
+    vec4 screenShadowSample = texelFetch(screenOcclusionTex, ivec3(_1197, _1198, 0).xy, 0);
+    float sceneShadow = screenShadowSample.x;
+    float characterSelfShadow = screenShadowSample.y;
+    float lightingSceneBlend = mix(mix(1.0, sceneShadow, _35._m6.x), 1.0, _15._m102.z);
     float nDotMainLight = dot(normalWS, mainLightDirWS);
     vec3 directAlbedo = rampAlbedo * _15._m101.z;
-    vec3 softDirectAlbedo = directAlbedo * 0.64999997615814208984375;
-    float diffuseLuma = dot(diffuseAlbedo, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625));
+    vec3 softDirectAlbedo = directAlbedo * 0.65;
+    float diffuseLuma = dot(diffuseAlbedo, vec3(0.2, 0.7, 0.07));
     float cameraBackLightFactor = clamp(-dot(mainLightDirFlatWS.xz, normalize(cameraForwardWS.xz)), 0.0, 1.0);
     float mainRampBlend = 1.0 - _15._m113.x;
     // hairRampTex 作为 1D ramp 使用：y 固定 0.5，x 来自 N dot L/视角偏置光照；RGB 改色，A 是权重/mask。
@@ -696,14 +697,14 @@ void main()
     float rampColorChroma = spvNMax(spvNMax(_1257, _1258), _1259) - spvNMin(spvNMin(_1257, _1258), _1259);
     vec4 rampSampleNormal = textureLod(sampler2D(hairRampTex, samplerLinearClamp), vec2((dot(normalWS, cameraForwardWS) * 0.5) + 0.5, 0.5), 0.0);
     float rampNormalWeight = rampSampleNormal.w;
-    float occludedMask = lightOcclusionMask * screenOcclusion;
-    float sharedLightMask = spvNMin(spvNMin(screenOcclusion, lightOcclusionMask), rampMainWeight);
-    float directRampWeight = rampNormalWeight * occludedMask;
+    float shadowedMask = lightOcclusionMask * characterSelfShadow;
+    float sharedLightMask = spvNMin(spvNMin(characterSelfShadow, lightOcclusionMask), rampMainWeight);
+    float directRampWeight = rampNormalWeight * shadowedMask;
     vec3 probeAmbientTint = vec3((clamp(dot(normalWS, _15._m107.xyz) + _15._m108.x, 0.0, 1.0) * _15._m108.y) + _15._m108.z) * mix(probeHueColor, vec3(1.0), vec3(_15._m102.y * sharedLightMask));
     vec3 _1288 = vec3(sharedLightMask);
     vec3 sceneBlendVec = vec3(lightingSceneBlend);
     vec3 diffuseLightColor = mix((probeAmbientTint * mix(spvNMin(mix(0.64999997615814208984375, 1.0, probeIntensity), 1.5), clamp(probeIntensity, 1.25, 1.75), _15._m102.x)) * _15._m101.w, (mix(vec3(dot(mainLightColorScaled, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), mainLightColorScaled, _1288) + ((probeAmbientTint * clamp(probeIntensity, 0.0, 1.5)) * (vec3(1.0 - _15._m113.y) + (mainLightColor * _15._m113.y)))) * _15._m101.y, sceneBlendVec);
-    vec3 rampedBaseColor = mix(mix(mix(vec3(dot(softDirectAlbedo, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), softDirectAlbedo, vec3(1.2000000476837158203125)), directAlbedo, vec3(clamp((occludedMask * rampNormalWeight) + rampMainWeight, 0.0, 1.0))), diffuseAlbedo, _1288);
+    vec3 rampedBaseColor = mix(mix(mix(vec3(dot(softDirectAlbedo, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), softDirectAlbedo, vec3(1.2000000476837158203125)), directAlbedo, vec3(clamp((shadowedMask * rampNormalWeight) + rampMainWeight, 0.0, 1.0))), diffuseAlbedo, _1288);
     vec3 rampColoredBase = rampedBaseColor * (vec3(1.0 - rampColorChroma) + (rampSampleMain.xyz * rampColorChroma));
     vec3 shadedBaseColor = mix(mix(directAlbedo, mix(vec3(diffuseLuma), diffuseAlbedo, vec3(1.2000000476837158203125)), vec3(directRampWeight)), rampColoredBase * clamp(dot(rampedBaseColor, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625)) * (1.0 / spvNMax(dot(rampColoredBase, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625)), 0.001000000047497451305389404296875)), 0.0, 1.5), sceneBlendVec);
     vec4 shadedBaseAndBlend = vec4(shadedBaseColor, lightingSceneBlend);
@@ -736,7 +737,7 @@ void main()
     float viewNdot = dot(viewDirWS, normalWS);
     float nonSceneBlend = 1.0 - lightingSceneBlend;
     // 边缘光/背光与类似透射的补光；scene depth 采样用于避免效果穿过前景几何。
-    vec3 hairColorWithRim = mix(vec3(hairColorLuma), hairColorBeforeRim, vec3((overbrightLuma * overbrightLuma) + 1.0)) + (((((_15._m109.xyz * smoothstep(0.100000001490116119384765625, 0.20000000298023223876953125, (1.0 / ((_15._m24.z * textureLod(sampler2D(sceneDepthTex, samplerDepth), clamp(screenUV + ((depthOffsetDir * _15._m110.w) * 0.006000000052154064178466796875), depthUvMin, depthUvMax), 0.0).x) + _15._m24.w)) - fragViewDepth)) * _15._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimDirectionWS) + 1.0, 0.0, 1.0), lightOcclusionMask), screenOcclusion)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_15._m110.z)) * clamp(dot(rimDirectionWS, normalWS), 0.0, 1.0))) + ((((((mix(probeDiffuseColor * (1.0 / spvNMax(spvNMax(spvNMax(probeDiffuseColor.x, probeDiffuseColor.y), probeDiffuseColor.z) * 0.5, 1.0)), mainLightColorScaled, sceneBlendVec) * clamp(mix(dot(probeDominantDir.xyz, normalWS) * probeDominantDir.w, ((-flatLightNdot) * ((flatLightNdot * 0.5) - 1.0)) + 0.5, lightingSceneBlend), 0.0, 1.0)) * ((nonSceneBlend + (cameraBackLightFactor * lightingSceneBlend)) * mainRampBlend)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, 1.0 - abs(viewNdot))) * spvNMin(lightOcclusionMask, screenOcclusion)) * (nonSceneBlend + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * lightingSceneBlend))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));
+    vec3 hairColorWithRim = mix(vec3(hairColorLuma), hairColorBeforeRim, vec3((overbrightLuma * overbrightLuma) + 1.0)) + (((((_15._m109.xyz * smoothstep(0.100000001490116119384765625, 0.20000000298023223876953125, (1.0 / ((_15._m24.z * textureLod(sampler2D(sceneDepthTex, samplerDepth), clamp(screenUV + ((depthOffsetDir * _15._m110.w) * 0.006000000052154064178466796875), depthUvMin, depthUvMax), 0.0).x) + _15._m24.w)) - fragViewDepth)) * _15._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimDirectionWS) + 1.0, 0.0, 1.0), lightOcclusionMask), characterSelfShadow)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_15._m110.z)) * clamp(dot(rimDirectionWS, normalWS), 0.0, 1.0))) + ((((((mix(probeDiffuseColor * (1.0 / spvNMax(spvNMax(spvNMax(probeDiffuseColor.x, probeDiffuseColor.y), probeDiffuseColor.z) * 0.5, 1.0)), mainLightColorScaled, sceneBlendVec) * clamp(mix(dot(probeDominantDir.xyz, normalWS) * probeDominantDir.w, ((-flatLightNdot) * ((flatLightNdot * 0.5) - 1.0)) + 0.5, lightingSceneBlend), 0.0, 1.0)) * ((nonSceneBlend + (cameraBackLightFactor * lightingSceneBlend)) * mainRampBlend)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, 1.0 - abs(viewNdot))) * spvNMin(lightOcclusionMask, characterSelfShadow)) * (nonSceneBlend + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * lightingSceneBlend))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));
     // 10. 分块附加灯循环。bitmask 按 32x32 屏幕 tile 和深度 slice 筛出需要评估的灯。
     vec2 pixelCoordF = vec2(pixelCoordU);
     vec2 lightTileCoord = floor(pixelCoordF * 0.03125);
