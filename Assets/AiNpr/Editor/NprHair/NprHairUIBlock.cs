@@ -13,12 +13,15 @@ namespace UnityEditor.Rendering.HighDefinition
             public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Hair Inputs");
 
             public static GUIContent hairStrandMap = new GUIContent("Hair Strand Map", "Specifies the strand mask texture for NPR hair.");
+            public static GUIContent hairSpecularLutMap = new GUIContent("Hair SpecularLut Map", "");
         }
 
         const string kHairStrandMap = "_HairStrandMap";
-
+        const string kHairSpecularLutMap = "_HairSpecularLutMap";
+        
         MaterialProperty hairStrandMap = null;
-
+        MaterialProperty hairSpecularLutMap = null;
+        
         /// <summary>
         /// Constructs an NPR hair UI block.
         /// </summary>
@@ -34,6 +37,7 @@ namespace UnityEditor.Rendering.HighDefinition
         public override void LoadMaterialProperties()
         {
             hairStrandMap = FindProperty(kHairStrandMap, false);
+            hairSpecularLutMap = FindProperty(kHairSpecularLutMap, false);
         }
 
         /// <summary>
@@ -46,6 +50,8 @@ namespace UnityEditor.Rendering.HighDefinition
 
             materialEditor.TexturePropertySingleLine(Styles.hairStrandMap, hairStrandMap);
             materialEditor.TextureScaleOffsetProperty(hairStrandMap);
+            
+            materialEditor.TexturePropertySingleLine(Styles.hairSpecularLutMap, hairSpecularLutMap);
         }
     }
 }

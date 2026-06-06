@@ -5,11 +5,13 @@ Shader "AiNpr/NprHair"
         // Following set of parameters represent the parameters node inside the MaterialGraph.
         // They are use to fill a SurfaceData. With a MaterialGraph this should not exist.
 
+        //== hair
         _HairStrandMap("HairStrandMap", 2D) = "black" {}
+        _HairSpecularLutMap("HairSpecularLutMap", 2D) = "black" {}
         
         //== diffuse ramp
         _DiffuseRampMap("DiffuseRampMap", 2D) = "black" {}
-
+        _DiffuseRampOffset("DiffuseRampOffset", Range(-1.0, 1.0)) = 0.0
         
         // Reminder. Color here are in linear but the UI (color picker) do the conversion sRGB to linear
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)

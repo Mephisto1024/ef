@@ -7,6 +7,8 @@
 //== npr hair
 TEXTURE2D(_HairStrandMap);
 SAMPLER(sampler_HairStrandMap);
+
+TEXTURE2D(_HairSpecularLutMap);
 //==
 
 //== diffuse ramp

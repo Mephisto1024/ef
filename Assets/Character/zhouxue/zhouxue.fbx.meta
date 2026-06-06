@@ -32,6 +32,16 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: M_actor_aurora_eyebrow_01
+    second: {fileID: 2100000, guid: c500ba021e7ee4b41867b373b46c0816, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_actor_aurora_eyeshadow_01
+    second: {fileID: 2100000, guid: 3f18850eff73d744faa22366a4f765a9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: M_actor_aurora_face_01
     second: {fileID: 2100000, guid: 0e49908bbffb82643b497aaf6af3117d, type: 2}
   - first:
@@ -39,6 +49,11 @@ ModelImporter:
       assembly: UnityEngine.CoreModule
       name: M_actor_aurora_hair_01
     second: {fileID: 2100000, guid: 604208eeb049ff145918e16136e82205, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_actor_aurora_hair_02
+    second: {fileID: 2100000, guid: 9f2fedc5844bc1d4c952cdf013dee83d, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
