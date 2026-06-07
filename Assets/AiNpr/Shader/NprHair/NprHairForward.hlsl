@@ -287,7 +287,7 @@ void Frag(PackedVaryingsToPS packedInput
             float3 tangentWS = normalize(tbnMatrix[0]);
             float3 hairTangentWS = cross(secondaryNormalWS, lerp(cross(secondaryNormalWS, SafeNormalize(hairFlowSeedWS)), tangentWS, flowBlendMask).xyz);
             float3 viewDirObjectBasis = TransformWorldToObjectDir(viewDirWS);
-            float _46_m33 = 1.0;    //菲涅尔衰减
+            float _46_m33 = 3.0;    //菲涅尔衰减
             float anisoViewFactor = pow(clamp(dot(normalize( TransformObjectToWorldNormal(secondaryNormalWS).xz), normalize(viewDirObjectBasis.xz)), 0.0, 1.0), _46_m33);
         
             // 4. 准备屏幕/相机状态，供深度、分块灯光和雾效路径使用。
@@ -441,7 +441,7 @@ void Frag(PackedVaryingsToPS packedInput
 
             // 9. 头发 BRDF：两个各向异性高光 lobe，再叠加发丝破碎项；hairSpecularLutTex 提供高光 LUT/ramp。
             float3 objectBasisLightVector = TransformObjectToWorldDir(float3(viewDirObjectBasis.x, lerp(0.5, mainLightDirWS.y, lightingSceneBlend), viewDirObjectBasis.z));
-            float _46_m30 = 0.5;    //高光纵向偏移
+            float _46_m30 = 0.7;    //高光纵向偏移
             float3 primarySpecTangent = normalize(hairTangentWS + (secondaryNormalWS * ((_46_m30 * 2.0) - 1.0)));
             float3 halfVectorRaw = normalize((mainLightDirWS * lightingSceneBlend) + (float3(objectBasisLightVector.x, objectBasisLightVector.y, objectBasisLightVector.z) * 2.0)) + viewDirWS;
             float3 halfVectorWS = SafeNormalize(halfVectorRaw);
@@ -466,84 +466,84 @@ void Frag(PackedVaryingsToPS packedInput
             float3 primarySpecular = primarySpecLobe * specLut * anisoViewFactor;
             // hairSpecularLutTex 调制很窄的主高光 lobe；anisoViewFactor 根据视线与发丝方向关系衰减高光。
             float primarySpecularMax = max(max(primarySpecular.x, primarySpecular.y), primarySpecular.z);
-            float _46_m31 = 0.5;
+            float _46_m31 = 0.7;
             float secondaryTangentDotHalf = dot(normalize(hairTangentWS + (secondaryNormalWS * ((_46_m31 * 2.0) - 1.0))), halfVectorWS);
-            float _46_m40 = 0.5;
+            float _46_m40 = 0.58;
             float strandTangentDotHalf = dot(normalize(hairTangentWS + (secondaryNormalWS * ((2.0 * _46_m40) - 1.0))), halfVectorWS);
-        // 将 UV.x 程序条纹、hairStrandMaskTex.x 和当前高光强度混合，打散连续高光。
-        float _46_m39 = 10.0;
-        float proceduralStripe = ceil(saturate(frac(layerTexCoord.base.uv.x * _46_m39) - 0.5));
-
-        float textureStripe = 1.0 - strandMaskSample.r;
-
-        float _46_m44 = 1.0;
-        float strandMask = lerp(proceduralStripe, textureStripe, _46_m44);
-        float _46_m42 = 1.0;
-        float breakupBase = lerp(1.0 - _46_m42, 1.0, strandMask);
-
-        // 强主高光区域减少打散
-        breakupBase = lerp(breakupBase, 1.0, primarySpecularMax);
-
-        float strandSinTH = sqrt(max(1.0 - strandTangentDotHalf * strandTangentDotHalf, 0.0));
-
-        strandSinTH = max(strandSinTH, 1e-4);
-        float _46_m41 = 0.0;
-        float strandPower = (float)((int)(200.0 * max(1.0 - _46_m41, 0.0)));
-
-        float strandAngleMask = saturate(pow(strandSinTH, strandPower));
-
-        float breakupWithAngle = lerp(1.0, breakupBase, strandAngleMask);
-
-        float strandBreakup = lerp(1.0, breakupWithAngle, primarySpecMask);
-
-
-        float3 diffuseResult = (diffuseLightColor * shadedBaseColor) * strandBreakup;
-
-        float _46_m6 = 1.0;     //_46._m6 越大，materialAlpha 对颜色影响越明显
-        float alphaColorScale = (1.0 - _46_m6) + (materialAlpha * _46_m6);
-        float grayDiffuse = Luminance(diffuseResult);
-
-        //strandBreakup 越低，越受 _46._m43 影响，颜色更容易变灰/去饱和。
-        float _46_m43 = 1.0;
-        float colorKeep = lerp(0.0, 1.0, strandBreakup);
-        float3 diffuseHair = lerp(grayDiffuse, diffuseResult, colorKeep) * alphaColorScale;
-
-        float _46_m32 = 1.0;    //主高光强度
-        float3 primarySpec1 =
-            primarySpecular *
-            specularTintMask *
-            _46_m32 *
-            5.0 *
-            overrideSpecBoost;
-
-        float secondarySinTH =
-            sqrt(max(1.0 - secondaryTangentDotHalf * secondaryTangentDotHalf, 0.0));
-
-        secondarySinTH = max(secondarySinTH, 1e-4);
-        float _46_m34 = 1.0;    //次级高光强度
-        float secondaryPower = (float)((int)(200.0 * max(1.0 - _46_m34, 0.0)));
-        
-        float3 _46_m38 = 1.0;    //次级高光颜色
-        float3 secondarySpec =
-            pow(secondarySinTH, secondaryPower).xxx *
-            anisoViewFactor *
-            _46_m38.rgb *
-            controlMask.a *
-            overrideSpecBoost;
-
-        // 主高光强时压制次级高光
-        secondarySpec = lerp(secondarySpec, 0.0, primarySpecularMax);
-
-        //高光阴影下衰减
-        float specLight = ((specLightWeight * 0.5) + 0.5) * lerp(_15_m101z, 1.0, specLightWeight);
-
-        float3 specLighting = diffuseLightColor * specLight;
-
-        float _15_m114w = 1.0;    //总高光强度
-        float3 hairColorBeforeRim = diffuseHair + (primarySpec1 + secondarySpec) * specLighting * _15_m114w;
-        float hairColorLuma = Luminance(hairColorBeforeRim);
-            outColor = float4(hairColorBeforeRim.xyz,1);
-            //outColor = float4(strandBreakup.xxx,1);
+            // 将 UV.x 程序条纹、hairStrandMaskTex.x 和当前高光强度混合，打散连续高光。
+            float _46_m39 = 300.0;
+            float proceduralStripe = ceil(saturate(frac(layerTexCoord.base.uv.x * _46_m39) - 0.5));
+    
+            float textureStripe = 1.0 - strandMaskSample.r;
+    
+            float _46_m44 = 1.0;
+            float strandMask = lerp(proceduralStripe, textureStripe, _46_m44);
+            float _46_m42 = 0.3;
+            float breakupBase = lerp(1.0 - _46_m42, 1.0, strandMask);
+    
+            // 强主高光区域减少打散
+            breakupBase = lerp(breakupBase, 1.0, primarySpecularMax);
+    
+            float strandSinTH = sqrt(max(1.0 - strandTangentDotHalf * strandTangentDotHalf, 0.0));
+    
+            strandSinTH = max(strandSinTH, 1e-4);
+            float _46_m41 = 0.93;
+            float strandPower = (float)((int)(200.0 * max(1.0 - _46_m41, 0.0)));
+    
+            float strandAngleMask = saturate(pow(strandSinTH, strandPower));
+    
+            float breakupWithAngle = lerp(1.0, breakupBase, strandAngleMask);
+    
+            float strandBreakup = lerp(1.0, breakupWithAngle, primarySpecMask);
+    
+    
+            float3 diffuseResult = (diffuseLightColor * shadedBaseColor) * strandBreakup;
+    
+            float _46_m6 = 1.0;     //_46._m6 越大，materialAlpha 对颜色影响越明显
+            float alphaColorScale = (1.0 - _46_m6) + (materialAlpha * _46_m6);
+            float grayDiffuse = Luminance(diffuseResult);
+    
+            //strandBreakup 越低，越受 _46._m43 影响，颜色更容易变灰/去饱和。
+            float _46_m43 = 1.7;
+            float colorKeep = lerp(_46_m43, 1.0, strandBreakup);
+            float3 diffuseHair = lerp(grayDiffuse, diffuseResult, colorKeep) * alphaColorScale;
+    
+            float _46_m32 = 2.0;    //主高光强度
+            float3 primarySpec1 =
+                primarySpecular *
+                specularTintMask *
+                _46_m32 *
+                5.0 *
+                overrideSpecBoost;
+    
+            float secondarySinTH =
+                sqrt(max(1.0 - secondaryTangentDotHalf * secondaryTangentDotHalf, 0.0));
+    
+            secondarySinTH = max(secondarySinTH, 1e-4);
+            float _46_m34 = 1.0;    //次级高光强度
+            float secondaryPower = (float)((int)(200.0 * max(1.0 - _46_m34, 0.0)));
+            
+            float3 _46_m38 = 1.0;    //次级高光颜色
+            float3 secondarySpec =
+                pow(secondarySinTH, secondaryPower).xxx *
+                anisoViewFactor *
+                _46_m38.rgb *
+                controlMask.a *
+                overrideSpecBoost;
+    
+            // 主高光强时压制次级高光
+            secondarySpec = lerp(secondarySpec, 0.0, primarySpecularMax);
+    
+            //高光阴影下衰减
+            float specLight = ((specLightWeight * 0.5) + 0.5) * lerp(_15_m101z, 1.0, specLightWeight);
+    
+            float3 specLighting = diffuseLightColor * specLight;
+    
+            float _15_m114w = 1.0;    //总高光强度
+            float3 hairColorBeforeRim = diffuseHair + (primarySpec1 + secondarySpec) * specLighting * _15_m114w;
+            float hairColorLuma = Luminance(hairColorBeforeRim);
+            outColor = float4(hairFlowSeedWS.xyz,1);
+            outColor = float4(strandTangentDotHalf.xxx,1);
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
             #endif

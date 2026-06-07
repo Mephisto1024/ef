@@ -1247,21 +1247,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 1300004007901300085, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4910478775687173924, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 6931791242880986076, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
       propertyPath: m_Name
       value: zhouxue
-      objectReference: {fileID: 0}
-    - target: {fileID: 7052457400259988010, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
-      propertyPath: m_IsActive
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7744357117521686886, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
       propertyPath: m_LocalPosition.x
