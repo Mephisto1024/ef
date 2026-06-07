@@ -107,6 +107,7 @@ namespace UnityEngine.Rendering.HighDefinition
         bool NeedClearColorBuffer(HDCamera hdCamera)
         {
             if (hdCamera.clearColorMode == HDAdditionalCameraData.ClearColorMode.Color ||
+                hdCamera.clearColorMode == HDAdditionalCameraData.ClearColorMode.Sky ||
                 // If the luxmeter is enabled, the sky isn't rendered so we clear the background color
                 m_CurrentDebugDisplaySettings.data.lightingDebugSettings.debugLightingMode == DebugLightingMode.LuxMeter ||
                 // If the matcap view is enabled, the sky isn't updated so we clear the background color
