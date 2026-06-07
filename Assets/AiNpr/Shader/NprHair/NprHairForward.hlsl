@@ -251,8 +251,10 @@ void Frag(PackedVaryingsToPS packedInput
             float primarySpecMask = controlMask.y;
             float lightOcclusionMask = controlMask.z;
             float materialAlpha = baseSample.w;
-            float3 tintedBaseColor = baseColor * 1;
-            float3 readableBaseColor = lerp(dot(tintedBaseColor, float3(0.21, 0.71, 0.07)), tintedBaseColor, float3(1, 1, 1));
+            float _46_m18 = 0.5;    //找了好久的关键压低亮度操作
+            float3 tintedBaseColor = baseColor * _46_m18;
+            float _46_m19 = 1.1;
+            float3 readableBaseColor = lerp(dot(tintedBaseColor, float3(0.21, 0.71, 0.07)), tintedBaseColor, _46_m19);
             
             // RG is used as lighting normal, BA is reserved for hair direction/specular normal.
             float4 dualNormalSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_NormalMap, layerTexCoord.base).rgba;
@@ -283,7 +285,8 @@ void Frag(PackedVaryingsToPS packedInput
             float3 secondaryNormalWS = normalize(TransformTangentToWorldDir(float3(normalXYBScaled.x, normalXYBScaled.y, normalTSB.z),tbnMatrix));
             float3x3 objectToWorld3x3 = (float3x3)GetObjectToWorldMatrix();
             float _46_m35 = 0.0;    // 发流横向偏移
-            float3 hairFlowSeedWS = TransformObjectToWorldDir(float3(_46_m35, 1.0, 0.0));
+            float3 hairFlowSeedWS = TransformObjectToWorldDir(float3(_46_m35, 1.0, 0.0));   //骨骼动画留坑
+            
             float3 tangentWS = normalize(tbnMatrix[0]);
             float3 hairTangentWS = cross(secondaryNormalWS, lerp(cross(secondaryNormalWS, SafeNormalize(hairFlowSeedWS)), tangentWS, flowBlendMask).xyz);
             float3 viewDirObjectBasis = TransformWorldToObjectDir(viewDirWS);
@@ -499,7 +502,7 @@ void Frag(PackedVaryingsToPS packedInput
     
             float3 diffuseResult = (diffuseLightColor * shadedBaseColor) * strandBreakup;
     
-            float _46_m6 = 1.0;     //_46._m6 越大，materialAlpha 对颜色影响越明显
+            float _46_m6 = 0.0;     //_46._m6 越大，materialAlpha 对颜色影响越明显
             float alphaColorScale = (1.0 - _46_m6) + (materialAlpha * _46_m6);
             float grayDiffuse = Luminance(diffuseResult);
     
@@ -520,10 +523,10 @@ void Frag(PackedVaryingsToPS packedInput
                 sqrt(max(1.0 - secondaryTangentDotHalf * secondaryTangentDotHalf, 0.0));
     
             secondarySinTH = max(secondarySinTH, 1e-4);
-            float _46_m34 = 1.0;    //次级高光强度
+            float _46_m34 = 0.5;    //次级高光强度
             float secondaryPower = (float)((int)(200.0 * max(1.0 - _46_m34, 0.0)));
             
-            float3 _46_m38 = 1.0;    //次级高光颜色
+            float3 _46_m38 = float3(0.277,0.06,0.0);    //次级高光颜色
             float3 secondarySpec =
                 pow(secondarySinTH, secondaryPower).xxx *
                 anisoViewFactor *
@@ -542,8 +545,11 @@ void Frag(PackedVaryingsToPS packedInput
             float _15_m114w = 1.0;    //总高光强度
             float3 hairColorBeforeRim = diffuseHair + (primarySpec1 + secondarySpec) * specLighting * _15_m114w;
             float hairColorLuma = Luminance(hairColorBeforeRim);
-            outColor = float4(hairFlowSeedWS.xyz,1);
-            outColor = float4(strandTangentDotHalf.xxx,1);
+        
+            
+        
+            outColor = float4(hairColorBeforeRim.xyz,1);
+            //outColor = float4(primarySpecularMax.xxx,1);
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
             #endif
