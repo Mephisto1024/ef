@@ -545,10 +545,77 @@ void Frag(PackedVaryingsToPS packedInput
             float _15_m114w = 1.0;    //总高光强度
             float3 hairColorBeforeRim = diffuseHair + (primarySpec1 + secondarySpec) * specLighting * _15_m114w;
             float hairColorLuma = Luminance(hairColorBeforeRim);
+            float overbrightLuma = clamp(hairColorLuma - 0.5, 0.0, 0.5);
+            float2 _15_m110xy = float2(0,-1);
+            float3 rimDirectionWS = normalize(cross(cameraForwardWS, float3(_15_m110xy, 0.0)));
+            //float2 depthOffsetDir = normalize((normalWS * mat3(_15._m0[0].xyz, _15._m0[1].xyz, _15._m0[2].xyz)).xy) * vec2(_15._m27.y / _15._m27.x, 1.0);
+            //float2 depthUvMin = _15._m27.zw - vec2(1.0);
+            //float2 depthUvMax = vec2(2.0) - _15._m27.zw;
+            float flatLightNdot = dot(mainLightDirFlatWS, normalWS);
+            float viewNdot = dot(viewDirWS, normalWS);
+            float nonSceneBlend = 1.0 - lightingSceneBlend;
+            // 边缘光/背光与类似透射的补光；scene depth 采样用于避免效果穿过前景几何。
         
-            
+            //float3 hairColorWithRim = mix(hairColorLuma, hairColorBeforeRim, overbrightLuma * overbrightLuma + 1.0) + (((((_15._m109.xyz * smoothstep(0.1, 0.2, (1.0 / ((_15._m24.z * textureLod(sampler2D(sceneDepthTex, samplerDepth), clamp(screenUV + ((depthOffsetDir * _15._m110.w) * 0.006000000052154064178466796875), depthUvMin, depthUvMax), 0.0).x) + _15._m24.w)) - fragViewDepth)) * _15._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimDirectionWS) + 1.0, 0.0, 1.0), lightOcclusionMask), characterSelfShadow)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_15._m110.z)) * clamp(dot(rimDirectionWS, normalWS), 0.0, 1.0))) + ((((((mix(probeDiffuseColor * (1.0 / spvNMax(spvNMax(spvNMax(probeDiffuseColor.x, probeDiffuseColor.y), probeDiffuseColor.z) * 0.5, 1.0)), mainLightColorScaled, sceneBlendVec) * clamp(mix(dot(probeDominantDir.xyz, normalWS) * probeDominantDir.w, ((-flatLightNdot) * ((flatLightNdot * 0.5) - 1.0)) + 0.5, lightingSceneBlend), 0.0, 1.0)) * ((nonSceneBlend + (cameraBackLightFactor * lightingSceneBlend)) * mainRampBlend)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, 1.0 - abs(viewNdot))) * spvNMin(lightOcclusionMask, characterSelfShadow)) * (nonSceneBlend + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * lightingSceneBlend))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));
+    
+            // 10. 分块附加灯循环。bitmask 按 32x32 屏幕 tile 和深度 slice 筛出需要评估的灯。
+            float2 pixelCoordF = float2(pixelCoordU);
+            float2 lightTileCoord = floor(pixelCoordF * 0.03125);
+            //int lightTileListBase = int((lightTileCoord.x + (lightTileCoord.y * _31._m5)) * 8.0);
+            //float depthSliceRaw = floor(fragViewDepth - (_15._m25.y * _31._m11));
+            //float depthSliceClamped = clamp(depthSliceRaw, 0.0, _31._m7 - 1.0);
+            //int depthSliceListBase = int(depthSliceClamped * 8.0);
+            float3 accumulatedColor;
+            //accumulatedColor = hairColorWithRim;
+            accumulatedColor = hairColorBeforeRim;
+            float3 _1624;
         
-            outColor = float4(hairColorBeforeRim.xyz,1);
+            //for (int _1626 = 0; _1626 <= 7; accumulatedColor = _1624, _1626++)
+            //{
+            //}
+        
+            //采样深度
+            float2 uv = input.positionSS.xy * _ScreenSize.zw;
+            float rawSceneDepth = SampleCameraDepth(uv);
+            float sceneEyeDepth = LinearEyeDepth(rawSceneDepth, _ZBufferParams);
+
+            // 11. 可选材质覆盖：灰度/染色，再加特效菲涅尔。
+            float3 colorAfterMaterialOverride;
+            float _46_m12 = 0.0;
+            if (_46_m12 > 0.5)
+            {
+                float luma = Luminance(accumulatedColor);
+
+                float _46_m14 = 1;      //饱和度
+                float3 saturationColor = lerp(luma, accumulatedColor, _46_m14);
+                float _46_m15 = 1;
+                float _46_m13 = 1;
+                float3 contrastColor = lerp(0.5, saturationColor, _46_m15) * _46_m13;
+                float3 _46_m22xyz = 1;
+                float3 _46_m22w = 0; 
+                float3 overrideColor = lerp(contrastColor, _46_m22xyz, _46_m22w);
+
+                float _46_m16 = 0.35;
+                float rimMask = smoothstep(
+                    1.0 - _46_m16,
+                    1.0,
+                    1.0 - clamp(viewNdot, 0.0, 1.0)
+                );
+                
+                float3 _46_m23 = 1.0;   //边缘光颜色
+                float _46_m17 = 4.0;   //边缘光强度
+                float3 rimColor = _46_m23 * rimMask * _46_m17;
+
+                colorAfterMaterialOverride = overrideColor + rimColor;
+                
+                //colorAfterMaterialOverride = mix(mix(vec3(0.5), mix(vec3(dot(accumulatedColor, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), accumulatedColor, vec3(_46._m14)), vec3(_46._m15)) * _46._m13, _46._m22.xyz, vec3(_46._m22.w)) + ((_46._m23.xyz * smoothstep(1.0 - _46._m16, 1.0, 1.0 - clamp(viewNdot, 0.0, 1.0))) * _46._m17);
+            }
+            else
+            {
+                colorAfterMaterialOverride = accumulatedColor;
+            }
+        
+            outColor = float4(colorAfterMaterialOverride.xyz,1);
             //outColor = float4(primarySpecularMax.xxx,1);
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
