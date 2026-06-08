@@ -3,6 +3,7 @@
 #endif
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
+#include "Assets/AiNpr/Shader/NprHair/NprHairDebug.hlsl"
 
 
 #ifdef _WRITE_TRANSPARENT_MOTION_VECTOR
@@ -512,7 +513,7 @@ void Frag(PackedVaryingsToPS packedInput
             float3 diffuseHair = lerp(grayDiffuse, diffuseResult, colorKeep) * alphaColorScale;
     
             float _46_m32 = 2.0;    //主高光强度
-            float3 primarySpec1 =
+            float3 primarySpecResult =
                 primarySpecular *
                 specularTintMask *
                 _46_m32 *
@@ -543,7 +544,7 @@ void Frag(PackedVaryingsToPS packedInput
             float3 specLighting = diffuseLightColor * specLight;
     
             float _15_m114w = 1.0;    //总高光强度
-            float3 hairColorBeforeRim = diffuseHair + (primarySpec1 + secondarySpec) * specLighting * _15_m114w;
+            float3 hairColorBeforeRim = diffuseHair + (primarySpecResult + secondarySpec) * specLighting * _15_m114w;
             float hairColorLuma = Luminance(hairColorBeforeRim);
             float overbrightLuma = clamp(hairColorLuma - 0.5, 0.0, 0.5);
             float2 _15_m110xy = float2(0,-1);
@@ -615,10 +616,34 @@ void Frag(PackedVaryingsToPS packedInput
                 colorAfterMaterialOverride = accumulatedColor;
             }
         
-            outColor = float4(colorAfterMaterialOverride.xyz,1);
+            float4 nprHairDebugColor;
+            bool isNprHairDebugOutput = TryGetNprHairDebugColor(
+                _NprHairDebugEnabled > 0.5,
+                _NprHairDebugMode,
+                baseColor,
+                materialAlpha,
+                flowBlendMask,
+                primarySpecMask,
+                lightOcclusionMask,
+                strandMaskSample.xxx,
+                normalWS,
+                secondaryNormalWS,
+                tangentWS,
+                hairTangentWS,
+                sceneShadow,
+                characterSelfShadow,
+                diffuseHair,
+                primarySpecResult,
+                secondarySpec,
+                nprHairDebugColor);
+
+            outColor = isNprHairDebugOutput ? nprHairDebugColor : float4(colorAfterMaterialOverride.xyz, 1.0);
             //outColor = float4(primarySpecularMax.xxx,1);
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
-            outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
+            if (!isNprHairDebugOutput)
+            {
+                outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
+            }
             #endif
 
             #ifdef _TRANSPARENT_REFRACTIVE_SORT

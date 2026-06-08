@@ -81,6 +81,8 @@ SAMPLER(sampler_CoatMaskMap);
 CBUFFER_START(UnityPerMaterial)
 
 float4 _HairStrandMap_ST;
+float _NprHairDebugEnabled;
+int _NprHairDebugMode;
 
 #include "Assets/AiNpr/Shader/Properties/DiffuseRampProperties.hlsl"
 // shared constant between lit and layered lit

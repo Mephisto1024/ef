@@ -8,7 +8,9 @@ Shader "AiNpr/NprHair"
         //== hair
         _HairStrandMap("HairStrandMap", 2D) = "black" {}
         _HairSpecularLutMap("HairSpecularLutMap", 2D) = "black" {}
-        
+        [ToggleUI] _NprHairDebugEnabled("Enable Intermediate Debug", Float) = 0.0
+        _NprHairDebugMode("Intermediate Debug Mode", Int) = 0
+
         //== diffuse ramp
         _DiffuseRampMap("DiffuseRampMap", 2D) = "black" {}
         _DiffuseRampOffset("DiffuseRampOffset", Range(-1.0, 1.0)) = 0.0
