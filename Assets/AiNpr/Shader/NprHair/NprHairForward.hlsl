@@ -296,7 +296,7 @@ void Frag(PackedVaryingsToPS packedInput
         
             // 4. 准备屏幕/相机状态，供深度、分块灯光和雾效路径使用。
             float2 screenUV = posInput.positionSS.xy / _ScreenParams.xy;;
-            float2 pixelCoordU = float2(posInput.positionSS.xy);
+            uint2 pixelCoordU = uint2(posInput.positionSS.xy);
             float3 cameraForwardWS = TransformViewToWorldDir(float3(0,0,1));
             float _15_m113w = 0.0;
             float _15_m42x = 1.0;

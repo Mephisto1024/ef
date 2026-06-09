@@ -398,10 +398,10 @@ spirv_instruction(set = "GLSL.std.450", id = 80) vec4 spvNMax(vec4, vec4);
 
 void main()
 {
-    // 1. View vector. Perspective mode uses cameraPos - worldPos; the alternate mode uses camera forward.
-    //    viewDir points toward the camera; viewDistance drives fog, shadow, and volume LUT terms.
+    // 1. 视线向量。透视模式使用 cameraPos - worldPos；另一种模式使用相机前向。
+    //    viewDir 指向相机；viewDistance 驱动雾、阴影和体积 LUT 项。
     float linearEyeDepth = 1.0 / gl_FragCoord.w;
-    vec3 viewVectorRaw = mix(_17._m11.xyz - vWorldPos, vec3(_17._m0[2u].x, _17._m0[2u].y, _17._m0[2u].z), vec3(_17._m26.w));
+    vec3 viewVectorRaw = mix(_17._m11.xyz - vWorldPos, vec3(_17._m0[2u].x, _17._m0[2u].y, _17._m0[2u].z), vec3(_17._m26.w));    //_17._m11.xyz = 1.04954E-07, 301.45001, 1.38053; _17._m0[2].x = 8.65910E-08; _17._m0[2].y = -0.0207; _17._m0[2].z = 0.99979; _17._m26.w = 0.00
     float viewVectorLenSq = dot(viewVectorRaw, viewVectorRaw);
     float invViewVectorLen = inversesqrt(spvNMax(viewVectorLenSq, 9.9999999392252902907785028219223e-09));
     vec3 viewDir = viewVectorRaw * invViewVectorLen;
@@ -420,53 +420,53 @@ void main()
         objectPayloadRow2 = _20._m0[vObjectIndex]._m0[2];
         objectPayloadRow0 = _20._m0[vObjectIndex]._m0[0];
     }
-    // 2. Material textures. Base color, PBR mask, normal, and emission share UV and global mip bias.
-    vec4 baseColorSample = texture(sampler2D(texBaseColorAlpha, smpMaterialBase), vUv, _17._m38);
-    vec3 baseColor = baseColorSample.xyz * _51._m20.xyz;
-    vec4 pbrMaskSample = texture(sampler2D(texPbrMask, smpPbrMask), vUv, _17._m38);
+    // 2. 材质纹理。基础色、PBR 遮罩、法线和自发光共享 UV 与全局 mip 偏移。
+    vec4 baseColorSample = texture(sampler2D(texBaseColorAlpha, smpMaterialBase), vUv, _17._m38);    //_17._m38 = -1.00
+    vec3 baseColor = baseColorSample.xyz * _51._m20.xyz;    //_51._m20.xyz = 1.00, 1.00, 1.00
+    vec4 pbrMaskSample = texture(sampler2D(texPbrMask, smpPbrMask), vUv, _17._m38);    //_17._m38 = -1.00
     float metallicMask = pbrMaskSample.x;
     float aoMask = pbrMaskSample.z;
     float perceptualRoughness = 1.0 - pbrMaskSample.w;
-    float alpha = baseColorSample.w * _51._m20.w;
-    vec3 diffuseTintedForSaturation = baseColor * _51._m18;
-    vec3 diffuseColorSaturated = mix(vec3(dot(diffuseTintedForSaturation, kLumaRec709)), diffuseTintedForSaturation, vec3(_51._m19));
-    // 3. Normal map decode. This packing stores X in w*x, Y in y, and reconstructs Z on the unit hemisphere.
-    vec4 normalMapSample = texture(sampler2D(texNormalMap, smpNormalMap), vUv, _17._m38);
+    float alpha = baseColorSample.w * _51._m20.w;    //_51._m20.w = 1.00
+    vec3 diffuseTintedForSaturation = baseColor * _51._m18;    //_51._m18 = 0.50
+    vec3 diffuseColorSaturated = mix(vec3(dot(diffuseTintedForSaturation, kLumaRec709)), diffuseTintedForSaturation, vec3(_51._m19));    //_51._m19 = 1.00
+    // 3. 法线贴图解码。该打包方式将 X 存在 w*x 中，将 Y 存在 y 中，并在单位半球上重建 Z。
+    vec4 normalMapSample = texture(sampler2D(texNormalMap, smpNormalMap), vUv, _17._m38);    //_17._m38 = -1.00
     normalMapSample.w = normalMapSample.w * normalMapSample.x;
     vec2 normalMapXY = (normalMapSample.wy * 2.0) - vec2(1.0);
     vec3 tangentSpaceNormal = vec3(normalMapXY.x, normalMapXY.y, _523.z);
     vec2 normalXYForReconstruct = normalMapXY.xy;
     tangentSpaceNormal.z = spvNMax(1.000000016862383526387164645044e-16, sqrt(1.0 - clamp(dot(normalXYForReconstruct, normalXYForReconstruct), 0.0, 1.0)));
-    vec2 scaledNormalXY = tangentSpaceNormal.xy * _51._m3;
-    vec4 emissionSample = texture(sampler2D(texEmissionMap, smpEmissionMap), vUv, _17._m38);
-    vec3 objectPlanarVector = vWorldPos - vec3(objectPayloadRow0.w, _525, objectPayloadRow2.w);
-    objectPlanarVector.y = 6.103515625e-05;
-    vec3 objectPlanarDir = normalize(objectPlanarVector);
-    // 4. TBN transform. tangent.xyz, normal, and tangent.w bitangent sign move the normal into world space.
+    vec2 scaledNormalXY = tangentSpaceNormal.xy * _51._m3;    //_51._m3 = 1.00
+    vec4 emissionSample = texture(sampler2D(texEmissionMap, smpEmissionMap), vUv, _17._m38);    //_17._m38 = -1.00
+    vec3 rootToPixelVector = vWorldPos - vec3(objectPayloadRow0.w, _525, objectPayloadRow2.w);
+    rootToPixelVector.y = 1e-16;
+    vec3 rootToPixelDir = normalize(rootToPixelVector);
+    // 4. TBN 变换。tangent.xyz、normal 和 tangent.w 的副切线符号将法线变换到世界空间。
     vec3 worldNormalUnnormalized = mat3(vWorldTangentSign.xyz * 1.0, (cross(vWorldNormal, vWorldTangentSign.xyz) * vWorldTangentSign.w) * 1.0, vWorldNormal * 1.0) * vec3(scaledNormalXY.x, scaledNormalXY.y, tangentSpaceNormal.z);
-    float frontFaceNormalSign = gl_FrontFacing ? 1.0 : ((-1.0) + (2.0 * _51._m5));
+    float frontFaceNormalSign = gl_FrontFacing ? 1.0 : ((-1.0) + (2.0 * _51._m5));    //_51._m5 = 0.00
     vec3 shadingNormal = (worldNormalUnnormalized * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(worldNormalUnnormalized, worldNormalUnnormalized)))) * frontFaceNormalSign;
     vec3 geometryNormal = normalize(vWorldNormal) * frontFaceNormalSign;
     uvec2 pixelCoord = uvec2(gl_FragCoord.xy);
-    vec3 worldCameraForward = vec3(0.0, 0.0, 1.0) * mat3(_17._m1[0].xyz, _17._m1[1].xyz, _17._m1[2].xyz);
-    float sceneLightingScale = mix(_17._m44.x, 1.0, _17._m113.w) * _17._m42.x;
+    vec3 worldCameraForward = vec3(0.0, 0.0, 1.0) * mat3(_17._m1[0].xyz, _17._m1[1].xyz, _17._m1[2].xyz);    //_17._m1[0].xyz = -1.00, -1.25638E-12, 8.65910E-08; _17._m1[1].xyz = -1.79375E-09, 0.99979, -0.0207; _17._m1[2].xyz = 8.65724E-08, 0.0207, 0.99979
+    float sceneLightingScale = mix(_17._m44.x, 1.0, _17._m113.w) * _17._m42.x;    //_17._m44.x = 0.28772; _17._m113.w = 0.00; _17._m42.x = 1.00
     vec4 probeDominantDirAndWeight;
     vec3 probeRgbIrradiance;
     vec3 probeColorTint;
     float probeIntensity;
-    // 5. Ambient probe. Volume-probe coefficients or global constants build dominant direction, RGB irradiance, and tint.
-    if (_17._m102.y < 0.5)
+    // 5. 环境探针。体积探针系数或全局常量构建主方向、RGB 辐照度和染色。
+    if (_17._m102.y < 0.5)    //_17._m102.y = 1.00
     {
-        vec3 _718 = vWorldPos - (_17._m126.xyz + (worldCameraForward * (-_17._m128.w)));
+        vec3 _718 = vWorldPos - (_17._m126.xyz + (worldCameraForward * (-_17._m128.w)));    //_17._m126.xyz = -710.11267, 235.17313, -1150.84998; _17._m128.w = 144.00
         float _732 = spvNMax(clamp((spvNMax(abs(_718.x), abs(_718.z)) - 464.0) * 0.03125, 0.0, 1.0), clamp((abs(_718.y) - 208.0) * 0.03125, 0.0, 1.0));
         vec4 _1034;
         vec4 _1035;
         vec4 _1036;
         float _1037;
         float _1038;
-        if ((_17._m126.w != 0.0) && (_732 < 1.0))
+        if ((_17._m126.w != 0.0) && (_732 < 1.0))    //_17._m126.w = -1.00
         {
-            vec3 _745 = vWorldPos - (_17._m126.xyz + (worldCameraForward * (-_17._m128.y)));
+            vec3 _745 = vWorldPos - (_17._m126.xyz + (worldCameraForward * (-_17._m128.y)));    //_17._m126.xyz = -710.11267, 235.17313, -1150.84998; _17._m128.y = 13.00
             float _759 = spvNMax(clamp((spvNMax(abs(_745.x), abs(_745.z)) - 29.0) * 0.5, 0.0, 1.0), clamp((abs(_745.y) - 13.0) * 0.5, 0.0, 1.0));
             float _835;
             vec4 _836;
@@ -474,11 +474,11 @@ void main()
             vec4 _838;
             if (_759 < 1.0)
             {
-                vec3 _768 = ((vWorldPos * 2.0) + vec3(0.5)) * _17._m127.xyz;
+                vec3 _768 = ((vWorldPos * 2.0) + vec3(0.5)) * _17._m127.xyz;    //_17._m127.xyz = 0.00781, 0.01563, 0.00781
                 vec3 _770 = _768 - floor(_768);
                 vec4 _774 = textureLod(sampler3D(texVolumeProbeMaskFine, smpLinearRepeat), _770, 0.0);
                 float _775 = 1.0 - _759;
-                float _779 = _17._m127.y * 0.5;
+                float _779 = _17._m127.y * 0.5;    //_17._m127.y = 0.01563
                 float _784 = _770.x;
                 float _785 = clamp(_770.y, _779, 1.0 - _779) * 0.3333333432674407958984375;
                 float _786 = _770.z;
@@ -498,7 +498,7 @@ void main()
                 _837 = vec4(0.0);
                 _838 = vec4(0.0);
             }
-            vec3 _844 = vWorldPos - (_17._m126.xyz + (worldCameraForward * (-_17._m128.z)));
+            vec3 _844 = vWorldPos - (_17._m126.xyz + (worldCameraForward * (-_17._m128.z)));    //_17._m126.xyz = -710.11267, 235.17313, -1150.84998; _17._m128.z = 52.00
             float _858 = spvNMax(clamp((spvNMax(abs(_844.x), abs(_844.z)) - 116.0) * 0.125, 0.0, 1.0), clamp((abs(_844.y) - 52.0) * 0.125, 0.0, 1.0));
             float _938;
             vec4 _939;
@@ -506,11 +506,11 @@ void main()
             vec4 _941;
             if (_858 < 1.0)
             {
-                vec3 _867 = ((vWorldPos * 0.5) + vec3(0.5)) * _17._m127.xyz;
+                vec3 _867 = ((vWorldPos * 0.5) + vec3(0.5)) * _17._m127.xyz;    //_17._m127.xyz = 0.00781, 0.01563, 0.00781
                 vec3 _869 = _867 - floor(_867);
                 vec4 _873 = textureLod(sampler3D(texVolumeProbeMaskMid, smpLinearRepeat), _869, 0.0);
                 float _875 = _759 * (1.0 - _858);
-                float _879 = _17._m127.y * 0.5;
+                float _879 = _17._m127.y * 0.5;    //_17._m127.y = 0.01563
                 float _884 = _869.x;
                 float _885 = clamp(_869.y, _879, 1.0 - _879) * 0.3333333432674407958984375;
                 float _886 = _869.z;
@@ -536,12 +536,12 @@ void main()
             float _1027;
             if (_858 > 0.0)
             {
-                vec3 _950 = ((vWorldPos * 0.125) + vec3(0.5)) * _17._m127.xyz;
-                vec3 _953 = _17._m127.xyz * 0.5;
+                vec3 _950 = ((vWorldPos * 0.125) + vec3(0.5)) * _17._m127.xyz;    //_17._m127.xyz = 0.00781, 0.01563, 0.00781
+                vec3 _953 = _17._m127.xyz * 0.5;    //_17._m127.xyz = 0.00781, 0.01563, 0.00781
                 vec3 _955 = clamp(_950 - floor(_950), _953, vec3(1.0) - _953);
                 vec4 _959 = textureLod(sampler3D(texVolumeProbeMaskFar, smpLinearRepeat), _955, 0.0);
                 float _961 = _858 * (1.0 - _732);
-                float _965 = _17._m127.y * 0.5;
+                float _965 = _17._m127.y * 0.5;    //_17._m127.y = 0.01563
                 float _970 = _955.x;
                 float _971 = clamp(_955.y, _965, 1.0 - _965) * 0.3333333432674407958984375;
                 float _972 = _955.z;
@@ -576,9 +576,9 @@ void main()
             _1037 = 0.0;
             _1038 = 1.0;
         }
-        vec4 _1058 = _1036 + vec4(_17._m129.x * _1038, (_17._m129.y * _1038) + ((_17._m129.w * _1037) * 0.5), _17._m129.z * _1038, (_17._m129.w * _1038) + ((_17._m129.y * _1037) * 0.375));
-        vec4 _1078 = _1035 + vec4(_17._m130.x * _1038, (_17._m130.y * _1038) + ((_17._m130.w * _1037) * 0.5), _17._m130.z * _1038, (_17._m130.w * _1038) + ((_17._m130.y * _1037) * 0.375));
-        vec4 _1098 = _1034 + vec4(_17._m131.x * _1038, (_17._m131.y * _1038) + ((_17._m131.w * _1037) * 0.5), _17._m131.z * _1038, (_17._m131.w * _1038) + ((_17._m131.y * _1037) * 0.375));
+        vec4 _1058 = _1036 + vec4(_17._m129.x * _1038, (_17._m129.y * _1038) + ((_17._m129.w * _1037) * 0.5), _17._m129.z * _1038, (_17._m129.w * _1038) + ((_17._m129.y * _1037) * 0.375));    //_17._m129.x = -0.00755; _17._m129.y = 0.47224; _17._m129.w = 1.09631; _17._m129.z = 0.01217
+        vec4 _1078 = _1035 + vec4(_17._m130.x * _1038, (_17._m130.y * _1038) + ((_17._m130.w * _1037) * 0.5), _17._m130.z * _1038, (_17._m130.w * _1038) + ((_17._m130.y * _1037) * 0.375));    //_17._m130.x = -0.00755; _17._m130.y = 0.47224; _17._m130.w = 1.09631; _17._m130.z = 0.01217
+        vec4 _1098 = _1034 + vec4(_17._m131.x * _1038, (_17._m131.y * _1038) + ((_17._m131.w * _1037) * 0.5), _17._m131.z * _1038, (_17._m131.w * _1038) + ((_17._m131.y * _1037) * 0.375));    //_17._m131.x = -0.00755; _17._m131.y = 0.47224; _17._m131.w = 1.09631; _17._m131.z = 0.01217
         vec4 _1102 = vec4(shadingNormal, 1.0);
         vec3 _1108 = spvNMax(vec3(dot(_1058, _1102), dot(_1078, _1102), dot(_1098, _1102)), vec3(0.0)) * sceneLightingScale;
         vec3 _1116 = ((_1058.xyz * 0.2125999927520751953125) + (_1078.xyz * 0.715200006961822509765625)) + (_1098.xyz * 0.072200000286102294921875);
@@ -612,11 +612,11 @@ void main()
     {
         probeDominantDirAndWeight = vec4(0.0);
         probeRgbIrradiance = vec3(1.0);
-        probeColorTint = _17._m103.xyz;
+        probeColorTint = _17._m103.xyz;    //_17._m103.xyz = 0.87831, 0.93023, 1.12169
         probeIntensity = sceneLightingScale;
     }
-    float objectWetness = mix(_20._m0[vObjectIndex]._m6.x, _17._m111.y, _17._m111.x);
-    float heightWetness = spvNMax(_20._m0[vObjectIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_20._m0[vObjectIndex]._m6.z, _17._m111.w, _17._m111.x) - vWorldPos.y) * mix(_20._m0[vObjectIndex]._m6.y, 1.0, _17._m111.x));
+    float objectWetness = mix(_20._m0[vObjectIndex]._m6.x, _17._m111.y, _17._m111.x);    //_17._m111.y = 1.00; _17._m111.x = 0.00
+    float heightWetness = spvNMax(_20._m0[vObjectIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_20._m0[vObjectIndex]._m6.z, _17._m111.w, _17._m111.x) - vWorldPos.y) * mix(_20._m0[vObjectIndex]._m6.y, 1.0, _17._m111.x));    //_17._m111.w = -100.00; _17._m111.x = 0.00
     vec3 normalForLighting;
     float wetMinimumRoughness;
     float wetCoverage;
@@ -624,28 +624,28 @@ void main()
     vec3 diffuseColorForLighting;
     vec3 baseColorAfterWetness;
     SPIRV_CROSS_BRANCH
-    // 6. Rain/wetness. Object wetness plus height wetness samples _54/_55 triplanar rain normals and rewrites normal, roughness, and color.
+    // 6. 雨水/湿润度。物体湿润度加高度湿润度采样 _54/_55 三平面雨水法线，并重写法线、粗糙度和颜色。
     if ((objectWetness + heightWetness) > 0.00999999977648258209228515625)
     {
         float _1242 = 1.0 - metallicMask;
         float _1245 = smoothstep(0.3499999940395355224609375, 0.100000001490116119384765625, dot(baseColor * _1242, kLumaRec709));
         bvec3 _1248 = bvec3(usesExternalObjectPayload);
-        vec3 _1254 = mix(vRainProjectionPos, vRainProjectionPos.xzy * vec3(1.0, 1.0, -1.0), _1248) * _17._m111.z;
+        vec3 _1254 = mix(vRainProjectionPos, vRainProjectionPos.xzy * vec3(1.0, 1.0, -1.0), _1248) * _17._m111.z;    //_17._m111.z = 2.00
         vec3 _1256 = mix(vRainBlendNormal, vRainBlendNormal.xzy, _1248);
         vec3 _1258 = abs(_1256) - vec3(0.20000000298023223876953125);
         vec3 _1261 = spvNMax((_1258 * _1258) * _1258, vec3(0.0));
         vec3 _1264 = _1261 / vec3(dot(_1261, vec3(1.0)));
         vec2 _1272 = _1254.xy;
         vec2 _1277 = _1254.zy;
-        vec4 _1287 = ((texture(sampler2D(texRainNormalA, smpMaterialBase), _1254.xz, _17._m38) * _1264.y) + (texture(sampler2D(texRainNormalA, smpMaterialBase), _1272, _17._m38) * _1264.z)) + (texture(sampler2D(texRainNormalA, smpMaterialBase), _1277, _17._m38) * _1264.x);
+        vec4 _1287 = ((texture(sampler2D(texRainNormalA, smpMaterialBase), _1254.xz, _17._m38) * _1264.y) + (texture(sampler2D(texRainNormalA, smpMaterialBase), _1272, _17._m38) * _1264.z)) + (texture(sampler2D(texRainNormalA, smpMaterialBase), _1277, _17._m38) * _1264.x);    //_17._m38 = -1.00
         float _1288 = _1287.w;
         float _1290 = 1.10000002384185791015625 - _1288;
         float _1299 = spvNMax(smoothstep(0.800000011920928955078125 - _1288, _1290, clamp((objectWetness * _1242) + (shadingNormal.y * 0.20000000298023223876953125), 0.0, 1.0)), smoothstep(0.449999988079071044921875 - _1288, _1290, clamp(heightWetness * _1242, 0.0, 1.0)));
         float _1301 = smoothstep(0.5, 0.75, metallicMask);
         float _1303 = smoothstep(0.800000011920928955078125, 0.60000002384185791015625, perceptualRoughness) * _1245;
         float _1306 = clamp(_1303 + _1301, 0.0, 1.0) * spvNMax(objectWetness, heightWetness);
-        float _1315 = _17._m32.x * 3.0;
-        float _1316 = _17._m32.x * 4.345600128173828125;
+        float _1315 = _17._m32.x * 3.0;    //_17._m32.x = 1.33236
+        float _1316 = _17._m32.x * 4.345600128173828125;    //_17._m32.x = 1.33236
         vec3 _1317 = _1254 * 20.0;
         vec3 _1318 = _1254 * 34.345600128173828125;
         vec3 _1320 = spvNMax(pow(_1258, vec3(10.0)), vec3(0.0));
@@ -777,15 +777,15 @@ void main()
         vec4 _1720 = ((vec4(_1583, _1575, _1538.y) * _1516) + (vec4(_1647, _1639, _1602.y) * _1518)) + (vec4(_1711, _1703, _1666.y) * _1521);
         vec2 _1726 = spvNMax(_1523.zw, _1720.zw);
         float _1734 = (_1726.x * step(1.0 - _1306, _1726.y - 0.100000001490116119384765625)) * step(0.00999999977648258209228515625, objectWetness);
-        vec2 _1742 = vec2(0.0, (_17._m32.x * _17._m111.z) * 0.75);
+        vec2 _1742 = vec2(0.0, (_17._m32.x * _17._m111.z) * 0.75);    //_17._m32.x = 1.33236; _17._m111.z = 2.00
         vec3 _1745 = vec3(_1256.x, 0.0, _1256.z);
         vec3 _1751 = abs(_1745 * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(_1745, _1745)))) - vec3(0.20000000298023223876953125);
         vec3 _1754 = spvNMax((_1751 * _1751) * _1751, vec3(0.0));
         vec3 _1757 = _1754 / vec3(dot(_1754, vec3(1.0)));
         float _1776 = _1757.z;
         float _1778 = _1757.x;
-        vec4 _1780 = (texture(sampler2D(texRainNormalB, smpMaterialBase), _1272, _17._m38) * _1776) + (texture(sampler2D(texRainNormalB, smpMaterialBase), _1277, _17._m38) * _1778);
-        vec2 _1790 = mix((_1287.xy * 2.0) - vec2(1.0), (_1523.xy + _1720.xy).xy, bvec2(_1734 > 0.001000000047497451305389404296875)) + (((_1780.xy * 2.0) - vec2(1.0)) * ((texture(sampler2D(texRainNormalB, smpMaterialBase), _1272 + _1742, _17._m38).w * _1776) + (texture(sampler2D(texRainNormalB, smpMaterialBase), _1277 + _1742, _17._m38).w * _1778)));
+        vec4 _1780 = (texture(sampler2D(texRainNormalB, smpMaterialBase), _1272, _17._m38) * _1776) + (texture(sampler2D(texRainNormalB, smpMaterialBase), _1277, _17._m38) * _1778);    //_17._m38 = -1.00
+        vec2 _1790 = mix((_1287.xy * 2.0) - vec2(1.0), (_1523.xy + _1720.xy).xy, bvec2(_1734 > 0.001000000047497451305389404296875)) + (((_1780.xy * 2.0) - vec2(1.0)) * ((texture(sampler2D(texRainNormalB, smpMaterialBase), _1272 + _1742, _17._m38).w * _1776) + (texture(sampler2D(texRainNormalB, smpMaterialBase), _1277 + _1742, _17._m38).w * _1778)));    //_17._m38 = -1.00
         float _1791 = _1780.z;
         float _1795 = spvNMax(spvNMax(_1734, step(1.0099999904632568359375 - _1306, _1287.z)), smoothstep(1.0 - _1791, 1.10000002384185791015625 - _1791, _1306));
         vec3 _1796 = cross(shadingNormal, vec3(0.0, 1.0, 0.0));
@@ -821,11 +821,11 @@ void main()
     vec4 auxOutput = vec4(encodedVelocity.x, encodedVelocity.y, vec4(0.0).z, vec4(0.0).w);
     auxOutput.z = 1.0;
     auxOutput.w = (wetCoverage > 0.5) ? 0.699999988079071044921875 : 0.4000000059604644775390625;
-    vec3 mainLightDirMixed = mix(-_33._m0.xyz, _17._m112.xyz, vec3(_17._m102.w));
+    vec3 mainLightDirMixed = mix(-_33._m0.xyz, _17._m112.xyz, vec3(_17._m102.w));    //_17._m112.xyz = -0.26339, 0.58779, 0.76494; _17._m102.w = 1.00
     vec3 mainLightPlanarDir = normalize(vec3(mainLightDirMixed.x, 6.103515625e-05, mainLightDirMixed.z));
-    vec3 mainLightColor = mix(_33._m3.xyz, _17._m106.xyz, vec3(_17._m113.y));
-    vec3 scaledMainLightColor = mainLightColor * mix(_33._m3.w, 1.0, _17._m113.w);
-    // 7. Character shadow. Selects a per-object shadow tile and evaluates texCharacterShadowDepth with 16 soft taps.
+    vec3 mainLightColor = mix(_33._m3.xyz, _17._m106.xyz, vec3(_17._m113.y));    //_17._m106.xyz = 1.00, 1.00, 1.00; _17._m113.y = 1.00
+    vec3 scaledMainLightColor = mainLightColor * mix(_33._m3.w, 1.0, _17._m113.w);    //_17._m113.w = 0.00
+    // 7. 角色阴影。选择逐物体阴影图块，并用 16 次软采样评估 texCharacterShadowDepth。
     float characterShadow;
     do
     {
@@ -876,7 +876,7 @@ void main()
         characterShadow = _2038;
         break;
     } while(false);
-    // 8. Scene shadow. Mixes CSM/virtual shadowing and optionally modulates it with cloud/rain occlusion.
+    // 8. 场景阴影。混合 CSM/虚拟阴影，并可选择用云/雨遮挡对其进行调制。
     vec2 sceneShadowAndRawShadow;
     do
     {
@@ -886,7 +886,7 @@ void main()
             break;
         }
         int _2052 = int(_37._m7.x);
-        vec3 _2059 = vWorldPos - mix(_17._m11.xyz, _37._m1[0].xyz, bvec3(_2052 == 2));
+        vec3 _2059 = vWorldPos - mix(_17._m11.xyz, _37._m1[0].xyz, bvec3(_2052 == 2));    //_17._m11.xyz = 1.04954E-07, 301.45001, 1.38053
         float _2067 = clamp((_37._m6.w - dot(_2059, _2059)) * _37._m6.z, 0.0, 1.0);
         float _2266;
         bool _2267;
@@ -1046,10 +1046,10 @@ void main()
         float _2515;
         if (_2464 > 0.001000000047497451305389404296875)
         {
-            vec3 _2471 = vWorldPos - _17._m87.xyz;
-            vec2 _2481 = (_2471 + (_17._m90.xyz * _2471.y)).xz * _17._m88.z;
-            vec2 _2490 = _17._m89.xy * _17._m97.w;
-            _2515 = _2464 * mix(1.0, mix(textureLod(sampler2D(texCloudShadowOrRainOcclusion, smpLinearRepeat), _2481 + _2490, 0.0), textureLod(sampler2D(texCloudShadowOrRainOcclusion, smpLinearRepeat), (_2481 * _17._m89.w) + _2490, 0.0), vec4(smoothstep(_17._m88.x, _17._m88.y, length(_2471.xz)))).x, _17._m89.z);
+            vec3 _2471 = vWorldPos - _17._m87.xyz;    //_17._m87.xyz = 1.00, 0.00, 0.00
+            vec2 _2481 = (_2471 + (_17._m90.xyz * _2471.y)).xz * _17._m88.z;    //_17._m90.xyz = 0.00, 0.00, 0.00; _17._m88.z = 0.00
+            vec2 _2490 = _17._m89.xy * _17._m97.w;    //_17._m89.xy = 1.00, 1.00; _17._m97.w = 26.64717
+            _2515 = _2464 * mix(1.0, mix(textureLod(sampler2D(texCloudShadowOrRainOcclusion, smpLinearRepeat), _2481 + _2490, 0.0), textureLod(sampler2D(texCloudShadowOrRainOcclusion, smpLinearRepeat), (_2481 * _17._m89.w) + _2490, 0.0), vec4(smoothstep(_17._m88.x, _17._m88.y, length(_2471.xz)))).x, _17._m89.z);    //_17._m89.w = 1.00; _17._m88.x = 0.00; _17._m88.y = 0.00; _17._m89.z = 1.00
         }
         else
         {
@@ -1059,15 +1059,15 @@ void main()
         break;
     } while(false);
     float characterShadowMix = mix(1.0, characterShadow, _37._m6.x);
-    float mainShadow = mix(mix(1.0, sceneShadowAndRawShadow.x, _37._m6.x), 1.0, _17._m102.z);
+    float mainShadow = mix(mix(1.0, sceneShadowAndRawShadow.x, _37._m6.x), 1.0, _17._m102.z);    //_17._m102.z = 1.00
     float ndotlMain = dot(shadingNormal, mainLightDirMixed);
-    vec3 diffuseAlbedoScaled = diffuseLightingAlbedo * _17._m101.z;
+    vec3 diffuseAlbedoScaled = diffuseLightingAlbedo * _17._m101.z;    //_17._m101.z = 0.70
     vec3 diffuseAlbedoSoft = diffuseAlbedoScaled * 0.64999997615814208984375;
     float diffuseLuma = dot(diffuseAlbedo, kLumaRec709);
     float sunCameraOpposition = clamp(-dot(mainLightPlanarDir.xz, normalize(worldCameraForward.xz)), 0.0, 1.0);
-    float globalLightBlendInverse = 1.0 - _17._m113.x;
-    // 9. Ramp lighting. texLightRampLut maps main-light NdotL and normal direction to the stylized cloth/metal transition.
-    vec4 mainRampSample = textureLod(sampler2D(texLightRampLut, smpLinearClamp), vec2((clamp(mix(ndotlMain, ((-ndotlMain) * ((ndotlMain * 0.5) - 1.0)) + 0.5, (sunCameraOpposition * smoothstep(0.25, 0.75, 1.0 - abs(worldCameraForward.y))) * globalLightBlendInverse) + (_17._m112.w * _17._m113.x), -1.0, 1.0) * 0.5) + 0.5, 0.5), 0.0);
+    float globalLightBlendInverse = 1.0 - _17._m113.x;    //_17._m113.x = 1.00
+    // 9. Ramp 光照。texLightRampLut 将主光 NdotL 和法线方向映射到风格化布料/金属过渡。
+    vec4 mainRampSample = textureLod(sampler2D(texLightRampLut, smpLinearClamp), vec2((clamp(mix(ndotlMain, ((-ndotlMain) * ((ndotlMain * 0.5) - 1.0)) + 0.5, (sunCameraOpposition * smoothstep(0.25, 0.75, 1.0 - abs(worldCameraForward.y))) * globalLightBlendInverse) + (_17._m112.w * _17._m113.x), -1.0, 1.0) * 0.5) + 0.5, 0.5), 0.0);    //_17._m112.w = 0.00; _17._m113.x = 1.00
     float mainRampAlpha = mainRampSample.w;
     float mainRampR = mainRampSample.x;
     float mainRampG = mainRampSample.y;
@@ -1078,16 +1078,16 @@ void main()
     float aoTimesCharacterShadow = aoMask * characterShadowMix;
     float combinedDirectOcclusion = spvNMin(spvNMin(characterShadowMix, aoMask), mainRampAlpha);
     float ambientOcclusionRamp = ambientRampAlpha * aoTimesCharacterShadow;
-    vec3 probeRampColor = vec3((clamp(dot(shadingNormal, _17._m107.xyz) + _17._m108.x, 0.0, 1.0) * _17._m108.y) + _17._m108.z) * mix(probeColorTint, vec3(1.0), vec3(_17._m102.y * combinedDirectOcclusion));
+    vec3 probeRampColor = vec3((clamp(dot(shadingNormal, _17._m107.xyz) + _17._m108.x, 0.0, 1.0) * _17._m108.y) + _17._m108.z) * mix(probeColorTint, vec3(1.0), vec3(_17._m102.y * combinedDirectOcclusion));    //_17._m107.xyz = 0.00, 1.00, 4.37114E-08; _17._m108.x = 0.15; _17._m108.y = 1.50; _17._m108.z = 0.50; _17._m102.y = 1.00
     vec3 directOcclusionVec = vec3(combinedDirectOcclusion);
     vec3 mainShadowVec = vec3(mainShadow);
-    vec3 directLightColor = mix((probeRampColor * mix(spvNMin(mix(0.64999997615814208984375, 1.0, probeIntensity), 1.5), clamp(probeIntensity, 1.25, 1.75), _17._m102.x)) * _17._m101.w, (mix(vec3(dot(scaledMainLightColor, kLumaRec709)), scaledMainLightColor, directOcclusionVec) + ((probeRampColor * clamp(probeIntensity, 0.0, 1.5)) * (vec3(1.0 - _17._m113.y) + (mainLightColor * _17._m113.y)))) * _17._m101.y, mainShadowVec);
+    vec3 directLightColor = mix((probeRampColor * mix(spvNMin(mix(0.64999997615814208984375, 1.0, probeIntensity), 1.5), clamp(probeIntensity, 1.25, 1.75), _17._m102.x)) * _17._m101.w, (mix(vec3(dot(scaledMainLightColor, kLumaRec709)), scaledMainLightColor, directOcclusionVec) + ((probeRampColor * clamp(probeIntensity, 0.0, 1.5)) * (vec3(1.0 - _17._m113.y) + (mainLightColor * _17._m113.y)))) * _17._m101.y, mainShadowVec);    //_17._m102.x = 0.00; _17._m101.w = 0.90; _17._m113.y = 1.00; _17._m101.y = 1.10
     vec3 rampedDiffuseBase = mix(mix(mix(vec3(dot(diffuseAlbedoSoft, kLumaRec709)), diffuseAlbedoSoft, vec3(1.2000000476837158203125)), diffuseAlbedoScaled, vec3(clamp((aoTimesCharacterShadow * ambientRampAlpha) + mainRampAlpha, 0.0, 1.0))), diffuseAlbedo, directOcclusionVec);
     vec3 rampedDiffuseColored = rampedDiffuseBase * (vec3(1.0 - mainRampChroma) + (mainRampSample.xyz * mainRampChroma));
     vec3 finalDiffuseTerm = mix(mix(diffuseAlbedoScaled, mix(vec3(diffuseLuma), diffuseAlbedo, vec3(1.2000000476837158203125)), vec3(ambientOcclusionRamp)), rampedDiffuseColored * clamp(dot(rampedDiffuseBase, kLumaRec709) * (1.0 / spvNMax(dot(rampedDiffuseColored, kLumaRec709), 0.001000000047497451305389404296875)), 0.0, 1.5), mainShadowVec);
     vec4 diffuseAndShadow = vec4(finalDiffuseTerm, mainShadow);
     float directVisibility = mix(ambientOcclusionRamp, combinedDirectOcclusion, mainShadow);
-    float directIntensityScale = mix(_17._m101.z, 1.0, directVisibility);
+    float directIntensityScale = mix(_17._m101.z, 1.0, directVisibility);    //_17._m101.z = 0.70
     vec3 halfVectorBiasDir = vec3(worldCameraForward.x, mix(0.5, mainLightDirMixed.y, mainShadow), worldCameraForward.z);
     float ndotv = clamp(dot(normalForLighting, viewDir), 0.0, 1.0);
     float ndothBiased = dot(normalForLighting, normalize(((mainLightDirMixed * mainShadow) + ((halfVectorBiasDir * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(halfVectorBiasDir, halfVectorBiasDir)))) * 2.0)) + (viewDir * (2.0 + mainShadow))));
@@ -1097,14 +1097,14 @@ void main()
     float smithViewTermA = 2.0 * ndotv;
     float smithViewTermB = (1.0 + ndotv) - ndotv;
     float ndotv2 = ndotv * ndotv;
-    // 10. F0 LUT. GGX distribution and roughness select the F0 tint used by cloth/metal highlights.
-    vec3 f0TintedByLut = specularF0 * textureLod(sampler2D(texF0TintLut, smpLinearClamp), vec2(mix(ggxDistribution / spvNMin(1.0 / (roughness4 + 9.9999997473787516355514526367188e-05), 65504.0), ndotv2, _51._m4), finalPerceptualRoughness * (1.0 - metallicMask)), 0.0).xyz;
-    vec3 finalSpecularF0 = mix(specularF0, f0TintedByLut, vec3(_51._m4));
-    float alphaLightingScale = (1.0 - _51._m6) + (alpha * _51._m6);
-    vec3 mainDirectLighting = ((directLightColor * finalDiffuseTerm) * alphaLightingScale) + (((f0TintedByLut * clamp((ggxDistribution * (0.5 / ((smithViewTermA + (roughness2Clamped * smithViewTermB)) + 9.9999997473787516355514526367188e-05))) - 6.103515625e-05, 0.0, 20.0)) * ((directLightColor * (((directVisibility * 0.5) + 0.5) * directIntensityScale)) * 1.0)) * _17._m114.w);
+    // 10. F0 LUT。GGX 分布和粗糙度选择布料/金属高光使用的 F0 染色。
+    vec3 f0TintedByLut = specularF0 * textureLod(sampler2D(texF0TintLut, smpLinearClamp), vec2(mix(ggxDistribution / spvNMin(1.0 / (roughness4 + 9.9999997473787516355514526367188e-05), 65504.0), ndotv2, _51._m4), finalPerceptualRoughness * (1.0 - metallicMask)), 0.0).xyz;    //_51._m4 = 1.00
+    vec3 finalSpecularF0 = mix(specularF0, f0TintedByLut, vec3(_51._m4));    //_51._m4 = 1.00
+    float alphaLightingScale = (1.0 - _51._m6) + (alpha * _51._m6);    //_51._m6 = 1.00
+    vec3 mainDirectLighting = ((directLightColor * finalDiffuseTerm) * alphaLightingScale) + (((f0TintedByLut * clamp((ggxDistribution * (0.5 / ((smithViewTermA + (roughness2Clamped * smithViewTermB)) + 9.9999997473787516355514526367188e-05))) - 6.103515625e-05, 0.0, 20.0)) * ((directLightColor * (((directVisibility * 0.5) + 0.5) * directIntensityScale)) * 1.0)) * _17._m114.w);    //_17._m114.w = 1.00
     float mainDirectLuma = dot(mainDirectLighting, kLumaRec709);
     float mainDirectLumaOverHalf = clamp(mainDirectLuma - 0.5, 0.0, 0.5);
-    vec3 rimLightDir = normalize(cross(worldCameraForward, vec3(_17._m110.xy, 0.0)));
+    vec3 rimLightDir = normalize(cross(worldCameraForward, vec3(_17._m110.xy, 0.0)));    //_17._m110.xy = 8.74228E-08, -1.00
     float vdotn = dot(viewDir, shadingNormal);
     float viewEdgeFactor = 1.0 - abs(vdotn);
     float flatLightNdotL = dot(mainLightPlanarDir, shadingNormal);
@@ -1120,22 +1120,22 @@ void main()
     vec3 iblSpecularScaleBias = (finalSpecularF0 * iblScale) + vec3(iblBias);
     float iblScaleBiasSum = iblScale + iblBias;
     vec3 viewDirFromSurface = -viewDir;
-    vec3 directAndRimLighting = mix(vec3(mainDirectLuma), mainDirectLighting, vec3((mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0)) + (((((_17._m109.xyz * smoothstep(mix(0.800000011920928955078125, 0.20000000298023223876953125, _17._m110.w), mix(0.89999997615814208984375, 0.5, _17._m110.w), viewEdgeFactor)) * _17._m109.w) * spvNMin(spvNMin(clamp(dot(objectPlanarDir, rimLightDir) + 1.0, 0.0, 1.0), aoMask), characterShadowMix)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_17._m110.z)) * clamp(dot(rimLightDir, shadingNormal), 0.0, 1.0))) + ((((((mix(probeRgbIrradiance * (1.0 / spvNMax(spvNMax(spvNMax(probeRgbIrradiance.x, probeRgbIrradiance.y), probeRgbIrradiance.z) * 0.5, 1.0)), scaledMainLightColor, mainShadowVec) * clamp(mix(dot(probeDominantDirAndWeight.xyz, shadingNormal) * probeDominantDirAndWeight.w, ((-flatLightNdotL) * ((flatLightNdotL * 0.5) - 1.0)) + 0.5, mainShadow), 0.0, 1.0)) * ((shadowedAmount + (sunCameraOpposition * mainShadow)) * globalLightBlendInverse)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, viewEdgeFactor)) * spvNMin(aoMask, characterShadowMix)) * (shadowedAmount + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * mainShadow))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));
+    vec3 directAndRimLighting = mix(vec3(mainDirectLuma), mainDirectLighting, vec3((mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0)) + (((((_17._m109.xyz * smoothstep(mix(0.800000011920928955078125, 0.20000000298023223876953125, _17._m110.w), mix(0.89999997615814208984375, 0.5, _17._m110.w), viewEdgeFactor)) * _17._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimLightDir) + 1.0, 0.0, 1.0), aoMask), characterShadowMix)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_17._m110.z)) * clamp(dot(rimLightDir, shadingNormal), 0.0, 1.0))) + ((((((mix(probeRgbIrradiance * (1.0 / spvNMax(spvNMax(spvNMax(probeRgbIrradiance.x, probeRgbIrradiance.y), probeRgbIrradiance.z) * 0.5, 1.0)), scaledMainLightColor, mainShadowVec) * clamp(mix(dot(probeDominantDirAndWeight.xyz, shadingNormal) * probeDominantDirAndWeight.w, ((-flatLightNdotL) * ((flatLightNdotL * 0.5) - 1.0)) + 0.5, mainShadow), 0.0, 1.0)) * ((shadowedAmount + (sunCameraOpposition * mainShadow)) * globalLightBlendInverse)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, viewEdgeFactor)) * spvNMin(aoMask, characterShadowMix)) * (shadowedAmount + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * mainShadow))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));    //_17._m109.xyz = 0.00, 0.00, 0.00; _17._m110.w = 0.40; _17._m109.w = 1.00; _17._m110.z = 0.00
     vec2 pixelCoordFloat = vec2(pixelCoord);
     vec2 lightTileCoord = floor(pixelCoordFloat * 0.03125);
     int lightTileBaseIndex = int((lightTileCoord.x + (lightTileCoord.y * _31._m5)) * 8.0);
-    float depthSliceFloat = floor(linearEyeDepth - (_17._m25.y * _31._m11));
+    float depthSliceFloat = floor(linearEyeDepth - (_17._m25.y * _31._m11));    //_17._m25.y = 0.10
     float depthSliceClamped = clamp(depthSliceFloat, 0.0, _31._m7 - 1.0);
     int depthSliceBaseIndex = int(depthSliceClamped * 8.0);
     vec3 lightingAccumulator;
-    // 11. Initial lighting accumulator: direct light, rim light, emission, and cubemap IBL reflection.
-    lightingAccumulator = (directAndRimLighting + (((emissionSample.xyz * _51._m21.xyz) * _51._m7) * alphaLightingScale)) + (((textureLod(samplerCube(texReflectionCube, smpLinearClamp), reflect(viewDirFromSurface, normalForLighting), (1.2000000476837158203125 * log2(spvNMax(iblPerceptualRoughness, 0.001000000047497451305389404296875))) + 5.0).xyz * ((iblSpecularScaleBias + ((finalSpecularF0 * ((1.0 - iblScaleBiasSum) / iblScaleBiasSum)) * iblSpecularScaleBias)) * 1.0)) * ((clamp(probeIntensity, 0.5, 1.5) * _17._m101.w) * directIntensityScale)) * probeColorTint);
+    // 11. 初始光照累加器：直接光、边缘光、自发光和 cubemap IBL 反射。
+    lightingAccumulator = (directAndRimLighting + (((emissionSample.xyz * _51._m21.xyz) * _51._m7) * alphaLightingScale)) + (((textureLod(samplerCube(texReflectionCube, smpLinearClamp), reflect(viewDirFromSurface, normalForLighting), (1.2000000476837158203125 * log2(spvNMax(iblPerceptualRoughness, 0.001000000047497451305389404296875))) + 5.0).xyz * ((iblSpecularScaleBias + ((finalSpecularF0 * ((1.0 - iblScaleBiasSum) / iblScaleBiasSum)) * iblSpecularScaleBias)) * 1.0)) * ((clamp(probeIntensity, 0.5, 1.5) * _17._m101.w) * directIntensityScale)) * probeColorTint);    //_51._m21.xyz = 0.34793, 0.68676, 1.00; _51._m7 = 0.75; _17._m101.w = 0.90
     vec3 lightingAccumulatorAfterOneLight;
-    // 12. Clustered/Forward+ dynamic light loop. Screen tile and depth-slice masks select lights, then add diffuse and specular.
+    // 12. Clustered/Forward+ 动态光循环。屏幕图块和深度切片遮罩选择光源，然后累加漫反射和高光。
     SPIRV_CROSS_LOOP
     for (int lightTileWord = 0; lightTileWord <= 7; lightingAccumulator = lightingAccumulatorAfterOneLight, lightTileWord++)
     {
-        uint lightMaskWord = (depthSliceFloat <= depthSliceClamped) ? (_27._m0[uint(lightTileBaseIndex + lightTileWord)] & _27._m0[uint((_17._m43.y + depthSliceBaseIndex) + lightTileWord)]) : 0u;
+        uint lightMaskWord = (depthSliceFloat <= depthSliceClamped) ? (_27._m0[uint(lightTileBaseIndex + lightTileWord)] & _27._m0[uint((_17._m43.y + depthSliceBaseIndex) + lightTileWord)]) : 0u;    //_17._m43.y = 28800
         uint lightTileWordU = uint(lightTileWord);
         lightingAccumulatorAfterOneLight = lightingAccumulator;
         uint _2913;
@@ -1183,7 +1183,7 @@ void main()
                 do
                 {
                     uint _3035 = floatBitsToUint(_33._m6[_2932].w);
-                    if ((_3035 == 16u) || ((_33._m6[_2932].z + _17._m113.z) < 0.5))
+                    if ((_3035 == 16u) || ((_33._m6[_2932].z + _17._m113.z) < 0.5))    //_17._m113.z = 1.00
                     {
                         _3698 = lightingAccumulatorAfterOneLight;
                         break;
@@ -1380,7 +1380,7 @@ void main()
                                 }
                                 else
                                 {
-                                    _3571 = clamp(dot(objectPlanarDir, _3126) + 1.0, 0.0, 1.0);
+                                    _3571 = clamp(dot(rootToPixelDir, _3126) + 1.0, 0.0, 1.0);
                                 }
                                 _3572 = _3571;
                             }
@@ -1510,76 +1510,76 @@ void main()
     }
     vec3 colorBeforeExposureFog;
     SPIRV_CROSS_BRANCH
-    // 13. Material post/debug color path. Can push final color toward grayscale, a fixed tint, and view-edge color.
-    if (_51._m12 > 0.5)
+    // 13. 材质后处理/调试颜色路径。可将最终颜色推向灰度、固定染色和视角边缘颜色。
+    if (_51._m12 > 0.5)    //_51._m12 = 0.00
     {
-        colorBeforeExposureFog = mix(mix(vec3(0.5), mix(vec3(dot(lightingAccumulator, kLumaRec709)), lightingAccumulator, vec3(_51._m14)), vec3(_51._m15)) * _51._m13, _51._m22.xyz, vec3(_51._m22.w)) + ((_51._m23.xyz * smoothstep(1.0 - _51._m16, 1.0, 1.0 - clamp(vdotn, 0.0, 1.0))) * _51._m17);
+        colorBeforeExposureFog = mix(mix(vec3(0.5), mix(vec3(dot(lightingAccumulator, kLumaRec709)), lightingAccumulator, vec3(_51._m14)), vec3(_51._m15)) * _51._m13, _51._m22.xyz, vec3(_51._m22.w)) + ((_51._m23.xyz * smoothstep(1.0 - _51._m16, 1.0, 1.0 - clamp(vdotn, 0.0, 1.0))) * _51._m17);    //_51._m14 = 1.00; _51._m15 = 1.00; _51._m13 = 1.00; _51._m22.xyz = 1.00, 1.00, 1.00; _51._m22.w = 0.00; _51._m23.xyz = 1.00, 1.00, 1.00; _51._m16 = 0.35; _51._m17 = 4.00
     }
     else
     {
         colorBeforeExposureFog = lightingAccumulator;
     }
-    vec4 litColorBeforeFog = vec4(colorBeforeExposureFog / vec3(_17._m42.x), alpha);
-    litColorBeforeFog.w = (_51._m8 == 1.0) ? alpha : 1.0;
+    vec4 litColorBeforeFog = vec4(colorBeforeExposureFog / vec3(_17._m42.x), alpha);    //_17._m42.x = 1.00
+    litColorBeforeFog.w = (_51._m8 == 1.0) ? alpha : 1.0;    //_51._m8 = 1.00
     vec4 finalFoggedColor;
     SPIRV_CROSS_BRANCH
-    // 14. Fog and aerial perspective. Height, distance, and the aerial perspective LUT blend into final color.
-    if (_17._m113.w < 0.5)
+    // 14. 雾和大气透视。高度、距离和大气透视 LUT 混合进最终颜色。
+    if (_17._m113.w < 0.5)    //_17._m113.w = 0.00
     {
-        float _3769 = vWorldPos.y * _17._m68.w;
-        float _3774 = spvNMax(0.00999999977648258209228515625, _3769 + _17._m69.w);
-        vec3 _3788 = exp(_17._m67.xyz * ((-spvNMax(0.0, (viewDistance * _17._m66.w) - _17._m65.w)) * (((1.0 - exp(-_3774)) / _3774) * exp(_3769 + _17._m70.w))));
-        float _3791 = dot(viewDirFromSurface, _17._m66.xyz);
-        float _3797 = _17._m67.w * _17._m67.w;
-        float _3801 = (1.0 + _3797) - ((2.0 * _17._m67.w) * _3791);
+        float _3769 = vWorldPos.y * _17._m68.w;    //_17._m68.w = -1.00
+        float _3774 = spvNMax(0.00999999977648258209228515625, _3769 + _17._m69.w);    //_17._m69.w = 0.00
+        vec3 _3788 = exp(_17._m67.xyz * ((-spvNMax(0.0, (viewDistance * _17._m66.w) - _17._m65.w)) * (((1.0 - exp(-_3774)) / _3774) * exp(_3769 + _17._m70.w))));    //_17._m67.xyz = 1.00000E-05, 1.00000E-05, 1.00000E-05; _17._m66.w = 0.001; _17._m65.w = 0.00; _17._m70.w = -65535.00
+        float _3791 = dot(viewDirFromSurface, _17._m66.xyz);    //_17._m66.xyz = 0.00, 0.00, 1.00
+        float _3797 = _17._m67.w * _17._m67.w;    //_17._m67.w = 0.00
+        float _3801 = (1.0 + _3797) - ((2.0 * _17._m67.w) * _3791);    //_17._m67.w = 0.00
         vec3 _4128;
         float _4129;
-        if (_17._m77.z > 0.0)
+        if (_17._m77.z > 0.0)    //_17._m77.z = 0.00
         {
-            uvec3 _3850 = (uvec3(ivec3(int(pixelCoord.x), int(pixelCoord.y), int(_17._m41 & 7u))) * uvec3(1664525u)) + uvec3(1013904223u);
+            uvec3 _3850 = (uvec3(ivec3(int(pixelCoord.x), int(pixelCoord.y), int(_17._m41 & 7u))) * uvec3(1664525u)) + uvec3(1013904223u);    //_17._m41 = 655
             uint _3851 = _3850.y;
             uint _3852 = _3850.z;
             uint _3855 = _3850.x + (_3851 * _3852);
             uint _3857 = _3851 + (_3852 * _3855);
             uint _3859 = _3852 + (_3855 * _3857);
             uint _3861 = _3855 + (_3857 * _3859);
-            float _3886 = dot(viewDirFromSurface, -_17._m0[2].xyz);
-            vec3 _3893 = vWorldPos - _17._m11.xyz;
-            float _3895 = (_17._m77.w * ((_3886 > 5.9604644775390625e-08) ? (1.0 / _3886) : 0.0)) * (1.0 / viewDistance);
+            float _3886 = dot(viewDirFromSurface, -_17._m0[2].xyz);    //_17._m0[2].xyz = 8.65910E-08, -0.0207, 0.99979
+            vec3 _3893 = vWorldPos - _17._m11.xyz;    //_17._m11.xyz = 1.04954E-07, 301.45001, 1.38053
+            float _3895 = (_17._m77.w * ((_3886 > 5.9604644775390625e-08) ? (1.0 / _3886) : 0.0)) * (1.0 / viewDistance);    //_17._m77.w = 0.00
             float _3896 = _3893.y;
             float _3897 = _3895 * _3896;
-            float _3899 = _17._m11.y + _3897;
+            float _3899 = _17._m11.y + _3897;    //_17._m11.y = 301.45001
             float _3900 = _3896 - _3897;
             float _3902 = (1.0 - _3895) * viewDistance;
-            float _3916 = spvNMax(-127.0, _17._m71.z * _3900);
-            float _3940 = spvNMax(-127.0, _17._m74.x * _3900);
-            float _3951 = ((_17._m71.y * exp2(-spvNMax(-127.0, _17._m71.z * (_3899 - _17._m71.x)))) * ((abs(_3916) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_3916)) / _3916) : (0.693147182464599609375 - (0.2402265071868896484375 * _3916)))) + ((_17._m74.y * exp2(-spvNMax(-127.0, _17._m74.x * (_3899 - _17._m74.z)))) * ((abs(_3940) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_3940)) / _3940) : (0.693147182464599609375 - (0.2402265071868896484375 * _3940))));
-            float _3973 = clamp((viewDistance * _17._m72.w) + _17._m72.z, 0.0, 1.0);
-            float _3976 = clamp((spvNMax(clamp(exp2(-(_3951 * _3902)), 0.0, 1.0), _17._m73.w) + clamp((viewDistance * _17._m72.y) + _17._m72.x, 0.0, 1.0)) + _3973, 0.0, 1.0);
-            vec4 _4016 = mix(vec4(0.0, 0.0, 0.0, 1.0), textureLod(sampler3D(texAerialPerspectiveLut, smpLinearClamp), vec3((pixelCoordFloat + ((((vec3(uvec3(_3861, _3857 + (_3859 * _3861), _526) >> uvec3(16u)) * vec3(1.525902189314365386962890625e-05)) * 2.0) - vec3(1.0)) * _17._m81.w).xy) * _17._m79.xy, (log2((linearEyeDepth * _17._m78.x) + _17._m78.y) * _17._m78.z) / _17._m77.z), 0.0), vec4(clamp((linearEyeDepth - _17._m80.z) * 1000000.0, 0.0, 1.0)));
-            _4128 = _4016.xyz + (((_17._m73.xyz * (1.0 - _3976)) + (((_17._m76.xyz * pow(clamp(dot(viewDir, _17._m75.xyz), 0.0, 1.0), _17._m76.w)) * (1.0 - clamp(exp2(-(_3951 * spvNMax(_3902 - _17._m75.w, 0.0))), 0.0, 1.0))) * (1.0 - _3973))) * _4016.w);
+            float _3916 = spvNMax(-127.0, _17._m71.z * _3900);    //_17._m71.z = 0.00
+            float _3940 = spvNMax(-127.0, _17._m74.x * _3900);    //_17._m74.x = 0.00
+            float _3951 = ((_17._m71.y * exp2(-spvNMax(-127.0, _17._m71.z * (_3899 - _17._m71.x)))) * ((abs(_3916) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_3916)) / _3916) : (0.693147182464599609375 - (0.2402265071868896484375 * _3916)))) + ((_17._m74.y * exp2(-spvNMax(-127.0, _17._m74.x * (_3899 - _17._m74.z)))) * ((abs(_3940) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_3940)) / _3940) : (0.693147182464599609375 - (0.2402265071868896484375 * _3940))));    //_17._m71.y = 0.00; _17._m71.z = 0.00; _17._m71.x = 0.00; _17._m74.y = 0.00; _17._m74.x = 0.00; _17._m74.z = 0.00
+            float _3973 = clamp((viewDistance * _17._m72.w) + _17._m72.z, 0.0, 1.0);    //_17._m72.w = 0.00; _17._m72.z = 0.00
+            float _3976 = clamp((spvNMax(clamp(exp2(-(_3951 * _3902)), 0.0, 1.0), _17._m73.w) + clamp((viewDistance * _17._m72.y) + _17._m72.x, 0.0, 1.0)) + _3973, 0.0, 1.0);    //_17._m73.w = 1.00; _17._m72.y = 0.00; _17._m72.x = 0.00
+            vec4 _4016 = mix(vec4(0.0, 0.0, 0.0, 1.0), textureLod(sampler3D(texAerialPerspectiveLut, smpLinearClamp), vec3((pixelCoordFloat + ((((vec3(uvec3(_3861, _3857 + (_3859 * _3861), _526) >> uvec3(16u)) * vec3(1.525902189314365386962890625e-05)) * 2.0) - vec3(1.0)) * _17._m81.w).xy) * _17._m79.xy, (log2((linearEyeDepth * _17._m78.x) + _17._m78.y) * _17._m78.z) / _17._m77.z), 0.0), vec4(clamp((linearEyeDepth - _17._m80.z) * 1000000.0, 0.0, 1.0)));    //_17._m81.w = 0.00; _17._m79.xy = 0.00, 0.00; _17._m78.x = 0.00; _17._m78.y = 0.00; _17._m78.z = 0.00; _17._m77.z = 0.00; _17._m80.z = 0.00
+            _4128 = _4016.xyz + (((_17._m73.xyz * (1.0 - _3976)) + (((_17._m76.xyz * pow(clamp(dot(viewDir, _17._m75.xyz), 0.0, 1.0), _17._m76.w)) * (1.0 - clamp(exp2(-(_3951 * spvNMax(_3902 - _17._m75.w, 0.0))), 0.0, 1.0))) * (1.0 - _3973))) * _4016.w);    //_17._m73.xyz = 0.00, 0.00, 0.00; _17._m76.xyz = 0.00, 0.00, 0.00; _17._m75.xyz = 0.00, 1.00, 0.00; _17._m76.w = 1.00; _17._m75.w = 0.00
             _4129 = _4016.w * _3976;
         }
         else
         {
-            vec3 _4022 = vWorldPos - _17._m11.xyz;
+            vec3 _4022 = vWorldPos - _17._m11.xyz;    //_17._m11.xyz = 1.04954E-07, 301.45001, 1.38053
             float _4024 = _4022.y;
-            float _4038 = spvNMax(-127.0, _17._m71.z * _4024);
-            float _4062 = spvNMax(-127.0, _17._m74.x * _4024);
-            float _4073 = ((_17._m71.y * exp2(-spvNMax(-127.0, _17._m71.z * (_17._m11.y - _17._m71.x)))) * ((abs(_4038) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_4038)) / _4038) : (0.693147182464599609375 - (0.2402265071868896484375 * _4038)))) + ((_17._m74.y * exp2(-spvNMax(-127.0, _17._m74.x * (_17._m11.y - _17._m74.z)))) * ((abs(_4062) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_4062)) / _4062) : (0.693147182464599609375 - (0.2402265071868896484375 * _4062))));
-            float _4095 = clamp((viewDistance * _17._m72.w) + _17._m72.z, 0.0, 1.0);
-            float _4098 = clamp((spvNMax(clamp(exp2(-(_4073 * viewDistance)), 0.0, 1.0), _17._m73.w) + clamp((viewDistance * _17._m72.y) + _17._m72.x, 0.0, 1.0)) + _4095, 0.0, 1.0);
-            _4128 = (_17._m73.xyz * (1.0 - _4098)) + (((_17._m76.xyz * pow(clamp(dot(viewDir, _17._m75.xyz), 0.0, 1.0), _17._m76.w)) * (1.0 - clamp(exp2(-(_4073 * spvNMax(viewDistance - _17._m75.w, 0.0))), 0.0, 1.0))) * (1.0 - _4095));
+            float _4038 = spvNMax(-127.0, _17._m71.z * _4024);    //_17._m71.z = 0.00
+            float _4062 = spvNMax(-127.0, _17._m74.x * _4024);    //_17._m74.x = 0.00
+            float _4073 = ((_17._m71.y * exp2(-spvNMax(-127.0, _17._m71.z * (_17._m11.y - _17._m71.x)))) * ((abs(_4038) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_4038)) / _4038) : (0.693147182464599609375 - (0.2402265071868896484375 * _4038)))) + ((_17._m74.y * exp2(-spvNMax(-127.0, _17._m74.x * (_17._m11.y - _17._m74.z)))) * ((abs(_4062) > 5.9604644775390625e-08) ? ((1.0 - exp2(-_4062)) / _4062) : (0.693147182464599609375 - (0.2402265071868896484375 * _4062))));    //_17._m71.y = 0.00; _17._m71.z = 0.00; _17._m11.y = 301.45001; _17._m71.x = 0.00; _17._m74.y = 0.00; _17._m74.x = 0.00; _17._m74.z = 0.00
+            float _4095 = clamp((viewDistance * _17._m72.w) + _17._m72.z, 0.0, 1.0);    //_17._m72.w = 0.00; _17._m72.z = 0.00
+            float _4098 = clamp((spvNMax(clamp(exp2(-(_4073 * viewDistance)), 0.0, 1.0), _17._m73.w) + clamp((viewDistance * _17._m72.y) + _17._m72.x, 0.0, 1.0)) + _4095, 0.0, 1.0);    //_17._m73.w = 1.00; _17._m72.y = 0.00; _17._m72.x = 0.00
+            _4128 = (_17._m73.xyz * (1.0 - _4098)) + (((_17._m76.xyz * pow(clamp(dot(viewDir, _17._m75.xyz), 0.0, 1.0), _17._m76.w)) * (1.0 - clamp(exp2(-(_4073 * spvNMax(viewDistance - _17._m75.w, 0.0))), 0.0, 1.0))) * (1.0 - _4095));    //_17._m73.xyz = 0.00, 0.00, 0.00; _17._m76.xyz = 0.00, 0.00, 0.00; _17._m75.xyz = 0.00, 1.00, 0.00; _17._m76.w = 1.00; _17._m75.w = 0.00
             _4129 = _4098;
         }
-        vec3 _4134 = (litColorBeforeFog.xyz * (_3788 * _4129)) + ((((clamp(((_17._m68.xyz * (0.0596831031143665313720703125 * (1.0 + (_3791 * _3791)))) + _17._m70.xyz) + (_17._m69.xyz * ((1.0 - _3797) / spvNMax((12.56637096405029296875 * _3801) * sqrt(_3801), 0.001000000047497451305389404296875))), vec3(0.0), vec3(1.0)) * 255.0) * (vec3(1.0) - _3788)) * _4129) + _4128);
+        vec3 _4134 = (litColorBeforeFog.xyz * (_3788 * _4129)) + ((((clamp(((_17._m68.xyz * (0.0596831031143665313720703125 * (1.0 + (_3791 * _3791)))) + _17._m70.xyz) + (_17._m69.xyz * ((1.0 - _3797) / spvNMax((12.56637096405029296875 * _3801) * sqrt(_3801), 0.001000000047497451305389404296875))), vec3(0.0), vec3(1.0)) * 255.0) * (vec3(1.0) - _3788)) * _4129) + _4128);    //_17._m68.xyz = 0.00, 0.00, 0.00; _17._m70.xyz = 0.00, 0.00, 0.00; _17._m69.xyz = 0.00, 0.00, 0.00
         finalFoggedColor = vec4(_4134.x, _4134.y, _4134.z, litColorBeforeFog.w);
     }
     else
     {
         finalFoggedColor = litColorBeforeFog;
     }
-    // MRT0 writes color. MRT1 writes encoded screen velocity; w also marks wet coverage strength.
+    // MRT0 写入颜色。MRT1 写入编码后的屏幕速度；w 也标记湿润覆盖强度。
     outColor = finalFoggedColor;
     outAux = auxOutput;
 }

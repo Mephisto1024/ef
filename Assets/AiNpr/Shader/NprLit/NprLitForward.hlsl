@@ -77,9 +77,9 @@ PackedVaryingsToPS VertTesselation(VaryingsToDS input)
 
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Debug/DebugDisplayMaterial.hlsl"
 
-#if defined(_TRANSPARENT_REFRACTIVE_SORT) || defined(_ENABLE_FOG_ON_TRANSPARENT)
+/*#if defined(_TRANSPARENT_REFRACTIVE_SORT) || defined(_ENABLE_FOG_ON_TRANSPARENT)
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/Water/Shaders/UnderWaterUtilities.hlsl"
-#endif
+#endif*/
 
 //NOTE: some shaders set target1 to be
 //   Blend 1 One OneMinusSrcAlpha
@@ -237,65 +237,74 @@ void Frag(PackedVaryingsToPS packedInput
             outColor = ApplyBlendMode(diffuseLighting, specularLighting, builtinData.opacity);
 
             //my
+            float3 viewDirWS = V;
             LayerTexCoord layerTexCoord;
             ZERO_INITIALIZE(LayerTexCoord, layerTexCoord);
             GetLayerTexCoord(input, layerTexCoord);
         
             float4 baseSample = SAMPLE_UVMAPPING_TEXTURE2D(_BaseColorMap, sampler_BaseColorMap, layerTexCoord.base).rgba * _BaseColor.rgba;
             float3 baseColor = baseSample.xyz;
-            float4 controlMask = SAMPLE_UVMAPPING_TEXTURE2D(_MaskMap, sampler_MaskMap, layerTexCoord.base).rgba;
-            float flowBlendMask = controlMask.x;
-            float primarySpecMask = controlMask.y;
-            float lightOcclusionMask = controlMask.z;
-
-            float3 tintedBaseColor = baseColor * 1;
-            float3 readableBaseColor = lerp(dot(tintedBaseColor, float3(0.21, 0.71, 0.07)), tintedBaseColor, float3(1, 1, 1));
             
-            // RG is used as lighting normal, BA is reserved for hair direction/specular normal.
-            float4 dualNormalSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_NormalMap, layerTexCoord.base).rgba;
-            float2 normalPackedA = (dualNormalSample.xy * 2.0) - (1.0);
-            float3 normalTSA = float3(normalPackedA.x, normalPackedA.y, 1);
-            float2 normalXYA = normalPackedA.xy;
-            normalTSA.z = max(1e-16, sqrt(1.0 - clamp(dot(normalXYA, normalXYA), 0.0, 1.0)));
-            float2 normalXYAScaled = normalTSA.xy * _NormalScale;   //光照、漫反射、Ramp、边缘光法线
-
-            //UVMapping hairStrandMapping = layerTexCoord.base;
-            //hairStrandMapping.uv = hairStrandMapping.uv * _HairStrandMap_ST.xy + _HairStrandMap_ST.zw;
-            //float4 strandMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_HairStrandMap, sampler_HairStrandMap, hairStrandMapping);
+            float4 pbrMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_MaskMap, sampler_MaskMap, layerTexCoord.base).rgba;
+            float metallicMask = pbrMaskSample.x;
+            float aoMask = pbrMaskSample.z;
+            float perceptualRoughness = 1.0 - pbrMaskSample.w;
+            float alpha = baseSample.w;
         
-            // 3. 由 TBN、实例基矩阵和控制 mask 生成世界空间法线与各向异性发丝切线。
+            float _51_m18 = 0.50;
+            float3 diffuseTintedForSaturation = baseColor * _51_m18;    //_51._m18 = 0.50
+            float3 _51_m19 = 1.00;
+            float3 diffuseColorSaturated = lerp(Luminance(diffuseTintedForSaturation), diffuseTintedForSaturation, _51_m19);    //_51._m19 = 1.00
+            
+            // 3. 法线贴图解码。该打包方式将 X 存在 w*x 中，将 Y 存在 y 中，并在单位半球上重建 Z。
+            float4 normalMapSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_NormalMap, layerTexCoord.base).rgba;
+            normalMapSample.w = normalMapSample.w * normalMapSample.x;
+            float2 normalMapXY = (normalMapSample.wy * 2.0) - 1.0;
+            float3 tangentSpaceNormal = float3(normalMapXY.x, normalMapXY.y, 1);
+            float2 normalXYForReconstruct = normalMapXY.xy;
+            tangentSpaceNormal.z = max(1e-16, sqrt(1.0 - clamp(dot(normalXYForReconstruct, normalXYForReconstruct), 0.0, 1.0)));
+            float2 scaledNormalXY = tangentSpaceNormal.xy * _NormalScale;    //_51._m3 = 1.00
+        
+            float4 emissionSample = SAMPLE_UVMAPPING_TEXTURE2D(_EmissiveColorMap, sampler_EmissiveColorMap, layerTexCoord.base);
+        
             float3 rootToPixelVector = posInput.positionWS - TransformObjectToWorld(0);
-            rootToPixelVector.y = 1e-16;
+            rootToPixelVector.y = 6.103515625e-05;
             float3 rootToPixelDir = normalize(rootToPixelVector);
-            float3x3 tbnMatrix = input.tangentToWorld;
-            float3 normalWSRaw = mul(float3(normalXYAScaled.x, normalXYAScaled.y, normalTSA.z), tbnMatrix);
-            float frontFaceSign = input.isFrontFace? 1.0 : GetDoubleSidedConstants().z;
-            float3 normalWS = SafeNormalize(normalWSRaw) * frontFaceSign;
-            float3 geometricNormalWS = normalize(surfaceData.geomNormalWS) * frontFaceSign;
-            float2 normalPackedB = (dualNormalSample.zw * 2.0) - 1.0;
-            float3 normalTSB = float3(normalPackedB.x, normalPackedB.y, 1);
-            float2 normalXYB = normalPackedB.xy;
-            normalTSB.z = max(1e-16,sqrt(1.0 - saturate(dot(normalXYB, normalXYB))));
-            float2 normalXYBScaled = normalTSB.xy * 1;  //头发方向、各向异性高光法线
-            float3 secondaryNormalWS = normalize(TransformTangentToWorldDir(float3(normalXYBScaled.x, normalXYBScaled.y, normalTSB.z),tbnMatrix));
-            float3x3 objectToWorld3x3 = (float3x3)GetObjectToWorldMatrix();
-            //float3 hairFlowSeedWS = float3(_46._m35, 1.0, 0.0) * objectToWorld3x3;
-            //float3 hairTangentWS = cross(secondaryNormalWS, mix(cross(secondaryNormalWS, (hairFlowSeedWS * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(hairFlowSeedWS, hairFlowSeedWS)))).xyz), tangentWSAndSign.xyz, vec3(flowBlendMask)).xyz) * mix(1.0, tangentWSAndSign.w, flowBlendMask);
-            //float3 viewDirObjectBasis = objectToWorld3x3 * viewDirWS;
-            //float anisoViewFactor = pow(clamp(dot(normalize((objectToWorld3x3 * secondaryNormalWS).xz), normalize(viewDirObjectBasis.xz)), 0.0, 1.0), _46._m33);
         
-            // 4. 准备屏幕/相机状态，供深度、分块灯光和雾效路径使用。
-            float2 screenUV = posInput.positionSS.xy / _ScreenParams.xy;;
-            float2 pixelCoordU = float2(posInput.positionSS.xy);
-            float3 cameraForwardWS = TransformViewToWorldDir(float3(0,0,1));
-            //float probeLightingScale = mix(_15._m44.x, 1.0, _15._m113.w) * _15._m42.x;
-            float4 probeDominantDir;
-            float3 probeDiffuseColor;
-            float3 probeHueColor;
+            // 4. TBN 变换。tangent.xyz、normal 和 tangent.w 的副切线符号将法线变换到世界空间。
+            float3x3 tbnMatrix = input.tangentToWorld;
+            float3 worldNormalUnnormalized = mul(float3(scaledNormalXY.x, scaledNormalXY.y, tangentSpaceNormal.z), tbnMatrix);
+            float frontFaceNormalSign = input.isFrontFace? 1.0 : GetDoubleSidedConstants().z;
+            float3 shadingNormal = SafeNormalize(worldNormalUnnormalized) * frontFaceNormalSign;
+            float3 geometryNormal = normalize(surfaceData.geomNormalWS) * frontFaceNormalSign;
+            
+            uint2 pixelCoord = uint2(posInput.positionSS.xy);
+            float3 worldCameraForward = TransformViewToWorldDir(float3(0,0,1));    //_17._m1[0].xyz = -1.00, -1.25638E-12, 8.65910E-08; _17._m1[1].xyz = -1.79375E-09, 0.99979, -0.0207; _17._m1[2].xyz = 8.65724E-08, 0.0207, 0.99979
+            float _17_m44x = 0.28772;
+            float _17_m113w = 0.00;
+            float _17_m42x = 1.00;
+            float sceneLightingScale = lerp(_17_m44x, 1.0, _17_m113w) * _17_m42x;    //_17._m44.x = 0.28772; _17._m113.w = 0.00; _17._m42.x = 1.00
+            float4 probeDominantDirAndWeight;
+            float3 probeRgbIrradiance;
+            float3 probeColorTint;
             float probeIntensity;
+        
             
-            // 5. Probe/SH 风格的体积光照。fine/mid/coarse 三层 3D 体积混合出漫反射颜色和主方向。
+        // 5. 环境探针。体积探针系数或全局常量构建主方向、RGB 辐照度和染色。
+        float _17_m102y = 1.0;
+        float3 _17_m103xyz = float3(0.87831, 0.93023, 1.12169);
+        if (_17_m102y < 0.5)    //_17._m102.y = 1.00
+        {
             
+        }
+        else
+        {
+            probeDominantDirAndWeight = 0.0;
+            probeRgbIrradiance = 1.0;
+            probeColorTint = _17_m103xyz;
+            probeIntensity = sceneLightingScale;
+        }
+        
             // 6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
             //float instanceColorOverride = mix(_18._m0[instanceIndex]._m6.x, _15._m111.y, _15._m111.x);
             //float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
@@ -303,7 +312,7 @@ void Frag(PackedVaryingsToPS packedInput
             float3 baseForLightness;
             float3 baseForDiffuse;
         
-            //outColor = float4(secondaryNormalWS.xyz,1);
+            outColor = float4(baseColor.xyz,alpha);
                 
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
