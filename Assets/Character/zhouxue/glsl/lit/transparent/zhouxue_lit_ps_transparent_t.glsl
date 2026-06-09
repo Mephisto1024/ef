@@ -829,51 +829,55 @@ void main()
     float characterShadow;
     do
     {
-        float _1921 = log2(float(floatBitsToUint(_20._m0[vObjectIndex]._m2.z))) - 8.0;
-        float _2038;
-        if ((_1921 >= 0.0) && (_1921 < _37._m19.z))
+        float characterShadowSlot = log2(float(floatBitsToUint(_20._m0[vObjectIndex]._m2.z))) - 8.0;
+        float resolvedCharacterShadow;
+        if ((characterShadowSlot >= 0.0) && (characterShadowSlot < _37._m19.z))
         {
-            int _1929 = int(_1921);
-            float _1935 = 1.0 - clamp(dot(geometryNormal, _37._m16[_1929].xyz), 0.0, 0.89999997615814208984375);
-            vec4 _1952 = vec4((vWorldPos - (_37._m16[_1929].xyz * (_1935 * _37._m15[_1929].x))) + (geometryNormal * (_1935 * _37._m15[_1929].y)), 1.0) * _37._m14[_1929];
-            float _1954 = spvNMax(_1952.z, 0.00999999977648258209228515625);
-            vec4 _1955 = _1952;
-            _1955.z = _1954;
-            bvec3 _1957 = lessThanEqual(_1955.xyz, vec3(0.0));
-            bvec3 _1958 = greaterThanEqual(_1955.xyz, vec3(1.0));
-            if (any(bvec3(_1957.x || _1958.x, _1957.y || _1958.y, _1957.z || _1958.z)) || ((floatBitsToUint(_1954) & 2147483647u) > 2139095040u))
+            int characterShadowIndex = int(characterShadowSlot);
+            // 法线越背向阴影方向，偏移越大，用来降低角色阴影自遮挡。
+            float normalBiasWeight = 1.0 - clamp(dot(geometryNormal, _37._m16[characterShadowIndex].xyz), 0.0, 0.89999997615814208984375);
+            vec3 biasedWorldPos = (vWorldPos - (_37._m16[characterShadowIndex].xyz * (normalBiasWeight * _37._m15[characterShadowIndex].x))) + (geometryNormal * (normalBiasWeight * _37._m15[characterShadowIndex].y));
+            vec4 characterShadowCoord = vec4(biasedWorldPos, 1.0) * _37._m14[characterShadowIndex];
+            float receiverDepth = spvNMax(characterShadowCoord.z, 0.00999999977648258209228515625);
+            vec4 clampedShadowCoord = characterShadowCoord;
+            clampedShadowCoord.z = receiverDepth;
+            bvec3 belowShadowBounds = lessThanEqual(clampedShadowCoord.xyz, vec3(0.0));
+            bvec3 aboveShadowBounds = greaterThanEqual(clampedShadowCoord.xyz, vec3(1.0));
+            if (any(bvec3(belowShadowBounds.x || aboveShadowBounds.x, belowShadowBounds.y || aboveShadowBounds.y, belowShadowBounds.z || aboveShadowBounds.z)) || ((floatBitsToUint(receiverDepth) & 2147483647u) > 2139095040u))
             {
                 characterShadow = 1.0;
                 break;
             }
-            float _1979 = 4.0 * _37._m18.x;
-            vec2 _1980 = (_37._m17[_1929].xy + (_1955.xy * _37._m17[_1929].zw)).xy;
-            ivec2 _1982 = ivec2(pixelCoord % uvec2(4u));
-            int _1986 = (_1982.x * 4) + _1982.y;
-            mat2 _1993 = mat2(kPcfRotation16[_1986], vec2(-kPcfRotation16[_1986].y, kPcfRotation16[_1986].x));
-            float _1995;
-            float _1998;
-            _1995 = 0.0;
-            _1998 = 0.0;
-            for (uint _2000 = 0u; _2000 < 16u; )
+            float pcfSampleRadius = 4.0 * _37._m18.x;
+            vec2 characterShadowUv = (_37._m17[characterShadowIndex].xy + (clampedShadowCoord.xy * _37._m17[characterShadowIndex].zw)).xy;
+            ivec2 pixelInFourByFourTile = ivec2(pixelCoord % uvec2(4u));
+            int pcfRotationIndex = (pixelInFourByFourTile.x * 4) + pixelInFourByFourTile.y;
+            mat2 pcfRotation = mat2(kPcfRotation16[pcfRotationIndex], vec2(-kPcfRotation16[pcfRotationIndex].y, kPcfRotation16[pcfRotationIndex].x));
+            float visibleDepthDeltaSum;
+            float visibleSampleCount;
+            visibleDepthDeltaSum = 0.0;
+            visibleSampleCount = 0.0;
+            // 16 个 Poisson tap，每次 textureGather 取 2x2 深度，共 64 个比较样本。
+            for (uint pcfTapIndex = 0u; pcfTapIndex < 16u; )
             {
-                vec4 _2012 = textureGather(sampler2D(texCharacterShadowDepth, smpLinearClamp), _1980 + ((_1993 * kPoissonDisk16[_2000]) * _1979)) - vec4(_1954);
-                vec4 _2013 = step(vec4(0.0), _2012);
-                _1995 += dot(_2012, _2013);
-                _1998 += dot(_2013, vec4(1.0));
-                _2000++;
+                vec4 sampledDepthDelta = textureGather(sampler2D(texCharacterShadowDepth, smpLinearClamp), characterShadowUv + ((pcfRotation * kPoissonDisk16[pcfTapIndex]) * pcfSampleRadius)) - vec4(receiverDepth);
+                vec4 visibleSamples = step(vec4(0.0), sampledDepthDelta);
+                visibleDepthDeltaSum += dot(sampledDepthDelta, visibleSamples);
+                visibleSampleCount += dot(visibleSamples, vec4(1.0));
+                pcfTapIndex++;
                 continue;
             }
-            float _2024 = (2.0 * clamp(_1998 * 0.015625, 0.0, 1.0)) - 1.0;
-            float _2027 = float(int(sign(_2024)));
-            float _2029 = 1.0 - (_2027 * _2024);
-            _2038 = spvNMin(1.0, 0.5 - (0.5 * ((1.0 - mix((_2029 * _2029) * _2029, _2029, clamp((_1995 * (1.0 / _1998)) * (1.0 / _1954), 0.0, 1.0))) * _2027)));
+            float signedVisibleRatio = (2.0 * clamp(visibleSampleCount * 0.015625, 0.0, 1.0)) - 1.0;
+            float visibilitySign = float(int(sign(signedVisibleRatio)));
+            float distanceFromVisibilityExtreme = 1.0 - (visibilitySign * signedVisibleRatio);
+            float normalizedVisibleDepthSlack = clamp((visibleDepthDeltaSum * (1.0 / visibleSampleCount)) * (1.0 / receiverDepth), 0.0, 1.0);
+            resolvedCharacterShadow = spvNMin(1.0, 0.5 - (0.5 * ((1.0 - mix((distanceFromVisibilityExtreme * distanceFromVisibilityExtreme) * distanceFromVisibilityExtreme, distanceFromVisibilityExtreme, normalizedVisibleDepthSlack)) * visibilitySign)));
         }
         else
         {
-            _2038 = 1.0;
+            resolvedCharacterShadow = 1.0;
         }
-        characterShadow = _2038;
+        characterShadow = resolvedCharacterShadow;
         break;
     } while(false);
     // 8. 场景阴影。混合 CSM/虚拟阴影，并可选择用云/雨遮挡对其进行调制。
