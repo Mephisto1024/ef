@@ -365,13 +365,15 @@ void Frag(PackedVaryingsToPS packedInput
             float characterSelfShadow = 1.0;
             float lightingSceneBlend = lerp( lerp( 1.0, sceneShadow, 1.0 ), 1.0, 1 );     //? 
             float nDotMainLight = dot(normalWS, mainLightDirWS);
-            float _15_m101z = 0.7;
+            float _15_m101z = 0.7;      //shadowedLightingScale
             float3 directAlbedo = rampAlbedo * _15_m101z;     //?
             float3 softDirectAlbedo = directAlbedo * 0.65;
             float diffuseLuma = dot(diffuseAlbedo, float3(0.2, 0.7, 0.07));
             float cameraBackLightFactor = clamp(-dot(mainLightDirFlatWS.xz, normalize(cameraForwardWS.xz)), 0.0, 1.0);
-            float _15_m113x = 1.0;      //?
+            float _15_m113x = 1.0;      //? ndotl随着相机转动
             float mainRampBlend = 1.0 - _15_m113x;
+
+        
             // hairRampTex 作为 1D ramp 使用：y 固定 0.5，x 来自 N dot L/视角偏置光照；RGB 改色，A 是权重/mask。
             float remappedNdotMainLight =((-nDotMainLight) * ((nDotMainLight * 0.5) - 1.0)) + 0.5;
     
@@ -408,24 +410,17 @@ void Frag(PackedVaryingsToPS packedInput
             float ambientProbeBoostA = min(lerp(0.65, 1.0, probeIntensity), 1.5);
             float ambientProbeBoostB = clamp(probeIntensity, 1.25, 1.75);
             float ambientProbeBoost = lerp(ambientProbeBoostA, ambientProbeBoostB, 0 );
-    
             float3 ambientOnlyDiffuse = probeAmbientTint * ambientProbeBoost * 0.9 ;
-    
             float3 probeLightTint = lerp(1.0, mainLightColor, _15_m113y);
             float3 probeDiffuse = probeAmbientTint * clamp(probeIntensity, 0.0, 1.5) * probeLightTint;
-    
             float3 sceneDiffuse = (mainLightDiffuse + probeDiffuse) * 1.1;
-    
             float3 diffuseLightColor = lerp(ambientOnlyDiffuse, sceneDiffuse, lightingSceneBlend);
             
             float graySoft = Luminance(softDirectAlbedo);
             float3 boostedSoft = lerp(graySoft, softDirectAlbedo, 1.2);
-    
             float3 directWeight = clamp(shadowedMask * rampNormalWeight + rampMainWeight, 0.0, 1.0);
             float3 rampedDirect = lerp(boostedSoft, directAlbedo, directWeight);
-    
             float3 rampedBaseColor = lerp(rampedDirect, diffuseAlbedo, sharedLightMask);
-            //float3 rampedBaseColor = mix(mix(mix(vec3(dot(softDirectAlbedo, vec3(0.21267290413379669189453125, 0.715152204036712646484375, 0.072175003588199615478515625))), softDirectAlbedo, vec3(1.2000000476837158203125)), directAlbedo, vec3(clamp((occludedMask * rampNormalWeight) + rampMainWeight, 0.0, 1.0))), diffuseAlbedo, _1288);
             float3 rampColoredBase = rampedBaseColor * (1.0 - rampColorChroma + (rampSampleMain.xyz * rampColorChroma));
         
             float3 brightDiffuse = lerp(diffuseLuma, diffuseAlbedo, 1.2);

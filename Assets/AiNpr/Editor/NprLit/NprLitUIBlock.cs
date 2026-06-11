@@ -10,14 +10,14 @@ namespace UnityEditor.Rendering.HighDefinition
     {
         internal class Styles
         {
-            public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Hair Inputs");
+            public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Lit Inputs");
 
-            public static GUIContent hairStrandMap = new GUIContent("Hair Strand Map", "Specifies the strand mask texture for NPR hair.");
+            public static GUIContent f0TintLutMap = new GUIContent("F0 Tint LUT Map", "Specifies the F0 tint lookup texture for NPR lit.");
         }
 
-        const string kHairStrandMap = "_HairStrandMap";
+        const string kF0TintLutMap = "_F0TintLutMap";
 
-        MaterialProperty hairStrandMap = null;
+        MaterialProperty f0TintLutMap = null;
 
         /// <summary>
         /// Constructs an NPR hair UI block.
@@ -33,7 +33,7 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         public override void LoadMaterialProperties()
         {
-            hairStrandMap = FindProperty(kHairStrandMap, false);
+            f0TintLutMap = FindProperty(kF0TintLutMap, false);
         }
 
         /// <summary>
@@ -41,11 +41,10 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         protected override void OnGUIOpen()
         {
-            if (hairStrandMap == null)
+            if (f0TintLutMap == null)
                 return;
 
-            materialEditor.TexturePropertySingleLine(Styles.hairStrandMap, hairStrandMap);
-            materialEditor.TextureScaleOffsetProperty(hairStrandMap);
+            materialEditor.TexturePropertySingleLine(Styles.f0TintLutMap, f0TintLutMap);
         }
     }
 }

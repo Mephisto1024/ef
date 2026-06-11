@@ -13,11 +13,14 @@ namespace UnityEditor.Rendering.HighDefinition
             public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Diffuse Ramp Inputs");
 
             public static GUIContent diffuseRampMap = new GUIContent("Diffuse Ramp Map", "");
+            public static GUIContent diffuseRampOffset = new GUIContent("Diffuse Ramp Offset", "");
         }
 
         const string kDiffuseRampMap = "_DiffuseRampMap";
+        const string kDiffuseRampOffset = "_DiffuseRampOffset";
 
         MaterialProperty diffuseRampMap = null;
+        MaterialProperty diffuseRampOffset = null;
 
         /// <summary>
         /// Constructs an NPR diffuse ramp UI block.
@@ -34,6 +37,7 @@ namespace UnityEditor.Rendering.HighDefinition
         public override void LoadMaterialProperties()
         {
             diffuseRampMap = FindProperty(kDiffuseRampMap, false);
+            diffuseRampOffset = FindProperty(kDiffuseRampOffset, false);
         }
 
         /// <summary>
@@ -45,6 +49,9 @@ namespace UnityEditor.Rendering.HighDefinition
                 return;
 
             materialEditor.TexturePropertySingleLine(Styles.diffuseRampMap, diffuseRampMap);
+
+            if (diffuseRampOffset != null)
+                materialEditor.ShaderProperty(diffuseRampOffset, Styles.diffuseRampOffset);
         }
     }
 }

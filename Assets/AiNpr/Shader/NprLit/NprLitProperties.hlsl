@@ -4,6 +4,12 @@
 // Otherwise those parameters are not bound correctly at runtime.
 // ===========================================================================
 
+//== npr lit
+TEXTURE2D(_F0TintLutMap);
+//==
+//== diffuse ramp
+TEXTURE2D(_DiffuseRampMap);
+//==
 
 TEXTURE2D(_EmissiveColorMap);
 SAMPLER(sampler_EmissiveColorMap);
@@ -70,7 +76,7 @@ SAMPLER(sampler_CoatMaskMap);
 
 CBUFFER_START(UnityPerMaterial)
 
-
+#include "Assets/AiNpr/Shader/Properties/DiffuseRampProperties.hlsl"
 // shared constant between lit and layered lit
 float _AlphaCutoff;
 float _UseShadowThreshold;

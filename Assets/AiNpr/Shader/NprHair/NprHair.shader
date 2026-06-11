@@ -12,7 +12,7 @@ Shader "AiNpr/NprHair"
         _NprHairDebugMode("Intermediate Debug Mode", Int) = 0
 
         //== diffuse ramp
-        _DiffuseRampMap("DiffuseRampMap", 2D) = "black" {}
+        _DiffuseRampMap("DiffuseRampMap", 2D) = "white" {}
         _DiffuseRampOffset("DiffuseRampOffset", Range(-1.0, 1.0)) = 0.0
         
         // Reminder. Color here are in linear but the UI (color picker) do the conversion sRGB to linear

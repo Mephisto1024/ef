@@ -20,7 +20,8 @@ namespace UnityEditor.Rendering.HighDefinition
             new SurfaceOptionUIBlock(MaterialUIBlock.ExpandableBit.Base, features: SurfaceOptionUIBlock.Features.Lit),
             new TessellationOptionsUIBlock(MaterialUIBlock.ExpandableBit.Tessellation),
             new LitSurfaceInputsUIBlock(MaterialUIBlock.ExpandableBit.Input, features: litSurfaceFeatures),
-            //new NprHairUIBlock(MaterialUIBlock.ExpandableBit.User0),
+            new NprLitUIBlock(MaterialUIBlock.ExpandableBit.User0),
+            new NprDiffuseRampUIBlock(MaterialUIBlock.ExpandableBit.User1),
             //new DetailInputsUIBlock(MaterialUIBlock.ExpandableBit.Detail),
             // We don't want distortion in Lit
             new TransparencyUIBlock(MaterialUIBlock.ExpandableBit.Transparency, features: TransparencyUIBlock.Features.All & ~TransparencyUIBlock.Features.Distortion),
