@@ -1,0 +1,13 @@
+Name,Value,Byte Offset,Type
+_child0,"8",0,int
+_child1,"3600",4,int
+_child2,"2560",8,int
+_child3,"1440",12,int
+_child4,"32.00",16,float
+_child5,"80.00",20,float
+_child6,"45.00",24,float
+_child7,"2048.00",28,float
+_child8,"0.10",32,float
+_child9,"10000.00",36,float
+_child10,"1.00",40,float
+_child11,"1.00",44,float

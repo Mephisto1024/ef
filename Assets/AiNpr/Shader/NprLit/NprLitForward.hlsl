@@ -494,23 +494,201 @@ void Frag(PackedVaryingsToPS packedInput
             float2 iblFitInput1 = float2(1.0, iblRoughness2);
             float3 iblFitInput2 = float3(1.0, iblRoughness2, (iblRoughness2 * iblRoughness2) * iblRoughness2);
 
-            //    float iblScale = dot(mat2(vec2(0.0365463010966777801513671875, 9.0631999969482421875), vec2(3.3270699977874755859375, -9.0475597381591796875)) * iblFitInput0, iblFitInput1) / dot(mat3(vec3(1.0, 9.044010162353515625, 5.565889835357666015625), vec3(3.596849918365478515625, -16.3173999786376953125, 19.788600921630859375), vec3(-1.36772000789642333984375, 9.2294902801513671875, -20.212299346923828125)) * vec3(1.0, ndotv2, iblNdotV3), iblFitInput2);
-            //float iblBias = dot(mat2(vec2(0.99044001102447509765625, 1.29677999019622802734375), vec2(-1.28514003753662109375, -0.755906999111175537109375)) * iblFitInput0, iblFitInput1) / dot(mat3(vec3(1.0, 20.3225002288818359375, 121.5630035400390625), vec3(2.9233798980712890625, -27.0301990509033203125, 626.1300048828125), vec3(59.41880035400390625, 222.5919952392578125, 316.62701416015625)) * vec3(1.0, ndotv, iblNdotV3), iblFitInput2);
-            //vec3 iblSpecularScaleBias = (finalSpecularF0 * iblScale) + vec3(iblBias);
-            //float iblScaleBiasSum = iblScale + iblBias;
-            //vec3 viewDirFromSurface = -viewDir;
-            //vec3 directAndRimLighting = mix(vec3(mainDirectLuma), mainDirectLighting, vec3((mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0)) + (((((_17._m109.xyz * smoothstep(mix(0.800000011920928955078125, 0.20000000298023223876953125, _17._m110.w), mix(0.89999997615814208984375, 0.5, _17._m110.w), viewEdgeFactor)) * _17._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimLightDir) + 1.0, 0.0, 1.0), aoMask), characterShadowMix)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_17._m110.z)) * clamp(dot(rimLightDir, shadingNormal), 0.0, 1.0))) + ((((((mix(probeRgbIrradiance * (1.0 / spvNMax(spvNMax(spvNMax(probeRgbIrradiance.x, probeRgbIrradiance.y), probeRgbIrradiance.z) * 0.5, 1.0)), scaledMainLightColor, mainShadowVec) * clamp(mix(dot(probeDominantDirAndWeight.xyz, shadingNormal) * probeDominantDirAndWeight.w, ((-flatLightNdotL) * ((flatLightNdotL * 0.5) - 1.0)) + 0.5, mainShadow), 0.0, 1.0)) * ((shadowedAmount + (sunCameraOpposition * mainShadow)) * globalLightBlendInverse)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, viewEdgeFactor)) * spvNMin(aoMask, characterShadowMix)) * (shadowedAmount + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * mainShadow))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));    //_17._m109.xyz = 0.00, 0.00, 0.00; _17._m110.w = 0.40; _17._m109.w = 1.00; _17._m110.z = 0.00
-            //vec2 pixelCoordFloat = vec2(pixelCoord);
-            //vec2 lightTileCoord = floor(pixelCoordFloat * 0.03125);
+            float iblScale =
+                dot(
+                    mul(
+                        float2x2(
+                            0.03654630109667778, 3.32707,
+                            9.0632,              -9.0475597
+                        ),
+                        iblFitInput0
+                    ),
+                    iblFitInput1
+                )
+                /
+                dot(
+                    mul(
+                        float3x3(
+                            1.0,       3.5968499,  -1.36772,
+                            9.0440102, -16.3174,    9.2294903,
+                            5.5658898,  19.7886009, -20.2122993
+                        ),
+                        float3(1.0, ndotv2, iblNdotV3)
+                    ),
+                    iblFitInput2
+                );
+        
+        float iblBias =
+            dot(
+                mul(
+                    float2x2(
+                        0.9904400110244751,  -1.285140037536621,
+                        1.296779990196228,   -0.7559069991111755
+                    ),
+                    iblFitInput0
+                ),
+                iblFitInput1
+            )
+            /
+            dot(
+                mul(
+                    float3x3(
+                        1.0,                 2.923379898071289,   59.418800354003906,
+                        20.322500228881836, -27.03019905090332,  222.5919952392578,
+                        121.56300354003906, 626.1300048828125,   316.62701416015625
+                    ),
+                    float3(1.0, ndotv, iblNdotV3)
+                ),
+                iblFitInput2
+            );
+            float3 iblSpecularScaleBias = (finalSpecularF0 * iblScale) + iblBias;
+            float iblScaleBiasSum = iblScale + iblBias;
+            float3 viewDirFromSurface = -V;
+        
+            float3 directAndRimLighting;
+            {
+                // 主光亮度增强：当主光已经比较亮时，保留更多彩色信息
+                float mainDirectColorWeight = (mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0;
+                float3 directLighting = lerp(mainDirectLuma, mainDirectLighting, mainDirectColorWeight);
+                // Rim light / 边缘光
+                
+                float _17_m110w = 0.40;
+                float rimEdgeStart = lerp(0.8,0.2,_17_m110w);
+
+                float rimEdgeEnd = lerp(0.9,0.5,_17_m110w);
+
+                float rimEdgeMask = smoothstep(rimEdgeStart, rimEdgeEnd, viewEdgeFactor);
+
+                float rimDirectionMask = clamp(dot(rootToPixelDir, rimLightDir) + 1.0, 0.0, 1.0);
+
+                float rimOcclusionMask = min(min(rimDirectionMask, aoMask), characterShadowMix);
+
+                float rimNdotL = clamp(dot(rimLightDir, shadingNormal), 0.0, 1.0);
+
+                float _17_m110z = 0.00;
+                float3 rimAlbedo = lerp(0.25, diffuseAlbedo, _17_m110z);
+
+                float3 _17_m109xyz = 0.00;
+                float _17_m109w = 1.00;
+                float3 rimLighting =
+                    _17_m109xyz
+                    * rimEdgeMask
+                    * _17_m109w
+                    * rimOcclusionMask
+                    * rimAlbedo
+                    * rimNdotL;
+
+
+                // 环境/背光补光
+                float3 normalizedProbeIrradiance =
+                    probeRgbIrradiance *
+                    (1.0 / max(max(max(probeRgbIrradiance.x, probeRgbIrradiance.y),
+                            probeRgbIrradiance.z
+                        ) * 0.5,
+                        1.0
+                    ));
+
+                float3 ambientBackLightColor = lerp(normalizedProbeIrradiance, scaledMainLightColor, mainShadowVec);
+
+                float probeDominantNdotL =
+                    dot(probeDominantDirAndWeight.xyz, shadingNormal)
+                    * probeDominantDirAndWeight.w;
+
+                float stylizedFlatNdotL =
+                    ((-flatLightNdotL) * ((flatLightNdotL * 0.5) - 1.0)) + 0.5;
+
+                float ambientBackLightDirection =
+                    clamp(
+                        lerp(probeDominantNdotL, stylizedFlatNdotL, mainShadow),
+                        0.0,
+                        1.0
+                    );
+
+                float ambientBackLightVisibility =
+                    (shadowedAmount + (sunCameraOpposition * mainShadow))
+                    * globalLightBlendInverse;
+
+                float ambientBackLightEdgeMask =
+                    smoothstep(
+                        0.600000023841858,
+                        0.800000011920929,
+                        viewEdgeFactor
+                    );
+
+                float ambientBackLightOcclusion = min(aoMask, characterShadowMix);
+
+                float darkDiffuseBoost =
+                    smoothstep(
+                        0.1,
+                        0.04,
+                        diffuseLuma
+                    );
+
+                float ambientBackLightShadowFactor = shadowedAmount + (darkDiffuseBoost * mainShadow);
+
+                float3 ambientBackLightAlbedo = max(0.15, diffuseAlbedo);
+
+                float3 ambientBackLighting =
+                    ambientBackLightColor
+                    * ambientBackLightDirection
+                    * ambientBackLightVisibility
+                    * ambientBackLightEdgeMask
+                    * ambientBackLightOcclusion
+                    * ambientBackLightShadowFactor
+                    * ambientBackLightAlbedo;
+
+
+                // 原 1136 行结果
+                directAndRimLighting =
+                    directLighting
+                    + rimLighting
+                    + ambientBackLighting;
+            }
+            //float3 directAndRimLighting = mix(vec3(mainDirectLuma), mainDirectLighting, vec3((mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0)) + (((((_17._m109.xyz * smoothstep(mix(0.800000011920928955078125, 0.20000000298023223876953125, _17._m110.w), mix(0.89999997615814208984375, 0.5, _17._m110.w), viewEdgeFactor)) * _17._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimLightDir) + 1.0, 0.0, 1.0), aoMask), characterShadowMix)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_17._m110.z)) * clamp(dot(rimLightDir, shadingNormal), 0.0, 1.0))) + ((((((mix(probeRgbIrradiance * (1.0 / spvNMax(spvNMax(spvNMax(probeRgbIrradiance.x, probeRgbIrradiance.y), probeRgbIrradiance.z) * 0.5, 1.0)), scaledMainLightColor, mainShadowVec) * clamp(mix(dot(probeDominantDirAndWeight.xyz, shadingNormal) * probeDominantDirAndWeight.w, ((-flatLightNdotL) * ((flatLightNdotL * 0.5) - 1.0)) + 0.5, mainShadow), 0.0, 1.0)) * ((shadowedAmount + (sunCameraOpposition * mainShadow)) * globalLightBlendInverse)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, viewEdgeFactor)) * spvNMin(aoMask, characterShadowMix)) * (shadowedAmount + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * mainShadow))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));    //_17._m109.xyz = 0.00, 0.00, 0.00; _17._m110.w = 0.40; _17._m109.w = 1.00; _17._m110.z = 0.00
+            float2 pixelCoordFloat = float2(pixelCoord);
+            float2 lightTileCoord = floor(pixelCoordFloat * 0.03125);
             //int lightTileBaseIndex = int((lightTileCoord.x + (lightTileCoord.y * _31._m5)) * 8.0);
             //float depthSliceFloat = floor(linearEyeDepth - (_17._m25.y * _31._m11));    //_17._m25.y = 0.10
             //float depthSliceClamped = clamp(depthSliceFloat, 0.0, _31._m7 - 1.0);
             //int depthSliceBaseIndex = int(depthSliceClamped * 8.0);
-            //vec3 lightingAccumulator;
-            //// 11. 初始光照累加器：直接光、边缘光、自发光和 cubemap IBL 反射。
+            float3 lightingAccumulator;
+            // 11. 初始光照累加器：直接光、边缘光、自发光和 cubemap IBL 反射。
+            // 自发光
+            float3 emissionLighting = emissionSample.xyz * _51._m21.xyz * _51._m7 * alphaLightingScale;
+            // IBL 反射方向
+            float3 iblReflectionDir = reflect(viewDirFromSurface, normalForLighting);
+            // 根据粗糙度选择 reflection cubemap mip
+            float iblReflectionMip =
+                (1.2000000476837158 * log2(max(iblPerceptualRoughness, 0.0010000000474974513)))
+                + 5.0;
+            // 采样环境反射 cubemap
+            float3 iblReflectionColor =
+                textureLod(
+                    samplerCube(texReflectionCube, smpLinearClamp),
+                    iblReflectionDir,
+                    iblReflectionMip
+                ).xyz;
+            // 对 IBL BRDF scale/bias 做额外补偿
+            float iblEnergyCompensation =
+                (1.0 - iblScaleBiasSum) / iblScaleBiasSum;
+    
+            float3 iblSpecularCompensation =
+                finalSpecularF0
+                * iblEnergyCompensation
+                * iblSpecularScaleBias;
+    
+            float3 iblSpecularTerm =iblSpecularScaleBias + iblSpecularCompensation;
+            // IBL 强度
+            float iblProbeIntensity = clamp(probeIntensity, 0.5, 1.5);
+            float iblIntensity = iblProbeIntensity * _17._m101.w * directIntensityScale;
+        
+            // 最终 IBL 反射光
+            float3 iblReflectionLighting = iblReflectionColor * iblSpecularTerm * iblIntensity * probeColorTint;
+            // 原 1145 行结果
+            lightingAccumulator = directAndRimLighting + emissionLighting + iblReflectionLighting;
             //lightingAccumulator = (directAndRimLighting + (((emissionSample.xyz * _51._m21.xyz) * _51._m7) * alphaLightingScale)) + (((textureLod(samplerCube(texReflectionCube, smpLinearClamp), reflect(viewDirFromSurface, normalForLighting), (1.2000000476837158203125 * log2(spvNMax(iblPerceptualRoughness, 0.001000000047497451305389404296875))) + 5.0).xyz * ((iblSpecularScaleBias + ((finalSpecularF0 * ((1.0 - iblScaleBiasSum) / iblScaleBiasSum)) * iblSpecularScaleBias)) * 1.0)) * ((clamp(probeIntensity, 0.5, 1.5) * _17._m101.w) * directIntensityScale)) * probeColorTint);    //_51._m21.xyz = 0.34793, 0.68676, 1.00; _51._m7 = 0.75; _17._m101.w = 0.90
-            //vec3 lightingAccumulatorAfterOneLight;
-    // 12. Clustered/Forward+ 动态光循环。屏幕图块和深度切片遮罩选择光源，然后累加漫反射和高光。
+            float3 lightingAccumulatorAfterOneLight;
+            // 12. Clustered/Forward+ 动态光循环。屏幕图块和深度切片遮罩选择光源，然后累加漫反射和高光。
         
             // 6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
             //float instanceColorOverride = mix(_18._m0[instanceIndex]._m6.x, _15._m111.y, _15._m111.x);
