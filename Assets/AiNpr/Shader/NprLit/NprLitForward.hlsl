@@ -2,6 +2,9 @@
 #error SHADERPASS_is_not_correctly_define
 #endif
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GlobalSamplers.hlsl"
+
+#include "Assets/AiNpr/Shader/Common/NprRainEffect.hlsl"
+
 #include "Assets/AiNpr/Shader/NprLit/NprLitDebug.hlsl"
 #ifdef _WRITE_TRANSPARENT_MOTION_VECTOR
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/RenderPipeline/ShaderPass/MotionVectorVertexShaderCommon.hlsl"
@@ -315,9 +318,69 @@ void Frag(PackedVaryingsToPS packedInput
             float finalPerceptualRoughness;
             float3 diffuseColorForLighting;
             float3 baseColorAfterWetness;
-    
+            // 6. 雨水/湿润度。物体湿润度加高度湿润度采样 _54/_55 三平面雨水法线，并重写法线、粗糙度和颜色。
+            float3 vRainProjectionPos = TransformWorldToObject(posInput.positionWS);    //目前不适配骨骼动画
+            float3 vRainBlendNormal = TransformWorldToObjectNormal(input.tangentToWorld[2], true);
             if ((objectWetness + heightWetness) > 1e-16)
             {
+                float nonMetallicMask = 1.0 - metallicMask;
+                float darkNonMetallicMask = smoothstep(0.35, 0.1, Luminance(baseColor * nonMetallicMask));
+                float externalPayloadSwizzle = 0;    //在xyz和xz-y间切换
+                
+                //雨水投影tilling
+                float _17_m111z = 2.0;
+                float3 rainProjectionCoord = lerp(vRainProjectionPos, vRainProjectionPos.xzy * float3(1.0, 1.0, -1.0), externalPayloadSwizzle) * _17_m111z;    //_17._m111.z = 2.00
+                float3 rainBlendNormal = lerp(vRainBlendNormal, vRainBlendNormal.xzy, externalPayloadSwizzle);
+                float3 triplanarWeightSeed = abs(rainBlendNormal) - 0.2;
+                float3 triplanarWeightRaw = max((triplanarWeightSeed * triplanarWeightSeed) * triplanarWeightSeed, 0.0);
+                float3 triplanarWeights = triplanarWeightRaw / dot(triplanarWeightRaw, 1.0);
+                float2 rainUvXY = rainProjectionCoord.xy;
+                float2 rainUvZY = rainProjectionCoord.zy;
+                
+                // 三平面采样基础雨水法线，w/z 通道继续参与湿润覆盖和水滴触发。
+
+                float4 rainNormalAPlaneXZ = SAMPLE_TEXTURE2D(_RainLayerAMap,sampler_LinearRepeat, rainProjectionCoord.xz);
+                float4 rainNormalAPlaneXY = SAMPLE_TEXTURE2D(_RainLayerAMap,sampler_LinearRepeat, rainUvXY);
+                float4 rainNormalAPlaneZY = SAMPLE_TEXTURE2D(_RainLayerAMap,sampler_LinearRepeat, rainUvZY); 
+                float4 rainNormalASample = (rainNormalAPlaneXZ * triplanarWeights.y) + (rainNormalAPlaneXY * triplanarWeights.z) + (rainNormalAPlaneZY * triplanarWeights.x);
+                float rainNormalAHeight = rainNormalASample.w;
+                float rainNormalAUpperThreshold = 1.1 - rainNormalAHeight;
+                float surfaceWetnessCoverage = max(smoothstep(0.8 - rainNormalAHeight, rainNormalAUpperThreshold, clamp((objectWetness * nonMetallicMask) + (shadingNormal.y * 0.20000000298023223876953125), 0.0, 1.0)), smoothstep(0.449999988079071044921875 - rainNormalAHeight, rainNormalAUpperThreshold, clamp(heightWetness * nonMetallicMask, 0.0, 1.0)));
+                float metallicWetHighlightMask = smoothstep(0.5, 0.75, metallicMask);
+                float smoothDarkSurfaceMask = smoothstep(0.8, 0.6, perceptualRoughness) * darkNonMetallicMask;
+                float rippleActivation = clamp(smoothDarkSurfaceMask + metallicWetHighlightMask, 0.0, 1.0) * max(objectWetness, heightWetness);
+                
+                
+                float rippleTimeA = _RippleTimeScale * 3.0;    //_17._m32.x = 1.33236
+                float rippleTimeB = _RippleTimeScale * 4.3456;    //_17._m32.x = 1.33236
+                float3 rippleCoordA = rainProjectionCoord * 20.0;
+                float3 rippleCoordB = rainProjectionCoord * 34.3456;
+                float3 rippleTriplanarWeightRaw = max(pow(triplanarWeightSeed, 10.0), 0.0);
+                float3 rippleTriplanarWeights = rippleTriplanarWeightRaw / dot(rippleTriplanarWeightRaw, 1.0);
+                
+                float4 rippleAPlaneXZ = sampleRainRipplePlane(rippleCoordA.xz, rippleTimeA);
+                float4 rippleAPlaneXY = sampleRainRipplePlane(rippleCoordA.xy, rippleTimeA);
+                float4 rippleAPlaneZY = sampleRainRipplePlane(rippleCoordA.zy, rippleTimeA);
+
+                float rippleWeightXZ = rippleTriplanarWeights.y;
+                float rippleWeightXY = rippleTriplanarWeights.z;
+                float rippleWeightZY = rippleTriplanarWeights.x;
+                
+                float4 rippleLayerA =
+                    rippleAPlaneXZ * rippleWeightXZ +
+                    rippleAPlaneXY * rippleWeightXY +
+                    rippleAPlaneZY * rippleWeightZY;
+
+                float4 rippleBPlaneXZ = sampleRainRipplePlane(rippleCoordB.xz, rippleTimeB);
+                float4 rippleBPlaneXY = sampleRainRipplePlane(rippleCoordB.xy, rippleTimeB);
+                float4 rippleBPlaneZY = sampleRainRipplePlane(rippleCoordB.zy, rippleTimeB);
+
+                float4 rippleLayerB =
+                    rippleBPlaneXZ * rippleWeightXZ +
+                    rippleBPlaneXY * rippleWeightXY +
+                    rippleBPlaneZY * rippleWeightZY;
+                
+                
             }
             else
             {
@@ -482,7 +545,8 @@ void Frag(PackedVaryingsToPS packedInput
 
             float mainDirectLuma = Luminance(mainDirectLighting);
             float mainDirectLumaOverHalf = clamp(mainDirectLuma - 0.5, 0.0, 0.5);
-            //vec3 rimLightDir = normalize(cross(worldCameraForward, vec3(_17._m110.xy, 0.0)));    //_17._m110.xy = 8.74228E-08, -1.00
+            float2 _17_m110xy = float2(8.74228E-08, -1.00);
+            float3 rimLightDir = normalize(cross(worldCameraForward, float3(_17_m110xy, 0.0)));    //_17._m110.xy = 8.74228E-08, -1.00
             float vdotn = dot(V, shadingNormal);
             float viewEdgeFactor = 1.0 - abs(vdotn);
             float flatLightNdotL = dot(mainLightPlanarDir, shadingNormal);
@@ -499,8 +563,7 @@ void Frag(PackedVaryingsToPS packedInput
                     mul(
                         float2x2(
                             0.03654630109667778, 3.32707,
-                            9.0632,              -9.0475597
-                        ),
+                            9.0632,              -9.0475597),
                         iblFitInput0
                     ),
                     iblFitInput1
@@ -508,11 +571,9 @@ void Frag(PackedVaryingsToPS packedInput
                 /
                 dot(
                     mul(
-                        float3x3(
-                            1.0,       3.5968499,  -1.36772,
+                        float3x3(1.0,       3.5968499,  -1.36772,
                             9.0440102, -16.3174,    9.2294903,
-                            5.5658898,  19.7886009, -20.2122993
-                        ),
+                            5.5658898,  19.7886009, -20.2122993),
                         float3(1.0, ndotv2, iblNdotV3)
                     ),
                     iblFitInput2
@@ -654,20 +715,19 @@ void Frag(PackedVaryingsToPS packedInput
             float3 lightingAccumulator;
             // 11. 初始光照累加器：直接光、边缘光、自发光和 cubemap IBL 反射。
             // 自发光
-            float3 emissionLighting = emissionSample.xyz * _51._m21.xyz * _51._m7 * alphaLightingScale;
+            //_51._m21.xyz = 0.34793, 0.68676, 1.00; _51._m7 = 0.75; _17._m101.w = 0.90
+        
+            float3 emissionLighting = emissionSample.xyz * _EmissiveColor * 1 * alphaLightingScale;
             // IBL 反射方向
             float3 iblReflectionDir = reflect(viewDirFromSurface, normalForLighting);
             // 根据粗糙度选择 reflection cubemap mip
-            float iblReflectionMip =
-                (1.2000000476837158 * log2(max(iblPerceptualRoughness, 0.0010000000474974513)))
-                + 5.0;
+            float iblReflectionMip = (1.2 * log2(max(iblPerceptualRoughness, 0.001)))+ 5.0;
             // 采样环境反射 cubemap
-            float3 iblReflectionColor =
-                textureLod(
-                    samplerCube(texReflectionCube, smpLinearClamp),
+            float3 iblReflectionColor =SAMPLE_TEXTURECUBE_LOD(
+                    _IblReflectionCubeMap, sampler_IblReflectionCubeMap,
                     iblReflectionDir,
-                    iblReflectionMip
-                ).xyz;
+                    iblReflectionMip).xyz;
+        
             // 对 IBL BRDF scale/bias 做额外补偿
             float iblEnergyCompensation =
                 (1.0 - iblScaleBiasSum) / iblScaleBiasSum;
@@ -680,24 +740,20 @@ void Frag(PackedVaryingsToPS packedInput
             float3 iblSpecularTerm =iblSpecularScaleBias + iblSpecularCompensation;
             // IBL 强度
             float iblProbeIntensity = clamp(probeIntensity, 0.5, 1.5);
-            float iblIntensity = iblProbeIntensity * _17._m101.w * directIntensityScale;
+            float    _17_m101w = 0.90;
+            float iblIntensity = iblProbeIntensity * _17_m101w * directIntensityScale;
         
             // 最终 IBL 反射光
             float3 iblReflectionLighting = iblReflectionColor * iblSpecularTerm * iblIntensity * probeColorTint;
-            // 原 1145 行结果
+
             lightingAccumulator = directAndRimLighting + emissionLighting + iblReflectionLighting;
             //lightingAccumulator = (directAndRimLighting + (((emissionSample.xyz * _51._m21.xyz) * _51._m7) * alphaLightingScale)) + (((textureLod(samplerCube(texReflectionCube, smpLinearClamp), reflect(viewDirFromSurface, normalForLighting), (1.2000000476837158203125 * log2(spvNMax(iblPerceptualRoughness, 0.001000000047497451305389404296875))) + 5.0).xyz * ((iblSpecularScaleBias + ((finalSpecularF0 * ((1.0 - iblScaleBiasSum) / iblScaleBiasSum)) * iblSpecularScaleBias)) * 1.0)) * ((clamp(probeIntensity, 0.5, 1.5) * _17._m101.w) * directIntensityScale)) * probeColorTint);    //_51._m21.xyz = 0.34793, 0.68676, 1.00; _51._m7 = 0.75; _17._m101.w = 0.90
             float3 lightingAccumulatorAfterOneLight;
             // 12. Clustered/Forward+ 动态光循环。屏幕图块和深度切片遮罩选择光源，然后累加漫反射和高光。
         
-            // 6. 可选角色/材质变色。用于特殊状态下增亮、染色，并提高高光响应。
-            //float instanceColorOverride = mix(_18._m0[instanceIndex]._m6.x, _15._m111.y, _15._m111.x);
-            //float heightColorOverride = spvNMax(_18._m0[instanceIndex]._m6.w, smoothstep(-0.20000000298023223876953125, 0.1500000059604644775390625, mix(_18._m0[instanceIndex]._m6.z, _15._m111.w, _15._m111.x) - worldPos.y) * mix(_18._m0[instanceIndex]._m6.y, 1.0, _15._m111.x));
-            float overrideSpecBoost;
-            float3 baseForLightness;
-            float3 baseForDiffuse;
+
         
-            outColor = float4(mainDirectLighting.xyz,alpha);
+            outColor = float4(lightingAccumulator.xyz,alpha);
                 
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
             outColor = EvaluateAtmosphericScattering(posInput, V, outColor);

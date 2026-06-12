@@ -638,7 +638,10 @@ void main()
         vec2 rainUvXY = rainProjectionCoord.xy;
         vec2 rainUvZY = rainProjectionCoord.zy;
         // 三平面采样基础雨水法线，w/z 通道继续参与湿润覆盖和水滴触发。
-        vec4 rainNormalASample = ((texture(sampler2D(texRainNormalA, smpMaterialBase), rainProjectionCoord.xz, _17._m38) * triplanarWeights.y) + (texture(sampler2D(texRainNormalA, smpMaterialBase), rainUvXY, _17._m38) * triplanarWeights.z)) + (texture(sampler2D(texRainNormalA, smpMaterialBase), rainUvZY, _17._m38) * triplanarWeights.x);    //_17._m38 = -1.00
+        vec4 rainNormalAPlaneXZ = texture(sampler2D(texRainNormalA, smpMaterialBase), rainProjectionCoord.xz, _17._m38);    //_17._m38 = -1.00
+        vec4 rainNormalAPlaneXY = texture(sampler2D(texRainNormalA, smpMaterialBase), rainUvXY, _17._m38);    //_17._m38 = -1.00
+        vec4 rainNormalAPlaneZY = texture(sampler2D(texRainNormalA, smpMaterialBase), rainUvZY, _17._m38);    //_17._m38 = -1.00
+        vec4 rainNormalASample = (rainNormalAPlaneXZ * triplanarWeights.y) + (rainNormalAPlaneXY * triplanarWeights.z) + (rainNormalAPlaneZY * triplanarWeights.x);
         float rainNormalAHeight = rainNormalASample.w;
         float rainNormalAUpperThreshold = 1.10000002384185791015625 - rainNormalAHeight;
         float surfaceWetnessCoverage = spvNMax(smoothstep(0.800000011920928955078125 - rainNormalAHeight, rainNormalAUpperThreshold, clamp((objectWetness * nonMetallicMask) + (shadingNormal.y * 0.20000000298023223876953125), 0.0, 1.0)), smoothstep(0.449999988079071044921875 - rainNormalAHeight, rainNormalAUpperThreshold, clamp(heightWetness * nonMetallicMask, 0.0, 1.0)));

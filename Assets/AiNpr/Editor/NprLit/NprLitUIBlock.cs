@@ -12,11 +12,15 @@ namespace UnityEditor.Rendering.HighDefinition
         {
             public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Lit Inputs");
 
+            public static GUIContent iblReflectionCubeMap = new GUIContent("IBL Reflection Cube Map", "Specifies the reflection cubemap for NPR lit IBL.");
             public static GUIContent f0TintLutMap = new GUIContent("F0 Tint LUT Map", "Specifies the F0 tint lookup texture for NPR lit.");
         }
 
+        const string kDefaultIblReflectionCubeMapPath = "Assets/AiNpr/Texture/Glazed Patio.exr";
+        const string kIblReflectionCubeMap = "_IblReflectionCubeMap";
         const string kF0TintLutMap = "_F0TintLutMap";
 
+        MaterialProperty iblReflectionCubeMap = null;
         MaterialProperty f0TintLutMap = null;
 
         /// <summary>
@@ -33,6 +37,7 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         public override void LoadMaterialProperties()
         {
+            iblReflectionCubeMap = FindProperty(kIblReflectionCubeMap, false);
             f0TintLutMap = FindProperty(kF0TintLutMap, false);
         }
 
@@ -41,10 +46,25 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         protected override void OnGUIOpen()
         {
-            if (f0TintLutMap == null)
+            if (iblReflectionCubeMap == null && f0TintLutMap == null)
                 return;
 
-            materialEditor.TexturePropertySingleLine(Styles.f0TintLutMap, f0TintLutMap);
+            if (iblReflectionCubeMap != null)
+            {
+                SetDefaultIblReflectionCubeMapIfNeeded();
+                materialEditor.TexturePropertySingleLine(Styles.iblReflectionCubeMap, iblReflectionCubeMap);
+            }
+
+            if (f0TintLutMap != null)
+                materialEditor.TexturePropertySingleLine(Styles.f0TintLutMap, f0TintLutMap);
+        }
+
+        void SetDefaultIblReflectionCubeMapIfNeeded()
+        {
+            if (iblReflectionCubeMap.hasMixedValue || iblReflectionCubeMap.textureValue != null)
+                return;
+
+            iblReflectionCubeMap.textureValue = AssetDatabase.LoadAssetAtPath<Texture>(kDefaultIblReflectionCubeMapPath);
         }
     }
 }

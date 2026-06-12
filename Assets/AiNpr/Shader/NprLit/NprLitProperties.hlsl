@@ -4,11 +4,23 @@
 // Otherwise those parameters are not bound correctly at runtime.
 // ===========================================================================
 
+
+
 //== npr lit
 TEXTURE2D(_F0TintLutMap);
+
+TEXTURECUBE(_IblReflectionCubeMap);
+SAMPLER(sampler_IblReflectionCubeMap);
 //==
+
+
 //== diffuse ramp
 TEXTURE2D(_DiffuseRampMap);
+//==
+
+//== rain effect
+TEXTURE2D(_RainLayerAMap);
+TEXTURE2D(_RainLayerBMap);
 //==
 
 TEXTURE2D(_EmissiveColorMap);
@@ -77,6 +89,7 @@ SAMPLER(sampler_CoatMaskMap);
 CBUFFER_START(UnityPerMaterial)
 
 #include "Assets/AiNpr/Shader/Properties/DiffuseRampProperties.hlsl"
+#include "Assets/AiNpr/Shader/Properties/RainEffectProperties.hlsl"
 // shared constant between lit and layered lit
 float _AlphaCutoff;
 float _UseShadowThreshold;

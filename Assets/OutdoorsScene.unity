@@ -1609,6 +1609,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: zhouxue
       objectReference: {fileID: 0}
+    - target: {fileID: 7230875142805934090, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7744357117521686886, guid: ccb273c89966a724fbf8d595e4812551, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
