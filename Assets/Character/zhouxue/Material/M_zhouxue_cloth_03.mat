@@ -119,6 +119,14 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _RainLayerAMap:
+        m_Texture: {fileID: 2800000, guid: 92de8f0412fcd384098ccacef53bb613, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RainLayerBMap:
+        m_Texture: {fileID: 2800000, guid: 47f1d6d682f58bc43b2e6f23c613b1a2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecularColorMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -232,11 +240,15 @@ Material:
     - _PPDMinSamples: 5
     - _PPDPrimitiveLength: 1
     - _PPDPrimitiveWidth: 1
+    - _PerObjectWetness: 0.555
     - _PerPixelSorting: 0
+    - _RainLayerTilling: 2
+    - _RainScrollSpeed: 2
     - _RayTracing: 0
     - _ReceivesSSR: 1
     - _ReceivesSSRTransparent: 0
     - _RefractionModel: 0
+    - _RippleTimeScale: 1.33
     - _Smoothness: 0.5
     - _SmoothnessRemapMax: 1
     - _SmoothnessRemapMin: 0

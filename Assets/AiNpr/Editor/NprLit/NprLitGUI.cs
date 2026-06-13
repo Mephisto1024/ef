@@ -22,6 +22,7 @@ namespace UnityEditor.Rendering.HighDefinition
             new LitSurfaceInputsUIBlock(MaterialUIBlock.ExpandableBit.Input, features: litSurfaceFeatures),
             new NprLitUIBlock(MaterialUIBlock.ExpandableBit.User0),
             new NprDiffuseRampUIBlock(MaterialUIBlock.ExpandableBit.User1),
+            new NprRainEffectUIBlock(MaterialUIBlock.ExpandableBit.User5),
             //new DetailInputsUIBlock(MaterialUIBlock.ExpandableBit.Detail),
             // We don't want distortion in Lit
             new TransparencyUIBlock(MaterialUIBlock.ExpandableBit.Transparency, features: TransparencyUIBlock.Features.All & ~TransparencyUIBlock.Features.Distortion),

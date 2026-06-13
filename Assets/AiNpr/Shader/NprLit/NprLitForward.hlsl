@@ -310,6 +310,10 @@ void Frag(PackedVaryingsToPS packedInput
     
             //float objectWetness = mix(_20._m0[vObjectIndex]._m6.x, _17._m111.y, _17._m111.x);    //_17._m111.y = 1.00; _17._m111.x = 0.00
             float objectWetness = 0;
+            float perObjectWetness = _PerObjectWetness;
+            float globalWetness = 1;
+            float globalWetnessOverride = 0;
+            objectWetness = lerp(perObjectWetness, globalWetness, globalWetnessOverride);
             //float heightWetness = spvNMax(_20._m0[vObjectIndex]._m6.w, smoothstep(-0.2, 0.15, mix(_20._m0[vObjectIndex]._m6.z, _17._m111.w, _17._m111.x) - vWorldPos.y) * mix(_20._m0[vObjectIndex]._m6.y, 1.0, _17._m111.x));    //_17._m111.w = -100.00; _17._m111.x = 0.00
             float heightWetness = 0;
             float3 normalForLighting;
@@ -328,7 +332,7 @@ void Frag(PackedVaryingsToPS packedInput
                 float externalPayloadSwizzle = 0;    //在xyz和xz-y间切换
                 
                 //雨水投影tilling
-                float _17_m111z = 2.0;
+                float _17_m111z = _RainLayerTilling;
                 float3 rainProjectionCoord = lerp(vRainProjectionPos, vRainProjectionPos.xzy * float3(1.0, 1.0, -1.0), externalPayloadSwizzle) * _17_m111z;    //_17._m111.z = 2.00
                 float3 rainBlendNormal = lerp(vRainBlendNormal, vRainBlendNormal.xzy, externalPayloadSwizzle);
                 float3 triplanarWeightSeed = abs(rainBlendNormal) - 0.2;
@@ -345,14 +349,14 @@ void Frag(PackedVaryingsToPS packedInput
                 float4 rainNormalASample = (rainNormalAPlaneXZ * triplanarWeights.y) + (rainNormalAPlaneXY * triplanarWeights.z) + (rainNormalAPlaneZY * triplanarWeights.x);
                 float rainNormalAHeight = rainNormalASample.w;
                 float rainNormalAUpperThreshold = 1.1 - rainNormalAHeight;
-                float surfaceWetnessCoverage = max(smoothstep(0.8 - rainNormalAHeight, rainNormalAUpperThreshold, clamp((objectWetness * nonMetallicMask) + (shadingNormal.y * 0.20000000298023223876953125), 0.0, 1.0)), smoothstep(0.449999988079071044921875 - rainNormalAHeight, rainNormalAUpperThreshold, clamp(heightWetness * nonMetallicMask, 0.0, 1.0)));
+                float surfaceWetnessCoverage = max(smoothstep(0.8 - rainNormalAHeight, rainNormalAUpperThreshold, clamp((objectWetness * nonMetallicMask) + (shadingNormal.y * 0.2), 0.0, 1.0)), smoothstep(0.45 - rainNormalAHeight, rainNormalAUpperThreshold, clamp(heightWetness * nonMetallicMask, 0.0, 1.0)));
                 float metallicWetHighlightMask = smoothstep(0.5, 0.75, metallicMask);
                 float smoothDarkSurfaceMask = smoothstep(0.8, 0.6, perceptualRoughness) * darkNonMetallicMask;
                 float rippleActivation = clamp(smoothDarkSurfaceMask + metallicWetHighlightMask, 0.0, 1.0) * max(objectWetness, heightWetness);
                 
                 
-                float rippleTimeA = _RippleTimeScale * 3.0;    //_17._m32.x = 1.33236
-                float rippleTimeB = _RippleTimeScale * 4.3456;    //_17._m32.x = 1.33236
+                float rippleTimeA = _Time.x * 3.0;    //_17._m32.x = 1.33236
+                float rippleTimeB = _Time.x * 4.3456;    //_17._m32.x = 1.33236
                 float3 rippleCoordA = rainProjectionCoord * 20.0;
                 float3 rippleCoordB = rainProjectionCoord * 34.3456;
                 float3 rippleTriplanarWeightRaw = max(pow(triplanarWeightSeed, 10.0), 0.0);
@@ -380,7 +384,58 @@ void Frag(PackedVaryingsToPS packedInput
                     rippleBPlaneXY * rippleWeightXY +
                     rippleBPlaneZY * rippleWeightZY;
                 
+                float2 strongestRippleMaskAndSeed = max(rippleLayerA.zw, rippleLayerB.zw);
+                float proceduralRippleMask = (strongestRippleMaskAndSeed.x * step(1.0 - rippleActivation, strongestRippleMaskAndSeed.y - 0.1)) * step(0.01, objectWetness);
+                float2 rainNormalBScrollOffset = float2(0.0, (_Time.x * 2.0) * 0.75);    //_17._m32.x = 1.33236; _17._m111.z = 2.00
+                float3 horizontalRainNormal = float3(rainBlendNormal.x, 0.0, rainBlendNormal.z);
+                float3 horizontalTriplanarSeed = abs(horizontalRainNormal * rsqrt(max(1.1754943508222875079687365372222e-38, dot(horizontalRainNormal, horizontalRainNormal)))) - 0.2;
+                float3 horizontalTriplanarRaw = max((horizontalTriplanarSeed * horizontalTriplanarSeed) * horizontalTriplanarSeed, 0.0);
+                float3 horizontalTriplanarWeights = horizontalTriplanarRaw / dot(horizontalTriplanarRaw, 1.0);
+                float rainNormalBWeightXY = horizontalTriplanarWeights.z;
+                float rainNormalBWeightZY = horizontalTriplanarWeights.x;
                 
+                float4 rainNormalBSample = (SAMPLE_TEXTURE2D(_RainLayerBMap,sampler_LinearRepeat, rainUvXY) * rainNormalBWeightXY) + (SAMPLE_TEXTURE2D(_RainLayerBMap,sampler_LinearRepeat, rainUvZY) * rainNormalBWeightZY);    //_17._m38 = -1.00
+
+
+                // 1. Rain Normal A：从 0~1 解包到 -1~1
+                float2 rainNormalAUnpacked = (rainNormalASample.xy * 2.0) - 1.0;
+
+                // 2. 程序化涟漪法线
+                float2 proceduralRippleNormal = rippleLayerA.xy + rippleLayerB.xy;
+
+                // 3. 如果当前位置有程序化涟漪，就用涟漪法线；否则用 Rain Normal A
+                float2 baseWetNormal =
+                    lerp(
+                        rainNormalAUnpacked,
+                        proceduralRippleNormal,
+                        bool(proceduralRippleMask > 0.001)
+                    );
+
+                // 4. Rain Normal B：从 0~1 解包到 -1~1
+                float2 rainNormalBUnpacked = (rainNormalBSample.xy * 2.0) - 1.0;
+
+                // 5. 用滚动后的 UV 再采样 B 贴图的 w 通道，作为动态强度遮罩
+                float rainNormalBMask =
+                    SAMPLE_TEXTURE2D(_RainLayerBMap,sampler_LinearRepeat, rainUvXY + rainNormalBScrollOffset).w * rainNormalBWeightXY +
+                    SAMPLE_TEXTURE2D(_RainLayerBMap,sampler_LinearRepeat, rainUvZY + rainNormalBScrollOffset).w * rainNormalBWeightZY;
+                
+                // 6. 最终湿表面法线扰动
+                float2 wetNormalXY = baseWetNormal + rainNormalBUnpacked * rainNormalBMask;
+                //float2 wetNormalXY = lerp((rainNormalASample.xy * 2.0) - 1.0, (rippleLayerA.xy + rippleLayerB.xy).xy, bvec2(proceduralRippleMask > 0.001)) + (((rainNormalBSample.xy * 2.0) - vec2(1.0)) * ((texture(sampler2D(texRainNormalB, smpMaterialBase), rainUvXY + rainNormalBScrollOffset, _17._m38).w * rainNormalBWeightXY) + (texture(sampler2D(texRainNormalB, smpMaterialBase), rainUvZY + rainNormalBScrollOffset, _17._m38).w * rainNormalBWeightZY)));    //_17._m38 = -1.00
+
+                float rainNormalBHeight = rainNormalBSample.z;
+                float wetNormalBlend = max(max(proceduralRippleMask, step(1.01 - rippleActivation, rainNormalASample.z)), smoothstep(1.0 - rainNormalBHeight, 1.1 - rainNormalBHeight, rippleActivation));
+                float3 upCrossNormal = cross(shadingNormal, float3(0.0, 1.0, 0.0));
+                float3 wetTangentDir = lerp(float3(-1.0, 0.0, 0.0), -normalize(upCrossNormal), bool(dot(upCrossNormal, upCrossNormal) > 6.103515625e-05));
+                float wetRoughnessFloor = min(perceptualRoughness, 0.05);
+                float roughnessWithWetFloor = lerp(perceptualRoughness, wetRoughnessFloor, wetNormalBlend);
+                float wetDiffuseScale = lerp(1.0, 0.5, (surfaceWetnessCoverage * (1.0 - darkNonMetallicMask)) * (1.0 - smoothDarkSurfaceMask));
+                normalForLighting = normalize(lerp(shadingNormal, normalize(lerp(lerp(shadingNormal, wetTangentDir, wetNormalXY.x), cross(shadingNormal, wetTangentDir), wetNormalXY.y)), wetNormalBlend));
+                wetMinimumRoughness = wetRoughnessFloor;
+                wetCoverage = wetNormalBlend;
+                finalPerceptualRoughness = max(roughnessWithWetFloor - ((0.2 * darkNonMetallicMask) * surfaceWetnessCoverage), min(0.2, roughnessWithWetFloor));
+                diffuseColorForLighting = diffuseColorSaturated * wetDiffuseScale;
+                baseColorAfterWetness = lerp(baseColor, baseColor * ((smoothstep(0.7, 0.3, Luminance(baseColor)) * 0.5) + 1.0), wetNormalBlend * metallicWetHighlightMask) * wetDiffuseScale;
             }
             else
             {

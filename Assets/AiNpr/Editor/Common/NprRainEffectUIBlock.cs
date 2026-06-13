@@ -4,26 +4,32 @@ using UnityEngine.Rendering.HighDefinition;
 namespace UnityEditor.Rendering.HighDefinition
 {
     /// <summary>
-    /// The UI block that displays NPR diffuse ramp inputs.
+    /// The UI block that displays NPR rain effect inputs.
     /// </summary>
     public class NprRainEffectUIBlock : MaterialUIBlock
     {
         internal class Styles
         {
-            public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Diffuse Ramp Inputs");
+            public static readonly GUIContent header = EditorGUIUtility.TrTextContent("Rain Effect Inputs");
 
-            public static GUIContent diffuseRampMap = new GUIContent("Diffuse Ramp Map", "");
-            public static GUIContent diffuseRampOffset = new GUIContent("Diffuse Ramp Offset", "");
+            public static GUIContent perObjectWetness = new GUIContent("Per Object Wetness", "");
+            public static GUIContent rainLayerAMap = new GUIContent("Rain Layer A Map", "");
+            public static GUIContent rainLayerBMap = new GUIContent("Rain Layer B Map", "");
+            public static GUIContent rainLayerTilling = new GUIContent("Rain Layer Tilling", "");
         }
 
-        const string kDiffuseRampMap = "_DiffuseRampMap";
-        const string kDiffuseRampOffset = "_DiffuseRampOffset";
+        const string kPerObjectWetness = "_PerObjectWetness";
+        const string kRainLayerAMap = "_RainLayerAMap";
+        const string kRainLayerBMap = "_RainLayerBMap";
+        const string kRainLayerTilling = "_RainLayerTilling";
 
-        MaterialProperty diffuseRampMap = null;
-        MaterialProperty diffuseRampOffset = null;
+        MaterialProperty perObjectWetness = null;
+        MaterialProperty rainLayerAMap = null;
+        MaterialProperty rainLayerBMap = null;
+        MaterialProperty rainLayerTilling = null;
 
         /// <summary>
-        /// Constructs an NPR diffuse ramp UI block.
+        /// Constructs an NPR rain effect UI block.
         /// </summary>
         /// <param name="expandableBit">Bit index used to store the foldout state.</param>
         public NprRainEffectUIBlock(ExpandableBit expandableBit)
@@ -36,8 +42,10 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         public override void LoadMaterialProperties()
         {
-            diffuseRampMap = FindProperty(kDiffuseRampMap, false);
-            diffuseRampOffset = FindProperty(kDiffuseRampOffset, false);
+            perObjectWetness = FindProperty(kPerObjectWetness, false);
+            rainLayerAMap = FindProperty(kRainLayerAMap, false);
+            rainLayerBMap = FindProperty(kRainLayerBMap, false);
+            rainLayerTilling = FindProperty(kRainLayerTilling, false);
         }
 
         /// <summary>
@@ -45,13 +53,27 @@ namespace UnityEditor.Rendering.HighDefinition
         /// </summary>
         protected override void OnGUIOpen()
         {
-            if (diffuseRampMap == null)
+            if (perObjectWetness == null && rainLayerAMap == null && rainLayerBMap == null && rainLayerTilling == null)
                 return;
 
-            materialEditor.TexturePropertySingleLine(Styles.diffuseRampMap, diffuseRampMap);
+            if (perObjectWetness != null)
+                materialEditor.ShaderProperty(perObjectWetness, Styles.perObjectWetness);
 
-            if (diffuseRampOffset != null)
-                materialEditor.ShaderProperty(diffuseRampOffset, Styles.diffuseRampOffset);
+            if (rainLayerAMap != null)
+            {
+                NprMaterialPropertyUtility.SetDefaultTextureIfNeeded(rainLayerAMap, "Assets/AiNpr/Texture/RainLayerA.png");
+                materialEditor.TexturePropertySingleLine(Styles.rainLayerAMap, rainLayerAMap);
+            }
+                
+
+            if (rainLayerBMap != null)
+            {
+                NprMaterialPropertyUtility.SetDefaultTextureIfNeeded(rainLayerBMap, "Assets/AiNpr/Texture/RainLayerB.png");
+                materialEditor.TexturePropertySingleLine(Styles.rainLayerBMap, rainLayerBMap);
+            }
+
+            if (rainLayerTilling != null)
+                materialEditor.ShaderProperty(rainLayerTilling, Styles.rainLayerTilling);
         }
     }
 }

@@ -1,3 +1,4 @@
 #pragma once
 
-float _RippleTimeScale;
+float _PerObjectWetness;
+float _RainLayerTilling;

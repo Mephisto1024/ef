@@ -12,9 +12,10 @@ Shader "AiNpr/NprLit"
         _DiffuseRampMap("DiffuseRampMap", 2D) = "white" {}
         _DiffuseRampOffset("DiffuseRampOffset", Range(-1.0, 1.0)) = 0.0
         //== rain effect
+        _PerObjectWetness("PerObjectWetness", Range(0.0, 1.0)) = 0.0
         _RainLayerAMap("RainLayerAMap", 2D) = "gray"{}
         _RainLayerBMap("RainLayerBMap", 2D) = "gray"{}
-        _RippleTimeScale("RippleTimeScale", Range(1.0, 5.0)) = 1.33
+        _RainLayerTilling("RainLayerTilling", Range(1.0, 4.0)) = 2.0
         
         // Reminder. Color here are in linear but the UI (color picker) do the conversion sRGB to linear
         [MainColor] _BaseColor("BaseColor", Color) = (1,1,1,1)
