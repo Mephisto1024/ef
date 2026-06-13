@@ -250,7 +250,9 @@ void Frag(PackedVaryingsToPS packedInput
             
             float4 pbrMaskSample = SAMPLE_UVMAPPING_TEXTURE2D(_MaskMap, sampler_MaskMap, layerTexCoord.base).rgba;
             float metallicMask = pbrMaskSample.x;
+            float specularMask = pbrMaskSample.y;
             float aoMask = pbrMaskSample.z;
+            float smoothness = pbrMaskSample.w;
             float perceptualRoughness = 1.0 - pbrMaskSample.w;
             float alpha = baseSample.w;
         
@@ -261,6 +263,7 @@ void Frag(PackedVaryingsToPS packedInput
             
             // 3. 法线贴图解码。该打包方式将 X 存在 w*x 中，将 Y 存在 y 中，并在单位半球上重建 Z。
             float4 normalMapSample = SAMPLE_UVMAPPING_TEXTURE2D(_NormalMap, sampler_NormalMap, layerTexCoord.base).rgba;
+            float4 rawNormalMapSample = normalMapSample;
             normalMapSample.w = normalMapSample.w * normalMapSample.x;
             float2 normalMapXY = (normalMapSample.wy * 2.0) - 1.0;
             float3 tangentSpaceNormal = float3(normalMapXY.x, normalMapXY.y, 1);
@@ -282,7 +285,8 @@ void Frag(PackedVaryingsToPS packedInput
             float3 geometryNormal = normalize(surfaceData.geomNormalWS) * frontFaceNormalSign;
             
             uint2 pixelCoord = uint2(posInput.positionSS.xy);
-            float3 worldCameraForward = TransformViewToWorldDir(float3(0,0,1));    //_17._m1[0].xyz = -1.00, -1.25638E-12, 8.65910E-08; _17._m1[1].xyz = -1.79375E-09, 0.99979, -0.0207; _17._m1[2].xyz = 8.65724E-08, 0.0207, 0.99979
+            float3 worldCameraForward = TransformViewToWorldDir(float3(0, 0, 1));    //_17._m1[0].xyz = -1.00, -1.25638E-12, 8.65910E-08; _17._m1[1].xyz = -1.79375E-09, 0.99979, -0.0207; _17._m1[2].xyz = 8.65724E-08, 0.0207, 0.99979
+
             float _17_m44x = 0.28772;
             float _17_m113w = 0.00;
             float _17_m42x = 1.00;
@@ -449,7 +453,7 @@ void Frag(PackedVaryingsToPS packedInput
     
             float dielectricDiffuseScale = 0.96 - (metallicMask * 0.96);
             float3 diffuseAlbedo = baseColorAfterWetness * dielectricDiffuseScale;
-            float3 specularF0 = lerp(0.04 * pbrMaskSample.y, baseColorAfterWetness, metallicMask);
+            float3 specularF0 = lerp(0.04 * specularMask, baseColorAfterWetness, metallicMask);
             float3 diffuseLightingAlbedo = diffuseColorForLighting * dielectricDiffuseScale;
             float roughness2Clamped = max(finalPerceptualRoughness * finalPerceptualRoughness, 0.0078125);
             float roughness4 = roughness2Clamped * roughness2Clamped;
@@ -562,12 +566,12 @@ void Frag(PackedVaryingsToPS packedInput
             float directIntensityScale = lerp(_17_m101z, 1.0, directVisibility);    //_17._m101.z = 0.70
             
             float3 halfVectorBiasDir = float3(worldCameraForward.x, lerp(0.5, mainLightDirMixed.y, mainShadow), worldCameraForward.z);
-            float ndotv = clamp(dot(normalForLighting, V), 0.0, 1.0);
+            float ndotv = clamp(dot(normalForLighting, viewDirWS), 0.0, 1.0);
             float3 normalizedHalfVectorBiasDir = SafeNormalize(halfVectorBiasDir);
     
             float3 biasedHalfVector = normalize(mainLightDirMixed * mainShadow +
                 normalizedHalfVectorBiasDir * 2.0 +
-                V * (2.0 + mainShadow));
+                viewDirWS * (2.0 + mainShadow));
 
             float ndothBiased = dot(normalForLighting, biasedHalfVector);
             //float ndothBiased = dot(normalForLighting, normalize(((mainLightDirMixed * mainShadow) + ((halfVectorBiasDir * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(halfVectorBiasDir, halfVectorBiasDir)))) * 2.0)) + (viewDir * (2.0 + mainShadow))));
@@ -582,7 +586,7 @@ void Frag(PackedVaryingsToPS packedInput
             float ggxLutCoord = ggxDistribution / min(1.0 / (roughness4 + 0.0001),65504.0);
     
             float viewLutCoord = ndotv2;
-            float _51_m4 = 1.00;//F0 Tint LUT 的启用/混合权重
+            float _51_m4 = _UseViewLutCoord;//F0 Tint LUT 的启用/混合权重
             float f0LutU = lerp(ggxLutCoord, viewLutCoord, _51_m4);
     
             float f0LutV = finalPerceptualRoughness * (1.0 - metallicMask);
@@ -600,9 +604,9 @@ void Frag(PackedVaryingsToPS packedInput
 
             float mainDirectLuma = Luminance(mainDirectLighting);
             float mainDirectLumaOverHalf = clamp(mainDirectLuma - 0.5, 0.0, 0.5);
-            float2 _17_m110xy = float2(8.74228E-08, -1.00);
+            float2 _17_m110xy = float2(0, -1.00);
             float3 rimLightDir = normalize(cross(worldCameraForward, float3(_17_m110xy, 0.0)));    //_17._m110.xy = 8.74228E-08, -1.00
-            float vdotn = dot(V, shadingNormal);
+            float vdotn = dot(viewDirWS, shadingNormal);
             float viewEdgeFactor = 1.0 - abs(vdotn);
             float flatLightNdotL = dot(mainLightPlanarDir, shadingNormal);
             float shadowedAmount = 1.0 - mainShadow;
@@ -662,7 +666,9 @@ void Frag(PackedVaryingsToPS packedInput
             float3 viewDirFromSurface = -V;
         
             float3 directAndRimLighting;
-            {
+            float3 rimLighting;
+            float3 ambientBackLighting;
+            //{
                 // 主光亮度增强：当主光已经比较亮时，保留更多彩色信息
                 float mainDirectColorWeight = (mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0;
                 float3 directLighting = lerp(mainDirectLuma, mainDirectLighting, mainDirectColorWeight);
@@ -686,7 +692,7 @@ void Frag(PackedVaryingsToPS packedInput
 
                 float3 _17_m109xyz = 0.00;
                 float _17_m109w = 1.00;
-                float3 rimLighting =
+                rimLighting =
                     _17_m109xyz
                     * rimEdgeMask
                     * _17_m109w
@@ -726,8 +732,8 @@ void Frag(PackedVaryingsToPS packedInput
 
                 float ambientBackLightEdgeMask =
                     smoothstep(
-                        0.600000023841858,
-                        0.800000011920929,
+                        0.6,
+                        0.8,
                         viewEdgeFactor
                     );
 
@@ -744,7 +750,7 @@ void Frag(PackedVaryingsToPS packedInput
 
                 float3 ambientBackLightAlbedo = max(0.15, diffuseAlbedo);
 
-                float3 ambientBackLighting =
+                ambientBackLighting =
                     ambientBackLightColor
                     * ambientBackLightDirection
                     * ambientBackLightVisibility
@@ -759,7 +765,7 @@ void Frag(PackedVaryingsToPS packedInput
                     directLighting
                     + rimLighting
                     + ambientBackLighting;
-            }
+            //}
             //float3 directAndRimLighting = mix(vec3(mainDirectLuma), mainDirectLighting, vec3((mainDirectLumaOverHalf * mainDirectLumaOverHalf) + 1.0)) + (((((_17._m109.xyz * smoothstep(mix(0.800000011920928955078125, 0.20000000298023223876953125, _17._m110.w), mix(0.89999997615814208984375, 0.5, _17._m110.w), viewEdgeFactor)) * _17._m109.w) * spvNMin(spvNMin(clamp(dot(rootToPixelDir, rimLightDir) + 1.0, 0.0, 1.0), aoMask), characterShadowMix)) * (mix(vec3(0.25), diffuseAlbedo, vec3(_17._m110.z)) * clamp(dot(rimLightDir, shadingNormal), 0.0, 1.0))) + ((((((mix(probeRgbIrradiance * (1.0 / spvNMax(spvNMax(spvNMax(probeRgbIrradiance.x, probeRgbIrradiance.y), probeRgbIrradiance.z) * 0.5, 1.0)), scaledMainLightColor, mainShadowVec) * clamp(mix(dot(probeDominantDirAndWeight.xyz, shadingNormal) * probeDominantDirAndWeight.w, ((-flatLightNdotL) * ((flatLightNdotL * 0.5) - 1.0)) + 0.5, mainShadow), 0.0, 1.0)) * ((shadowedAmount + (sunCameraOpposition * mainShadow)) * globalLightBlendInverse)) * smoothstep(0.60000002384185791015625, 0.800000011920928955078125, viewEdgeFactor)) * spvNMin(aoMask, characterShadowMix)) * (shadowedAmount + (smoothstep(0.100000001490116119384765625, 0.039999999105930328369140625, diffuseLuma) * mainShadow))) * spvNMax(vec3(0.1500000059604644775390625), diffuseAlbedo)));    //_17._m109.xyz = 0.00, 0.00, 0.00; _17._m110.w = 0.40; _17._m109.w = 1.00; _17._m110.z = 0.00
             float2 pixelCoordFloat = float2(pixelCoord);
             float2 lightTileCoord = floor(pixelCoordFloat * 0.03125);
@@ -807,11 +813,35 @@ void Frag(PackedVaryingsToPS packedInput
             // 12. Clustered/Forward+ 动态光循环。屏幕图块和深度切片遮罩选择光源，然后累加漫反射和高光。
         
 
-        
-            outColor = float4(lightingAccumulator.xyz,alpha);
+            float4 nprLitDebugColor;
+            bool isNprLitDebugOutput = TryGetNprLitDebugColor(
+                _NprLitDebugEnabled > 0.5,
+                _NprLitDebugMode,
+                baseColor,
+                alpha,
+                metallicMask,
+                aoMask,
+                smoothness,
+                perceptualRoughness,
+                rawNormalMapSample,
+                emissionSample.xyz,
+                characterShadow,
+                sceneShadowAndRawShadow,
+                mainRampSample,
+                finalDiffuseTerm,
+                f0LutTint,
+                iblReflectionLighting,
+                rimLighting,
+                ambientBackLighting,
+                nprLitDebugColor);
+
+            outColor = isNprLitDebugOutput ? nprLitDebugColor : float4(lightingAccumulator.xyz, alpha);
                 
             #ifdef _ENABLE_FOG_ON_TRANSPARENT
-            outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
+            if (!isNprLitDebugOutput)
+            {
+                outColor = EvaluateAtmosphericScattering(posInput, V, outColor);
+            }
             #endif
 
             #ifdef _TRANSPARENT_REFRACTIVE_SORT

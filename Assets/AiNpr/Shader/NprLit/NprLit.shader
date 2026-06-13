@@ -6,8 +6,12 @@ Shader "AiNpr/NprLit"
         // They are use to fill a SurfaceData. With a MaterialGraph this should not exist.
         
         //== npr lit
+        [ToggleUI]_UseViewLutCoord("ViewLutCoord/GGXLutCoord", Float) = 0.0
         _F0TintLutMap("F0TintLutMap", 2D) = "white" {}
         _IblReflectionCubeMap("IblReflectionCubeMap", Cube) = "black" {}
+        [ToggleUI] _NprLitDebugEnabled("Enable Intermediate Debug", Float) = 0.0
+        _NprLitDebugMode("Intermediate Debug Mode", Int) = 0
+
         //== diffuse ramp
         _DiffuseRampMap("DiffuseRampMap", 2D) = "white" {}
         _DiffuseRampOffset("DiffuseRampOffset", Range(-1.0, 1.0)) = 0.0

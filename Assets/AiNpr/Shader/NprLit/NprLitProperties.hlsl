@@ -88,6 +88,10 @@ SAMPLER(sampler_CoatMaskMap);
 
 CBUFFER_START(UnityPerMaterial)
 
+float _UseViewLutCoord;
+float _NprLitDebugEnabled;
+int _NprLitDebugMode;
+
 #include "Assets/AiNpr/Shader/Properties/DiffuseRampProperties.hlsl"
 #include "Assets/AiNpr/Shader/Properties/RainEffectProperties.hlsl"
 // shared constant between lit and layered lit
