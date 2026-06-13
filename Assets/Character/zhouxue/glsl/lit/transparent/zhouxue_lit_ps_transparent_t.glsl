@@ -1151,377 +1151,385 @@ void main()
     SPIRV_CROSS_LOOP
     for (int lightTileWord = 0; lightTileWord <= 7; lightingAccumulator = lightingAccumulatorAfterOneLight, lightTileWord++)
     {
+        // 取当前屏幕 tile 与深度 slice 的交集 bitmask，每一位对应一个候选本地光。
         uint lightMaskWord = (depthSliceFloat <= depthSliceClamped) ? (_27._m0[uint(lightTileBaseIndex + lightTileWord)] & _27._m0[uint((_17._m43.y + depthSliceBaseIndex) + lightTileWord)]) : 0u;    //_17._m43.y = 28800
         uint lightTileWordU = uint(lightTileWord);
         lightingAccumulatorAfterOneLight = lightingAccumulator;
-        uint _2913;
-        vec3 _2910;
+        uint remainingLightBitsAfterClear;
+        vec3 accumulatedAfterCurrentLight;
         SPIRV_CROSS_LOOP
-        for (uint remainingLightBits = lightMaskWord; remainingLightBits != 0u; lightingAccumulatorAfterOneLight = _2910, remainingLightBits = _2913)
+        for (uint remainingLightBits = lightMaskWord; remainingLightBits != 0u; lightingAccumulatorAfterOneLight = accumulatedAfterCurrentLight, remainingLightBits = remainingLightBitsAfterClear)
         {
             uint lightBitIndex = uint(findLSB(remainingLightBits));
-            _2913 = remainingLightBits ^ (1u << (lightBitIndex & 31u));
-            int _2923 = int((32u * lightTileWordU) + lightBitIndex) * 8;
-            int _2926 = _2923 + 1;
-            int _2929 = _2923 + 2;
-            int _2932 = _2923 + 3;
-            int _2935 = _2923 + 4;
-            int _2938 = _2923 + 5;
-            int _2941 = _2923 + 6;
-            int _2944 = _2923 + 7;
-            float _3022;
-            if (uint(_33._m6[_2938].w) == 1u)
+            remainingLightBitsAfterClear = remainingLightBits ^ (1u << (lightBitIndex & 31u));
+            int lightDataBaseIndex = int((32u * lightTileWordU) + lightBitIndex) * 8;
+            int lightPositionRangeIndex = lightDataBaseIndex + 1;
+            int lightDirectionShapeIndex = lightDataBaseIndex + 2;
+            int lightModeShadowIndex = lightDataBaseIndex + 3;
+            int lightParamIndex = lightDataBaseIndex + 4;
+            int lightShapeMatrix0Index = lightDataBaseIndex + 5;
+            int lightShapeMatrix1Index = lightDataBaseIndex + 6;
+            int lightExtraIndex = lightDataBaseIndex + 7;
+            float lightShapeMaskFade;
+            // 可选的盒状/体积光范围裁剪：把像素变换到光源局部空间，越靠近边缘越淡出。
+            if (uint(_33._m6[lightShapeMatrix0Index].w) == 1u)
             {
-                uint _2953 = floatBitsToUint(_33._m6[_2938].x);
-                uint _2960 = floatBitsToUint(_33._m6[_2938].y);
-                uint _2967 = floatBitsToUint(_33._m6[_2938].z);
-                uint _2974 = floatBitsToUint(_33._m6[_2941].x);
-                uint _2981 = floatBitsToUint(_33._m6[_2941].y);
-                uint _2988 = floatBitsToUint(_33._m6[_2941].z);
-                vec3 _3007 = abs((mat4(vec4(unpackHalf2x16(_2953).x, unpackHalf2x16(_2967).x, unpackHalf2x16(_2981).x, 0.0), vec4(unpackHalf2x16(_2953 >> 16u).x, unpackHalf2x16(_2967 >> 16u).x, unpackHalf2x16(_2981 >> 16u).x, 0.0), vec4(unpackHalf2x16(_2960).x, unpackHalf2x16(_2974).x, unpackHalf2x16(_2988).x, 0.0), vec4(unpackHalf2x16(_2960 >> 16u).x, unpackHalf2x16(_2974 >> 16u).x, unpackHalf2x16(_2988 >> 16u).x, 0.0)) * vec4(vWorldPos - _33._m6[_2926].xyz, 1.0)).xyz);
-                float _3014 = _33._m6[_2944].x * 0.5;
-                float _3020 = 1.0 - clamp((spvNMax(spvNMax(_3007.x, _3007.y), _3007.z) - (_3014 + 0.5)) / (0.5 - _3014), 0.0, 1.0);
-                _3022 = _3020 * _3020;
+                uint packedShapeMatrix00_10 = floatBitsToUint(_33._m6[lightShapeMatrix0Index].x);
+                uint packedShapeMatrix20_30 = floatBitsToUint(_33._m6[lightShapeMatrix0Index].y);
+                uint packedShapeMatrix01_11 = floatBitsToUint(_33._m6[lightShapeMatrix0Index].z);
+                uint packedShapeMatrix21_31 = floatBitsToUint(_33._m6[lightShapeMatrix1Index].x);
+                uint packedShapeMatrix02_12 = floatBitsToUint(_33._m6[lightShapeMatrix1Index].y);
+                uint packedShapeMatrix22_32 = floatBitsToUint(_33._m6[lightShapeMatrix1Index].z);
+                vec3 absShapeLocalPos = abs((mat4(vec4(unpackHalf2x16(packedShapeMatrix00_10).x, unpackHalf2x16(packedShapeMatrix01_11).x, unpackHalf2x16(packedShapeMatrix02_12).x, 0.0), vec4(unpackHalf2x16(packedShapeMatrix00_10 >> 16u).x, unpackHalf2x16(packedShapeMatrix01_11 >> 16u).x, unpackHalf2x16(packedShapeMatrix02_12 >> 16u).x, 0.0), vec4(unpackHalf2x16(packedShapeMatrix20_30).x, unpackHalf2x16(packedShapeMatrix21_31).x, unpackHalf2x16(packedShapeMatrix22_32).x, 0.0), vec4(unpackHalf2x16(packedShapeMatrix20_30 >> 16u).x, unpackHalf2x16(packedShapeMatrix21_31 >> 16u).x, unpackHalf2x16(packedShapeMatrix22_32 >> 16u).x, 0.0)) * vec4(vWorldPos - _33._m6[lightPositionRangeIndex].xyz, 1.0)).xyz);
+                float shapeSoftInnerExtent = _33._m6[lightExtraIndex].x * 0.5;
+                float shapeEdgeFade = 1.0 - clamp((spvNMax(spvNMax(absShapeLocalPos.x, absShapeLocalPos.y), absShapeLocalPos.z) - (shapeSoftInnerExtent + 0.5)) / (0.5 - shapeSoftInnerExtent), 0.0, 1.0);
+                lightShapeMaskFade = shapeEdgeFade * shapeEdgeFade;
             }
             else
             {
-                _3022 = 1.0;
+                lightShapeMaskFade = 1.0;
             }
-            if (false || (_3022 < 0.001000000047497451305389404296875))
+            if (false || (lightShapeMaskFade < 0.001000000047497451305389404296875))
             {
-                _2910 = lightingAccumulatorAfterOneLight;
+                accumulatedAfterCurrentLight = lightingAccumulatorAfterOneLight;
                 continue;
             }
-            vec3 _3699;
-            if (_33._m6[_2923].w < 1.5)
+            vec3 accumulatorAfterThisLight;
+            if (_33._m6[lightDataBaseIndex].w < 1.5)
             {
-                vec3 _3698;
+                vec3 accumulatorAfterLocalLight;
                 do
                 {
-                    uint _3035 = floatBitsToUint(_33._m6[_2932].w);
-                    if ((_3035 == 16u) || ((_33._m6[_2932].z + _17._m113.z) < 0.5))    //_17._m113.z = 1.00
+                    uint lightMode = floatBitsToUint(_33._m6[lightModeShadowIndex].w);
+                    if ((lightMode == 16u) || ((_33._m6[lightModeShadowIndex].z + _17._m113.z) < 0.5))    //_17._m113.z = 1.00
                     {
-                        _3698 = lightingAccumulatorAfterOneLight;
+                        accumulatorAfterLocalLight = lightingAccumulatorAfterOneLight;
                         break;
                     }
-                    bool _3047 = (uint(_33._m6[_2923].w) & 1u) == 0u;
-                    bool _3051 = (!_3047) && (_33._m6[_2929].z > 0.0);
-                    bool _3052 = _3035 == 4u;
-                    float _3053 = float(_3047);
-                    float _3061 = (0.5 + (0.5 * _33._m6[_2929].y)) - abs(_33._m6[_2929].x);
-                    float _3062 = _33._m6[_2929].y - _3061;
-                    float _3069 = abs(spvNMax((1.0 - abs(_3061)) - abs(_3062), 0.00048828125));
-                    vec3 _3073 = normalize(vec3(_3061, _3062, (_33._m6[_2929].x >= 0.0) ? _3069 : (-_3069)));
-                    float _3079 = mix(_33._m6[_2941].w, spvNMax(2.0 * _33._m6[_2935].y, 0.100000001490116119384765625), float(_3052));
-                    vec3 _3084 = _33._m6[_2926].xyz - vWorldPos;
-                    vec3 _3085 = -_3073;
-                    vec3 _3090 = mix(_3084, _3085 * dot(_3084, _3085), vec3(float(_3052 && (_33._m6[_2935].z > 0.5)) * _3053));
-                    float _3091 = dot(_3090, _3090);
-                    float _3092 = inversesqrt(_3091);
-                    vec3 _3093 = _3090 * _3092;
-                    vec3 _3126;
-                    float _3127;
-                    if (_3051)
+                    bool usesSpotCone = (uint(_33._m6[lightDataBaseIndex].w) & 1u) == 0u;
+                    bool usesLineAreaShape = (!usesSpotCone) && (_33._m6[lightDirectionShapeIndex].z > 0.0);
+                    bool isColorBlendLight = lightMode == 4u;
+                    float spotConeSelector = float(usesSpotCone);
+                    // 光方向以八面体编码存放在 lightDirectionShapeIndex.xy，这里还原为世界方向。
+                    float decodedDirOctX = (0.5 + (0.5 * _33._m6[lightDirectionShapeIndex].y)) - abs(_33._m6[lightDirectionShapeIndex].x);
+                    float decodedDirOctY = _33._m6[lightDirectionShapeIndex].y - decodedDirOctX;
+                    float decodedDirOctZAbs = abs(spvNMax((1.0 - abs(decodedDirOctX)) - abs(decodedDirOctY), 0.00048828125));
+                    vec3 lightForwardDir = normalize(vec3(decodedDirOctX, decodedDirOctY, (_33._m6[lightDirectionShapeIndex].x >= 0.0) ? decodedDirOctZAbs : (-decodedDirOctZAbs)));
+                    float distanceFalloffPower = mix(_33._m6[lightShapeMatrix1Index].w, spvNMax(2.0 * _33._m6[lightParamIndex].y, 0.100000001490116119384765625), float(isColorBlendLight));
+                    vec3 surfaceToLightVector = _33._m6[lightPositionRangeIndex].xyz - vWorldPos;
+                    vec3 backwardLightDir = -lightForwardDir;
+                    vec3 attenuationVector = mix(surfaceToLightVector, backwardLightDir * dot(surfaceToLightVector, backwardLightDir), vec3(float(isColorBlendLight && (_33._m6[lightParamIndex].z > 0.5)) * spotConeSelector));
+                    float attenuationDistanceSq = dot(attenuationVector, attenuationVector);
+                    float invAttenuationDistance = inversesqrt(attenuationDistanceSq);
+                    vec3 pointLightDir = attenuationVector * invAttenuationDistance;
+                    vec3 effectiveLightDir;
+                    float areaLightScale;
+                    if (usesLineAreaShape)
                     {
-                        vec3 _3097 = (_3073 * _33._m6[_2929].z) * 0.5;
-                        vec3 _3098 = _3090 - _3097;
-                        vec3 _3099 = _3090 + _3097;
-                        float _3100 = length(_3098);
-                        float _3101 = length(_3099);
-                        vec3 _3110 = normalize(cross(cross(_3073, _3093), _3073));
-                        _3126 = _3110;
-                        _3127 = ((1.0 / ((((_3100 * _3101) + dot(_3098, _3099)) * 0.5) + 1.0)) * clamp(0.5 * ((dot(_3110, _3098) / _3100) + (dot(_3110, _3099) / _3101)), 0.0, 1.0)) * (1.0 / clamp(1.0 + (0.5 * clamp(_33._m6[_2929].z * _3092, 0.0, 1.0)), 0.0, 1.0));
+                        // 线光源用两端点近似代表方向，并加入面积归一化，避免退化成普通点光。
+                        vec3 lineHalfVector = (lightForwardDir * _33._m6[lightDirectionShapeIndex].z) * 0.5;
+                        vec3 lineEndpointAVector = attenuationVector - lineHalfVector;
+                        vec3 lineEndpointBVector = attenuationVector + lineHalfVector;
+                        float lineEndpointADistance = length(lineEndpointAVector);
+                        float lineEndpointBDistance = length(lineEndpointBVector);
+                        vec3 lineRepresentativeDir = normalize(cross(cross(lightForwardDir, pointLightDir), lightForwardDir));
+                        effectiveLightDir = lineRepresentativeDir;
+                        areaLightScale = ((1.0 / ((((lineEndpointADistance * lineEndpointBDistance) + dot(lineEndpointAVector, lineEndpointBVector)) * 0.5) + 1.0)) * clamp(0.5 * ((dot(lineRepresentativeDir, lineEndpointAVector) / lineEndpointADistance) + (dot(lineRepresentativeDir, lineEndpointBVector) / lineEndpointBDistance)), 0.0, 1.0)) * (1.0 / clamp(1.0 + (0.5 * clamp(_33._m6[lightDirectionShapeIndex].z * invAttenuationDistance, 0.0, 1.0)), 0.0, 1.0));
                     }
                     else
                     {
-                        _3126 = _3093;
-                        _3127 = 1.0;
+                        effectiveLightDir = pointLightDir;
+                        areaLightScale = 1.0;
                     }
-                    float _3149;
-                    if (_3079 < 0.0)
+                    float rangeAttenuation;
+                    if (distanceFalloffPower < 0.0)
                     {
-                        float _3137 = _3091 * (_33._m6[_2926].w * _33._m6[_2926].w);
-                        float _3140 = clamp(1.0 - (_3137 * _3137), 0.0, 1.0);
-                        _3149 = mix(1.0 / (_3091 + 1.0), _3127, float(_3051)) * (_3140 * _3140);
+                        float normalizedDistanceSq = attenuationDistanceSq * (_33._m6[lightPositionRangeIndex].w * _33._m6[lightPositionRangeIndex].w);
+                        float smoothRangeFade = clamp(1.0 - (normalizedDistanceSq * normalizedDistanceSq), 0.0, 1.0);
+                        rangeAttenuation = mix(1.0 / (attenuationDistanceSq + 1.0), areaLightScale, float(usesLineAreaShape)) * (smoothRangeFade * smoothRangeFade);
                     }
                     else
                     {
-                        vec3 _3143 = _3090 * _33._m6[_2926].w;
-                        _3149 = _3127 * pow(1.0 - clamp(dot(_3143, _3143), 0.0, 1.0), _3079);
+                        vec3 normalizedRangeVector = attenuationVector * _33._m6[lightPositionRangeIndex].w;
+                        rangeAttenuation = areaLightScale * pow(1.0 - clamp(dot(normalizedRangeVector, normalizedRangeVector), 0.0, 1.0), distanceFalloffPower);
                     }
-                    float _3154 = clamp((dot(_3126, _3085) - _33._m6[_2929].z) * _33._m6[_2929].w, 0.0, 1.0);
-                    float _3157 = _3149 * mix(1.0, _3154 * _3154, _3053);
-                    int _3159 = int(_33._m6[_2944].w);
-                    float _3263;
-                    if ((!_3051) && (_3159 >= 0))
+                    float spotConeAttenuation = clamp((dot(effectiveLightDir, backwardLightDir) - _33._m6[lightDirectionShapeIndex].z) * _33._m6[lightDirectionShapeIndex].w, 0.0, 1.0);
+                    float attenuationBeforeCookie = rangeAttenuation * mix(1.0, spotConeAttenuation * spotConeAttenuation, spotConeSelector);
+                    int cookieAtlasIndex = int(_33._m6[lightExtraIndex].w);
+                    float attenuationWithCookie;
+                    if ((!usesLineAreaShape) && (cookieAtlasIndex >= 0))
                     {
-                        uint _3165 = uint(_3159);
-                        vec2 _3256;
+                        // Spot cookie 走投影矩阵；Point cookie 按主轴选 cubemap face 后映射到 2D atlas。
+                        uint cookieAtlasIndexU = uint(cookieAtlasIndex);
+                        vec2 cookieAtlasUv;
                         SPIRV_CROSS_BRANCH
-                        if (_3053 != 0.0)
+                        if (spotConeSelector != 0.0)
                         {
-                            vec4 _3177 = vec4(vWorldPos, 1.0) * _68._m1[_3165];
-                            _3256 = _68._m0[_3165].xy + (clamp(_3177.xy / vec2(_3177.w), vec2(0.0), vec2(1.0)) * _68._m0[_3165].zw);
+                            vec4 projectedCookiePos = vec4(vWorldPos, 1.0) * _68._m1[cookieAtlasIndexU];
+                            cookieAtlasUv = _68._m0[cookieAtlasIndexU].xy + (clamp(projectedCookiePos.xy / vec2(projectedCookiePos.w), vec2(0.0), vec2(1.0)) * _68._m0[cookieAtlasIndexU].zw);
                         }
                         else
                         {
-                            vec3 _3197 = (_68._m1[_3165] * vec4(-_3090, 0.0)).xyz;
-                            vec3 _530 = _3197;
-                            vec3 _529 = _3197;
-                            vec3 _528 = abs(_3197);
-                            uint _3206 = uint(int(_528.y > _528.x));
-                            uint _3212 = (_528.z > _528[_3206]) ? 2u : _3206;
-                            uint _3218 = (_3212 * 2u) + uint(_529[_3212] < 0.0);
-                            float _3222 = abs(_530[_3218 / 2u]);
-                            float _3242 = 0.5 - (0.000244140625 / _68._m0[_3165].w);
-                            _3256 = _68._m0[_3165].xy + (clamp(vec2((float(_3218) + ((((_530[uint(kCubeFaceAxes[_3218].x)] * kCubeFaceSigns[_3218].x) / _3222) * _3242) + 0.5)) * 0.16666667163372039794921875, 0.5 - (((_530[uint(kCubeFaceAxes[_3218].y)] * kCubeFaceSigns[_3218].y) / _3222) * _3242)), vec2(0.0), vec2(1.0)) * _68._m0[_3165].zw);
+                            vec3 cubeCookieVector = (_68._m1[cookieAtlasIndexU] * vec4(-attenuationVector, 0.0)).xyz;
+                            vec3 cubeCookieVectorAlias = cubeCookieVector;
+                            vec3 cubeCookieVectorSign = cubeCookieVector;
+                            vec3 absCubeCookieVector = abs(cubeCookieVector);
+                            uint cubeMajorAxisXY = uint(int(absCubeCookieVector.y > absCubeCookieVector.x));
+                            uint cubeMajorAxis = (absCubeCookieVector.z > absCubeCookieVector[cubeMajorAxisXY]) ? 2u : cubeMajorAxisXY;
+                            uint cubeFaceIndex = (cubeMajorAxis * 2u) + uint(cubeCookieVectorSign[cubeMajorAxis] < 0.0);
+                            float cubeFaceDepth = abs(cubeCookieVectorAlias[cubeFaceIndex / 2u]);
+                            float cubeCookiePaddingScale = 0.5 - (0.000244140625 / _68._m0[cookieAtlasIndexU].w);
+                            cookieAtlasUv = _68._m0[cookieAtlasIndexU].xy + (clamp(vec2((float(cubeFaceIndex) + ((((cubeCookieVectorAlias[uint(kCubeFaceAxes[cubeFaceIndex].x)] * kCubeFaceSigns[cubeFaceIndex].x) / cubeFaceDepth) * cubeCookiePaddingScale) + 0.5)) * 0.16666667163372039794921875, 0.5 - (((cubeCookieVectorAlias[uint(kCubeFaceAxes[cubeFaceIndex].y)] * kCubeFaceSigns[cubeFaceIndex].y) / cubeFaceDepth) * cubeCookiePaddingScale)), vec2(0.0), vec2(1.0)) * _68._m0[cookieAtlasIndexU].zw);
                         }
-                        _3263 = _3157 * textureLod(sampler2D(texLightCookieAtlas, smpLinearClamp), _3256, 0.0).x;
+                        attenuationWithCookie = attenuationBeforeCookie * textureLod(sampler2D(texLightCookieAtlas, smpLinearClamp), cookieAtlasUv, 0.0).x;
                     }
                     else
                     {
-                        _3263 = _3157;
+                        attenuationWithCookie = attenuationBeforeCookie;
                     }
-                    float _3264 = _3263 * _3022;
-                    vec3 _3697;
+                    float finalLightAttenuation = attenuationWithCookie * lightShapeMaskFade;
+                    vec3 accumulatorAfterContribution;
                     do
                     {
-                        vec3 _3696;
+                        vec3 accumulatorCandidate;
                         SPIRV_CROSS_BRANCH
-                        if (_3264 > 9.9999997473787516355514526367188e-05)
+                        if (finalLightAttenuation > 9.9999997473787516355514526367188e-05)
                         {
                             SPIRV_CROSS_BRANCH
-                            if (_3052)
+                            if (isColorBlendLight)
                             {
-                                _3697 = mix(lightingAccumulatorAfterOneLight, _33._m6[_2923].xyz, vec3(_3264 * (_33._m6[_2935].x * ((1.0 - _33._m6[_2935].w) + (smoothstep(-0.5, 0.5, dot(geometryNormal, _3126)) * _33._m6[_2935].w)))));
+                                accumulatorAfterContribution = mix(lightingAccumulatorAfterOneLight, _33._m6[lightDataBaseIndex].xyz, vec3(finalLightAttenuation * (_33._m6[lightParamIndex].x * ((1.0 - _33._m6[lightParamIndex].w) + (smoothstep(-0.5, 0.5, dot(geometryNormal, effectiveLightDir)) * _33._m6[lightParamIndex].w)))));
                                 break;
                             }
-                            float _3284 = dot(shadingNormal, _3126);
-                            float _3285 = clamp(_3284, 0.0, 1.0);
-                            float _3572;
-                            if (_3035 != 0u)
+                            float rawNdotL = dot(shadingNormal, effectiveLightDir);
+                            float clampedNdotL = clamp(rawNdotL, 0.0, 1.0);
+                            float localShadowFactor;
+                            if (lightMode != 0u)
                             {
-                                int _3337;
-                                if (_3047)
+                                int localShadowIndex;
+                                if (usesSpotCone)
                                 {
-                                    _3337 = int(_33._m6[_2932].x);
+                                    localShadowIndex = int(_33._m6[lightModeShadowIndex].x);
                                 }
                                 else
                                 {
-                                    uint _3294 = floatBitsToUint(_33._m6[_2929].w);
-                                    uint _3296 = floatBitsToUint(_33._m6[_2932].x);
-                                    vec3 _3297 = vWorldPos - _33._m6[_2926].xyz;
-                                    vec3 _3298 = abs(_3297);
-                                    float _3299 = _3298.x;
-                                    float _3300 = _3298.y;
-                                    float _3302 = _3298.z;
-                                    int _3334;
-                                    if ((_3299 > _3300) && (_3299 > _3302))
+                                    uint packedPointShadowFacesXY = floatBitsToUint(_33._m6[lightDirectionShapeIndex].w);
+                                    uint packedPointShadowFacesZ = floatBitsToUint(_33._m6[lightModeShadowIndex].x);
+                                    vec3 lightToPixelOffset = vWorldPos - _33._m6[lightPositionRangeIndex].xyz;
+                                    vec3 absLightToPixelOffset = abs(lightToPixelOffset);
+                                    float absLightOffsetX = absLightToPixelOffset.x;
+                                    float absLightOffsetY = absLightToPixelOffset.y;
+                                    float absLightOffsetZ = absLightToPixelOffset.z;
+                                    int selectedPointShadowIndex;
+                                    if ((absLightOffsetX > absLightOffsetY) && (absLightOffsetX > absLightOffsetZ))
                                     {
-                                        _3334 = int((_3297.x > 0.0) ? (_3294 >> 24u) : ((_3294 >> 16u) & 255u));
+                                        selectedPointShadowIndex = int((lightToPixelOffset.x > 0.0) ? (packedPointShadowFacesXY >> 24u) : ((packedPointShadowFacesXY >> 16u) & 255u));
                                     }
                                     else
                                     {
-                                        int _3333;
-                                        if (_3300 > _3302)
+                                        int selectedPointShadowIndexYZ;
+                                        if (absLightOffsetY > absLightOffsetZ)
                                         {
-                                            _3333 = int((_3297.y > 0.0) ? ((_3294 >> 8u) & 255u) : (_3294 & 255u));
+                                            selectedPointShadowIndexYZ = int((lightToPixelOffset.y > 0.0) ? ((packedPointShadowFacesXY >> 8u) & 255u) : (packedPointShadowFacesXY & 255u));
                                         }
                                         else
                                         {
-                                            _3333 = int((_3297.z > 0.0) ? ((_3296 >> 8u) & 255u) : (_3296 & 255u));
+                                            selectedPointShadowIndexYZ = int((lightToPixelOffset.z > 0.0) ? ((packedPointShadowFacesZ >> 8u) & 255u) : (packedPointShadowFacesZ & 255u));
                                         }
-                                        _3334 = _3333;
+                                        selectedPointShadowIndex = selectedPointShadowIndexYZ;
                                     }
-                                    _3337 = (_3334 < 80) ? _3334 : (-1);
+                                    localShadowIndex = (selectedPointShadowIndex < 80) ? selectedPointShadowIndex : (-1);
                                 }
-                                bool _3338 = _3337 >= 0;
-                                float _3571;
-                                if (_3338)
+                                bool hasLocalShadow = localShadowIndex >= 0;
+                                float shadowVisibility;
+                                if (hasLocalShadow)
                                 {
-                                    vec3 _3342 = vWorldPos - _33._m6[_2926].xyz;
-                                    vec4 _3362 = vec4((vWorldPos - ((_3342 * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(_3342, _3342)))) * _37._m10[_3337].x)) + (geometryNormal * (_37._m10[_3337].y * 5.0)), 1.0) * _37._m9[_3337];
-                                    vec3 _3366 = _3362.xyz / vec3(_3362.w);
-                                    vec3 _3377 = _3366.xyz;
-                                    bvec3 _3378 = lessThanEqual(_3377, vec3(0.0));
-                                    bvec3 _3379 = greaterThanEqual(_3377, vec3(1.0));
-                                    float _3382 = _3366.z;
-                                    vec2 _3391 = ((_3366.xy * (_37._m11[_3337].zw - _37._m11[_3337].xy)) + _37._m11[_3337].xy).xy * _37._m12.zw;
-                                    vec2 _3393 = floor(_3391 + vec2(0.5));
-                                    vec2 _3394 = _3391 - _3393;
-                                    float _3395 = _3394.x;
-                                    float _3396 = _3395 + 0.5;
-                                    float _3397 = _3396 * _3396;
-                                    float _3400 = 1.0 - _3395;
-                                    float _3401 = spvNMin(_3395, 0.0);
-                                    float _3404 = _3395 + 1.0;
-                                    float _3405 = spvNMax(_3395, 0.0);
-                                    float _3416 = _3394.y;
-                                    float _3417 = _3416 + 0.5;
-                                    float _3418 = _3417 * _3417;
-                                    float _3421 = 1.0 - _3416;
-                                    float _3422 = spvNMin(_3416, 0.0);
-                                    float _3425 = _3416 + 1.0;
-                                    float _3426 = spvNMax(_3416, 0.0);
-                                    vec3 _3438 = vec3(0.1599999964237213134765625 * _3400, 0.1599999964237213134765625 * ((_3404 - (_3405 * _3405)) + 1.0), _3397 * 0.07999999821186065673828125);
-                                    vec3 _3439 = vec3(0.1599999964237213134765625 * ((_3397 * 0.5) - _3395), 0.1599999964237213134765625 * ((_3400 - (_3401 * _3401)) + 1.0), 0.1599999964237213134765625 * _3404) + _3438;
-                                    vec3 _3441 = vec3(0.1599999964237213134765625 * _3421, 0.1599999964237213134765625 * ((_3425 - (_3426 * _3426)) + 1.0), _3418 * 0.07999999821186065673828125);
-                                    vec3 _3442 = vec3(0.1599999964237213134765625 * ((_3418 * 0.5) - _3416), 0.1599999964237213134765625 * ((_3421 - (_3422 * _3422)) + 1.0), 0.1599999964237213134765625 * _3425) + _3441;
-                                    vec3 _3448 = ((_3438 / _3439) + vec3(-2.5, -0.5, 1.5)) * _37._m12.xxx;
-                                    vec3 _3450 = ((_3441 / _3442) + vec3(-2.5, -0.5, 1.5)) * _37._m12.yyy;
-                                    vec2 _3452 = _3393 * _37._m12.xy;
-                                    float _3453 = _3448.x;
-                                    float _3454 = _3450.x;
-                                    vec2 _3456 = _3452 + vec2(_3453, _3454);
-                                    float _3457 = _3448.y;
-                                    vec2 _3459 = _3452 + vec2(_3457, _3454);
-                                    float _3460 = _3448.z;
-                                    vec2 _3462 = _3452 + vec2(_3460, _3454);
-                                    float _3463 = _3450.y;
-                                    vec2 _3465 = _3452 + vec2(_3453, _3463);
-                                    vec2 _3467 = _3452 + vec2(_3457, _3463);
-                                    vec2 _3469 = _3452 + vec2(_3460, _3463);
-                                    float _3470 = _3450.z;
-                                    vec2 _3472 = _3452 + vec2(_3453, _3470);
-                                    vec2 _3474 = _3452 + vec2(_3457, _3470);
-                                    vec2 _3476 = _3452 + vec2(_3460, _3470);
-                                    float _3477 = _3439.x;
-                                    float _3478 = _3442.x;
-                                    float _3480 = _3439.y;
-                                    float _3482 = _3439.z;
-                                    float _3484 = _3442.y;
-                                    float _3488 = _3442.z;
-                                    float _3554 = ((((((((_3477 * _3478) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3456, _522).xy, _3382), 0.0)) + ((_3480 * _3478) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3459, _522).xy, _3382), 0.0))) + ((_3482 * _3478) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3462, _522).xy, _3382), 0.0))) + ((_3477 * _3484) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3465, _522).xy, _3382), 0.0))) + ((_3480 * _3484) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3467, _522).xy, _3382), 0.0))) + ((_3482 * _3484) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3469, _522).xy, _3382), 0.0))) + ((_3477 * _3488) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3472, _522).xy, _3382), 0.0))) + ((_3480 * _3488) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3474, _522).xy, _3382), 0.0));
-                                    _3571 = _3338 ? mix(1.0, (any(bvec3(_3378.x || _3379.x, _3378.y || _3379.y, _3378.z || _3379.z)) || ((floatBitsToUint(_3382) & 2147483647u) > 2139095040u)) ? 1.0 : (_3554 + ((_3482 * _3488) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(_3476, _522).xy, _3382), 0.0))), _37._m10[_3337].w) : 1.0;
+                                    // 本地光阴影：先投到阴影图，再用 3x3 separable PCF 权重采样。
+                                    vec3 shadowLightToPixel = vWorldPos - _33._m6[lightPositionRangeIndex].xyz;
+                                    vec4 shadowClipPos = vec4((vWorldPos - ((shadowLightToPixel * inversesqrt(spvNMax(1.1754943508222875079687365372222e-38, dot(shadowLightToPixel, shadowLightToPixel)))) * _37._m10[localShadowIndex].x)) + (geometryNormal * (_37._m10[localShadowIndex].y * 5.0)), 1.0) * _37._m9[localShadowIndex];
+                                    vec3 shadowUvDepth = shadowClipPos.xyz / vec3(shadowClipPos.w);
+                                    vec3 shadowBoundsCoord = shadowUvDepth.xyz;
+                                    bvec3 belowShadowBounds = lessThanEqual(shadowBoundsCoord, vec3(0.0));
+                                    bvec3 aboveShadowBounds = greaterThanEqual(shadowBoundsCoord, vec3(1.0));
+                                    float shadowCompareDepth = shadowUvDepth.z;
+                                    vec2 shadowTexelPos = ((shadowUvDepth.xy * (_37._m11[localShadowIndex].zw - _37._m11[localShadowIndex].xy)) + _37._m11[localShadowIndex].xy).xy * _37._m12.zw;
+                                    vec2 shadowTexelCenter = floor(shadowTexelPos + vec2(0.5));
+                                    vec2 shadowTexelFrac = shadowTexelPos - shadowTexelCenter;
+                                    float shadowFracX = shadowTexelFrac.x;
+                                    float shadowFracXPlusHalf = shadowFracX + 0.5;
+                                    float shadowFracXPlusHalfSq = shadowFracXPlusHalf * shadowFracXPlusHalf;
+                                    float shadowOneMinusFracX = 1.0 - shadowFracX;
+                                    float shadowFracXMinZero = spvNMin(shadowFracX, 0.0);
+                                    float shadowFracXPlusOne = shadowFracX + 1.0;
+                                    float shadowFracXMaxZero = spvNMax(shadowFracX, 0.0);
+                                    float shadowFracY = shadowTexelFrac.y;
+                                    float shadowFracYPlusHalf = shadowFracY + 0.5;
+                                    float shadowFracYPlusHalfSq = shadowFracYPlusHalf * shadowFracYPlusHalf;
+                                    float shadowOneMinusFracY = 1.0 - shadowFracY;
+                                    float shadowFracYMinZero = spvNMin(shadowFracY, 0.0);
+                                    float shadowFracYPlusOne = shadowFracY + 1.0;
+                                    float shadowFracYMaxZero = spvNMax(shadowFracY, 0.0);
+                                    vec3 shadowFilterNumeratorX = vec3(0.1599999964237213134765625 * shadowOneMinusFracX, 0.1599999964237213134765625 * ((shadowFracXPlusOne - (shadowFracXMaxZero * shadowFracXMaxZero)) + 1.0), shadowFracXPlusHalfSq * 0.07999999821186065673828125);
+                                    vec3 shadowFilterWeightX = vec3(0.1599999964237213134765625 * ((shadowFracXPlusHalfSq * 0.5) - shadowFracX), 0.1599999964237213134765625 * ((shadowOneMinusFracX - (shadowFracXMinZero * shadowFracXMinZero)) + 1.0), 0.1599999964237213134765625 * shadowFracXPlusOne) + shadowFilterNumeratorX;
+                                    vec3 shadowFilterNumeratorY = vec3(0.1599999964237213134765625 * shadowOneMinusFracY, 0.1599999964237213134765625 * ((shadowFracYPlusOne - (shadowFracYMaxZero * shadowFracYMaxZero)) + 1.0), shadowFracYPlusHalfSq * 0.07999999821186065673828125);
+                                    vec3 shadowFilterWeightY = vec3(0.1599999964237213134765625 * ((shadowFracYPlusHalfSq * 0.5) - shadowFracY), 0.1599999964237213134765625 * ((shadowOneMinusFracY - (shadowFracYMinZero * shadowFracYMinZero)) + 1.0), 0.1599999964237213134765625 * shadowFracYPlusOne) + shadowFilterNumeratorY;
+                                    vec3 shadowSampleOffsetX = ((shadowFilterNumeratorX / shadowFilterWeightX) + vec3(-2.5, -0.5, 1.5)) * _37._m12.xxx;
+                                    vec3 shadowSampleOffsetY = ((shadowFilterNumeratorY / shadowFilterWeightY) + vec3(-2.5, -0.5, 1.5)) * _37._m12.yyy;
+                                    vec2 shadowBaseUv = shadowTexelCenter * _37._m12.xy;
+                                    float shadowOffsetX0 = shadowSampleOffsetX.x;
+                                    float shadowOffsetY0 = shadowSampleOffsetY.x;
+                                    vec2 shadowSampleUv00 = shadowBaseUv + vec2(shadowOffsetX0, shadowOffsetY0);
+                                    float shadowOffsetX1 = shadowSampleOffsetX.y;
+                                    vec2 shadowSampleUv10 = shadowBaseUv + vec2(shadowOffsetX1, shadowOffsetY0);
+                                    float shadowOffsetX2 = shadowSampleOffsetX.z;
+                                    vec2 shadowSampleUv20 = shadowBaseUv + vec2(shadowOffsetX2, shadowOffsetY0);
+                                    float shadowOffsetY1 = shadowSampleOffsetY.y;
+                                    vec2 shadowSampleUv01 = shadowBaseUv + vec2(shadowOffsetX0, shadowOffsetY1);
+                                    vec2 shadowSampleUv11 = shadowBaseUv + vec2(shadowOffsetX1, shadowOffsetY1);
+                                    vec2 shadowSampleUv21 = shadowBaseUv + vec2(shadowOffsetX2, shadowOffsetY1);
+                                    float shadowOffsetY2 = shadowSampleOffsetY.z;
+                                    vec2 shadowSampleUv02 = shadowBaseUv + vec2(shadowOffsetX0, shadowOffsetY2);
+                                    vec2 shadowSampleUv12 = shadowBaseUv + vec2(shadowOffsetX1, shadowOffsetY2);
+                                    vec2 shadowSampleUv22 = shadowBaseUv + vec2(shadowOffsetX2, shadowOffsetY2);
+                                    float shadowWeightX0 = shadowFilterWeightX.x;
+                                    float shadowWeightY0 = shadowFilterWeightY.x;
+                                    float shadowWeightX1 = shadowFilterWeightX.y;
+                                    float shadowWeightX2 = shadowFilterWeightX.z;
+                                    float shadowWeightY1 = shadowFilterWeightY.y;
+                                    float shadowWeightY2 = shadowFilterWeightY.z;
+                                    float shadowFilteredFirstEightTaps = ((((((((shadowWeightX0 * shadowWeightY0) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv00, _522).xy, shadowCompareDepth), 0.0)) + ((shadowWeightX1 * shadowWeightY0) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv10, _522).xy, shadowCompareDepth), 0.0))) + ((shadowWeightX2 * shadowWeightY0) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv20, _522).xy, shadowCompareDepth), 0.0))) + ((shadowWeightX0 * shadowWeightY1) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv01, _522).xy, shadowCompareDepth), 0.0))) + ((shadowWeightX1 * shadowWeightY1) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv11, _522).xy, shadowCompareDepth), 0.0))) + ((shadowWeightX2 * shadowWeightY1) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv21, _522).xy, shadowCompareDepth), 0.0))) + ((shadowWeightX0 * shadowWeightY2) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv02, _522).xy, shadowCompareDepth), 0.0))) + ((shadowWeightX1 * shadowWeightY2) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv12, _522).xy, shadowCompareDepth), 0.0));
+                                    shadowVisibility = hasLocalShadow ? mix(1.0, (any(bvec3(belowShadowBounds.x || aboveShadowBounds.x, belowShadowBounds.y || aboveShadowBounds.y, belowShadowBounds.z || aboveShadowBounds.z)) || ((floatBitsToUint(shadowCompareDepth) & 2147483647u) > 2139095040u)) ? 1.0 : (shadowFilteredFirstEightTaps + ((shadowWeightX2 * shadowWeightY2) * textureLod(sampler2DShadow(texLocalLightShadowDepth, smpShadow), vec3(vec3(shadowSampleUv22, _522).xy, shadowCompareDepth), 0.0))), _37._m10[localShadowIndex].w) : 1.0;
                                 }
                                 else
                                 {
-                                    _3571 = clamp(dot(rootToPixelDir, _3126) + 1.0, 0.0, 1.0);
+                                    shadowVisibility = clamp(dot(rootToPixelDir, effectiveLightDir) + 1.0, 0.0, 1.0);
                                 }
-                                _3572 = _3571;
+                                localShadowFactor = shadowVisibility;
                             }
                             else
                             {
-                                _3572 = 1.0;
+                                localShadowFactor = 1.0;
                             }
-                            float _3652;
-                            vec3 _3653;
-                            float _3654;
-                            vec3 _3655;
-                            vec3 _3656;
-                            float _3657;
-                            float _3658;
+                            float contributionIntensity;
+                            vec3 contributionColor;
+                            float diffuseBlendFactor;
+                            vec3 litDiffuseTerm;
+                            vec3 darkDiffuseTerm;
+                            float specularScale;
+                            float sharpSpecularBlend;
                             SPIRV_CROSS_BRANCH
-                            if (_3035 == 0u)
+                            // 不同 lightMode 会改写漫反射、边缘光、粗糙度/金属度遮罩等参与方式。
+                            if (lightMode == 0u)
                             {
-                                vec3 _3578 = _33._m6[_2923].xyz * _3264;
-                                vec3 _3591 = diffuseAndShadow.xyz;
-                                _3652 = _3264;
-                                _3653 = (_33._m6[_2923].xyz * ((1.0 - _33._m6[_2935].y) + ((1.0 / spvNMax(1.0, spvNMax(spvNMax(_3578.x, _3578.y), _3578.z) * mix(0.75, 0.5, shadowedAmount))) * _33._m6[_2935].y))) * mix(0.25 * _33._m6[_2935].x, 1.0, clamp(_3284 + 0.5, 0.0, 1.0));
-                                _3654 = _3285;
-                                _3655 = _3591;
-                                _3656 = _3591;
-                                _3657 = 1.0;
-                                _3658 = 0.0;
+                                vec3 attenuatedLightColorPreview = _33._m6[lightDataBaseIndex].xyz * finalLightAttenuation;
+                                vec3 defaultLocalDiffuseTerm = diffuseAndShadow.xyz;
+                                contributionIntensity = finalLightAttenuation;
+                                contributionColor = (_33._m6[lightDataBaseIndex].xyz * ((1.0 - _33._m6[lightParamIndex].y) + ((1.0 / spvNMax(1.0, spvNMax(spvNMax(attenuatedLightColorPreview.x, attenuatedLightColorPreview.y), attenuatedLightColorPreview.z) * mix(0.75, 0.5, shadowedAmount))) * _33._m6[lightParamIndex].y))) * mix(0.25 * _33._m6[lightParamIndex].x, 1.0, clamp(rawNdotL + 0.5, 0.0, 1.0));
+                                diffuseBlendFactor = clampedNdotL;
+                                litDiffuseTerm = defaultLocalDiffuseTerm;
+                                darkDiffuseTerm = defaultLocalDiffuseTerm;
+                                specularScale = 1.0;
+                                sharpSpecularBlend = 0.0;
                             }
                             else
                             {
-                                float _3646;
-                                float _3647;
-                                vec3 _3648;
-                                vec3 _3649;
-                                float _3650;
-                                float _3651;
-                                if (_3035 == 3u)
+                                float selectedContributionIntensity;
+                                float selectedDiffuseBlendFactor;
+                                vec3 selectedLitDiffuseTerm;
+                                vec3 selectedDarkDiffuseTerm;
+                                float selectedSpecularScale;
+                                float selectedSharpSpecularBlend;
+                                if (lightMode == 3u)
                                 {
-                                    _3646 = _3264 * (smoothstep(mix(0.800000011920928955078125, 0.20000000298023223876953125, _33._m6[_2935].x), mix(0.89999997615814208984375, 0.5, _33._m6[_2935].x), viewEdgeFactor) * _3572);
-                                    _3647 = clamp(dot(shadingNormal, -normalize(cross(worldCameraForward, cross(worldCameraForward, _3126)))), 0.0, 1.0);
-                                    _3648 = mix(vec3(0.5), diffuseAlbedo, vec3(_33._m6[_2935].y));
-                                    _3649 = vec3(0.0);
-                                    _3650 = 1.0;
-                                    _3651 = 0.0;
+                                    selectedContributionIntensity = finalLightAttenuation * (smoothstep(mix(0.8, 0.2, _33._m6[lightParamIndex].x), mix(0.9, 0.5, _33._m6[lightParamIndex].x), viewEdgeFactor) * localShadowFactor);
+                                    selectedDiffuseBlendFactor = clamp(dot(shadingNormal, -normalize(cross(worldCameraForward, cross(worldCameraForward, effectiveLightDir)))), 0.0, 1.0);
+                                    selectedLitDiffuseTerm = mix(vec3(0.5), diffuseAlbedo, vec3(_33._m6[lightParamIndex].y));
+                                    selectedDarkDiffuseTerm = vec3(0.0);
+                                    selectedSpecularScale = 1.0;
+                                    selectedSharpSpecularBlend = 0.0;
                                 }
                                 else
                                 {
-                                    bool _3616 = _3035 == 1u;
-                                    float _3640;
-                                    vec3 _3641;
-                                    float _3642;
-                                    float _3643;
-                                    if (_3616)
+                                    bool isWrapDiffuseMode = lightMode == 1u;
+                                    float modeDiffuseBlendFactor;
+                                    vec3 modeDarkDiffuseTerm;
+                                    float modeSpecularScale;
+                                    float modeSharpSpecularBlend;
+                                    if (isWrapDiffuseMode)
                                     {
-                                        _3640 = clamp(clamp(_3284 + _33._m6[_2935].x, -1.0, 1.0), 0.0, 1.0) * _3572;
-                                        _3641 = diffuseLightingAlbedo * _33._m6[_2935].y;
-                                        _3642 = 1.0;
-                                        _3643 = 0.0;
+                                        modeDiffuseBlendFactor = clamp(clamp(rawNdotL + _33._m6[lightParamIndex].x, -1.0, 1.0), 0.0, 1.0) * localShadowFactor;
+                                        modeDarkDiffuseTerm = diffuseLightingAlbedo * _33._m6[lightParamIndex].y;
+                                        modeSpecularScale = 1.0;
+                                        modeSharpSpecularBlend = 0.0;
                                     }
                                     else
                                     {
-                                        bool _3626 = _3035 == 2u;
-                                        float _3638;
-                                        if (_3626)
+                                        bool isSpecularMaskMode = lightMode == 2u;
+                                        float specularMaskFactor;
+                                        if (isSpecularMaskMode)
                                         {
-                                            _3638 = smoothstep(_33._m6[_2935].x + 0.0500000007450580596923828125, _33._m6[_2935].x - 0.0500000007450580596923828125, finalPerceptualRoughness) * ((1.0 - _33._m6[_2935].z) + (step(0.5, metallicMask) * _33._m6[_2935].z));
+                                            specularMaskFactor = smoothstep(_33._m6[lightParamIndex].x + 0.0500000007450580596923828125, _33._m6[lightParamIndex].x - 0.0500000007450580596923828125, finalPerceptualRoughness) * ((1.0 - _33._m6[lightParamIndex].z) + (step(0.5, metallicMask) * _33._m6[lightParamIndex].z));
                                         }
                                         else
                                         {
-                                            _3638 = 1.0;
+                                            specularMaskFactor = 1.0;
                                         }
-                                        _3640 = _3285;
-                                        _3641 = vec3(0.0);
-                                        _3642 = _3638;
-                                        _3643 = _3626 ? _33._m6[_2935].y : 0.0;
+                                        modeDiffuseBlendFactor = clampedNdotL;
+                                        modeDarkDiffuseTerm = vec3(0.0);
+                                        modeSpecularScale = specularMaskFactor;
+                                        modeSharpSpecularBlend = isSpecularMaskMode ? _33._m6[lightParamIndex].y : 0.0;
                                     }
-                                    _3646 = _3264;
-                                    _3647 = _3640;
-                                    _3648 = mix(vec3(0.0), diffuseAlbedo, bvec3(_3616));
-                                    _3649 = _3641;
-                                    _3650 = _3642;
-                                    _3651 = _3643;
+                                    selectedContributionIntensity = finalLightAttenuation;
+                                    selectedDiffuseBlendFactor = modeDiffuseBlendFactor;
+                                    selectedLitDiffuseTerm = mix(vec3(0.0), diffuseAlbedo, bvec3(isWrapDiffuseMode));
+                                    selectedDarkDiffuseTerm = modeDarkDiffuseTerm;
+                                    selectedSpecularScale = modeSpecularScale;
+                                    selectedSharpSpecularBlend = modeSharpSpecularBlend;
                                 }
-                                _3652 = _3646;
-                                _3653 = _33._m6[_2923].xyz;
-                                _3654 = _3647;
-                                _3655 = _3648;
-                                _3656 = _3649;
-                                _3657 = _3650;
-                                _3658 = _3651;
+                                contributionIntensity = selectedContributionIntensity;
+                                contributionColor = _33._m6[lightDataBaseIndex].xyz;
+                                diffuseBlendFactor = selectedDiffuseBlendFactor;
+                                litDiffuseTerm = selectedLitDiffuseTerm;
+                                darkDiffuseTerm = selectedDarkDiffuseTerm;
+                                specularScale = selectedSpecularScale;
+                                sharpSpecularBlend = selectedSharpSpecularBlend;
                             }
-                            vec3 _3686;
+                            vec3 localSpecularBrdf;
                             SPIRV_CROSS_BRANCH
-                            if (_3035 != 3u)
+                            if (lightMode != 3u)
                             {
-                                float _3663 = mix(roughness2Clamped, 0.00999999977648258209228515625, _3658);
-                                float _3666 = dot(normalForLighting, normalize(_3126 + viewDir));
-                                float _3667 = _3663 * _3663;
-                                float _3671 = (((_3666 * _3667) - _3666) * _3666) + 1.0;
-                                float _3672 = _3671 * _3671;
-                                _3686 = ((f0TintedByLut * clamp((((_3667 != _3672) ? (_3667 / _3672) : 1.0) * (0.5 / ((smithViewTermA + (_3663 * smithViewTermB)) + 9.9999997473787516355514526367188e-05))) - 6.103515625e-05, 0.0, 20.0)) * _3657) * _33._m6[_2944].z;
+                                float localRoughness2 = mix(roughness2Clamped, 0.01, sharpSpecularBlend);
+                                float localHalfNdot = dot(normalForLighting, normalize(effectiveLightDir + viewDir));
+                                float localRoughness4 = localRoughness2 * localRoughness2;
+                                float localGgxDenom = (((localHalfNdot * localRoughness4) - localHalfNdot) * localHalfNdot) + 1.0;
+                                float localGgxDenomSq = localGgxDenom * localGgxDenom;
+                                localSpecularBrdf = ((f0TintedByLut * clamp((((localRoughness4 != localGgxDenomSq) ? (localRoughness4 / localGgxDenomSq) : 1.0) * (0.5 / ((smithViewTermA + (localRoughness2 * smithViewTermB)) + 9.9999997473787516355514526367188e-05))) - 6.103515625e-05, 0.0, 20.0)) * specularScale) * _33._m6[lightExtraIndex].z;
                             }
                             else
                             {
-                                _3686 = vec3(0.0);
+                                localSpecularBrdf = vec3(0.0);
                             }
-                            vec3 _3689 = _3653 * _3652;
-                            _3696 = lightingAccumulatorAfterOneLight + (((_3689 * mix(_3656, _3655, vec3(_3654))) * alphaLightingScale) + ((_3689 * _3686) * _3654));
+                            vec3 attenuatedContributionColor = contributionColor * contributionIntensity;
+                            // 漫反射按 diffuseBlendFactor 在暗部/亮部项之间插值，高光走局部 GGX BRDF。
+                            accumulatorCandidate = lightingAccumulatorAfterOneLight + (((attenuatedContributionColor * mix(darkDiffuseTerm, litDiffuseTerm, vec3(diffuseBlendFactor))) * alphaLightingScale) + ((attenuatedContributionColor * localSpecularBrdf) * diffuseBlendFactor));
                         }
                         else
                         {
-                            _3696 = lightingAccumulatorAfterOneLight;
+                            accumulatorCandidate = lightingAccumulatorAfterOneLight;
                         }
-                        _3697 = _3696;
+                        accumulatorAfterContribution = accumulatorCandidate;
                         break;
                     } while(false);
-                    _3698 = _3697;
+                    accumulatorAfterLocalLight = accumulatorAfterContribution;
                     break;
                 } while(false);
-                _3699 = _3698;
+                accumulatorAfterThisLight = accumulatorAfterLocalLight;
             }
             else
             {
-                _3699 = lightingAccumulatorAfterOneLight;
+                accumulatorAfterThisLight = lightingAccumulatorAfterOneLight;
             }
-            _2910 = _3699;
+            accumulatedAfterCurrentLight = accumulatorAfterThisLight;
         }
     }
     vec3 colorBeforeExposureFog;

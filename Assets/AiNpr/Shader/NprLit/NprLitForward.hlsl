@@ -604,7 +604,7 @@ void Frag(PackedVaryingsToPS packedInput
 
             float mainDirectLuma = Luminance(mainDirectLighting);
             float mainDirectLumaOverHalf = clamp(mainDirectLuma - 0.5, 0.0, 0.5);
-            float2 _17_m110xy = float2(0, -1.00);
+            float2 _17_m110xy = float2(0, 1.00);
             float3 rimLightDir = normalize(cross(worldCameraForward, float3(_17_m110xy, 0.0)));    //_17._m110.xy = 8.74228E-08, -1.00
             float vdotn = dot(viewDirWS, shadingNormal);
             float viewEdgeFactor = 1.0 - abs(vdotn);
@@ -690,8 +690,8 @@ void Frag(PackedVaryingsToPS packedInput
                 float _17_m110z = 0.00;
                 float3 rimAlbedo = lerp(0.25, diffuseAlbedo, _17_m110z);
 
-                float3 _17_m109xyz = 0.00;
-                float _17_m109w = 1.00;
+                float3 _17_m109xyz = 1.00;
+                float _17_m109w = 5.00;
                 rimLighting =
                     _17_m109xyz
                     * rimEdgeMask
@@ -811,8 +811,9 @@ void Frag(PackedVaryingsToPS packedInput
             //lightingAccumulator = (directAndRimLighting + (((emissionSample.xyz * _51._m21.xyz) * _51._m7) * alphaLightingScale)) + (((textureLod(samplerCube(texReflectionCube, smpLinearClamp), reflect(viewDirFromSurface, normalForLighting), (1.2000000476837158203125 * log2(spvNMax(iblPerceptualRoughness, 0.001000000047497451305389404296875))) + 5.0).xyz * ((iblSpecularScaleBias + ((finalSpecularF0 * ((1.0 - iblScaleBiasSum) / iblScaleBiasSum)) * iblSpecularScaleBias)) * 1.0)) * ((clamp(probeIntensity, 0.5, 1.5) * _17._m101.w) * directIntensityScale)) * probeColorTint);    //_51._m21.xyz = 0.34793, 0.68676, 1.00; _51._m7 = 0.75; _17._m101.w = 0.90
             float3 lightingAccumulatorAfterOneLight;
             // 12. Clustered/Forward+ 动态光循环。屏幕图块和深度切片遮罩选择光源，然后累加漫反射和高光。
-        
 
+
+        
             float4 nprLitDebugColor;
             bool isNprLitDebugOutput = TryGetNprLitDebugColor(
                 _NprLitDebugEnabled > 0.5,
