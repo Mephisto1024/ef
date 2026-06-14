@@ -23,7 +23,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_Saixi_Hair
+  m_Name: M_saixi_hair
   m_Shader: {fileID: 4800000, guid: 09cd9e30bde7ea64f81fadddf76beacc, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0

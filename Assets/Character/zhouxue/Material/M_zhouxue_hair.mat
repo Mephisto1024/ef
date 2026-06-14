@@ -223,7 +223,7 @@ Material:
     - _NormalMapSpace: 0
     - _NormalScale: 1
     - _NprHairDebugEnabled: 1
-    - _NprHairDebugMode: 0
+    - _NprHairDebugMode: 14
     - _ObjectSpaceUVMapping: 0
     - _ObjectSpaceUVMappingEmissive: 0
     - _OpaqueCullMode: 2
